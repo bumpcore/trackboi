@@ -16,6 +16,7 @@ import type {
 	Board,
 	Card,
 	CardPatch,
+	FieldValue,
 	GitContext,
 	Project,
 	ProjectIndex,
@@ -63,6 +64,7 @@ const DEFAULT_COLUMNS = [
 ];
 const DEFAULT_STORAGE_SEARCH_PATHS = [".etc/.trackboi", ".etc/trackboi", ".trackboi"];
 const PROJECT_METADATA_FILE = "project.json";
+const DEFAULT_BOARD_ID = "default";
 
 const DIGITS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 const MIN_DIGIT = 0;
@@ -121,8 +123,12 @@ async function cardsPath(rootPath: string) {
 	return join(rootPath, "cards");
 }
 
+async function boardsPath(rootPath: string) {
+	return join(rootPath, "boards");
+}
+
 async function boardPath(rootPath: string) {
-	return join(rootPath, "board.json");
+	return join(await boardsPath(rootPath), `${DEFAULT_BOARD_ID}.json`);
 }
 
 async function projectMetadataPath(rootPath: string) {
@@ -189,7 +195,45 @@ function asBoard(value: unknown): Board {
 			}
 			return { id: column.id, name: column.name };
 		}),
+		customFields: Array.isArray(board.customFields)
+			? board.customFields.flatMap((field) => {
+				if (
+					typeof field !== "object" ||
+					field == null ||
+					typeof field.id !== "string" ||
+					typeof field.name !== "string" ||
+					!["text", "number", "checkbox", "select", "date"].includes(String(field.type))
+				) {
+					return [];
+				}
+
+				return [{
+					id: field.id,
+					name: field.name,
+					type: field.type,
+					options: Array.isArray(field.options)
+						? field.options.filter((option): option is string => typeof option === "string")
+						: undefined,
+				}];
+			})
+			: [],
 	};
+}
+
+function asFieldValues(value: unknown): Record<string, FieldValue> {
+	if (typeof value !== "object" || value == null || Array.isArray(value)) return {};
+	const values: Record<string, FieldValue> = {};
+	for (const [key, fieldValue] of Object.entries(value)) {
+		if (
+			typeof fieldValue === "string" ||
+			typeof fieldValue === "number" ||
+			typeof fieldValue === "boolean" ||
+			fieldValue == null
+		) {
+			values[key] = fieldValue;
+		}
+	}
+	return values;
 }
 
 function asCard(value: unknown, expectedId?: string): Card {
@@ -219,11 +263,13 @@ function asCard(value: unknown, expectedId?: string): Card {
 		id: card.id,
 		title: card.title,
 		description: card.description,
+		parentId: typeof card.parentId === "string" ? card.parentId : null,
 		scope: asScope(card.scope),
 		column: card.column,
 		rank: card.rank,
 		labels: card.labels.filter((label): label is string => typeof label === "string"),
 		assignee: typeof card.assignee === "string" ? card.assignee : null,
+		fieldValues: asFieldValues(card.fieldValues),
 		createdAt: card.createdAt,
 		updatedAt: card.updatedAt,
 	};
@@ -496,6 +542,7 @@ async function ensureProject(project: Project): Promise<ProjectSnapshot> {
 	const storage = await resolveProjectStorage(project, registry, { create: true });
 	if (!storage) throw new Error("Unable to resolve Trackboi storage path");
 
+	await mkdir(await boardsPath(storage.rootPath), { recursive: true });
 	await mkdir(await cardsPath(storage.rootPath), { recursive: true });
 	await writeProjectMetadata(storage.rootPath, project, storage.storagePath);
 
@@ -505,6 +552,7 @@ async function ensureProject(project: Project): Promise<ProjectSnapshot> {
 			version: 1,
 			name: project.name || await basename(project.path),
 			columns: DEFAULT_COLUMNS,
+			customFields: [],
 		};
 		await atomicWriteJson(path, board);
 	}
@@ -590,7 +638,13 @@ async function tauriLocateProject(projectId: string) {
 	return snapshot;
 }
 
-async function tauriCreateCard(input: { title: string; description?: string; column: string }) {
+async function tauriCreateCard(input: {
+	title: string;
+	description?: string;
+	parentId?: string | null;
+	column: string;
+	scope?: WorkScope;
+}) {
 	const project = await requireActiveProject();
 	const registry = await readRegistry();
 	const storage = await resolveProjectStorage(project, registry, { create: true });
@@ -604,11 +658,13 @@ async function tauriCreateCard(input: { title: string; description?: string; col
 		id: `card_${crypto.randomUUID()}`,
 		title: input.title.trim(),
 		description: input.description?.trim() ?? "",
-		scope: scopeForGitContext(snapshot.git),
+		parentId: input.parentId ?? null,
+		scope: input.scope ?? scopeForGitContext(snapshot.git),
 		column: input.column,
 		rank: rankBetween(columnCards.at(-1)?.rank ?? null, null),
 		labels: [],
 		assignee: null,
+		fieldValues: {},
 		createdAt: timestamp,
 		updatedAt: timestamp,
 	};
@@ -638,6 +694,18 @@ async function tauriUpdateCard(cardId: string, patch: CardPatch) {
 	next.description = next.description.trim();
 
 	await atomicWriteJson(await cardPath(storage.rootPath, cardId), next);
+	await broadcastBoardChanged();
+	return next;
+}
+
+async function tauriUpdateBoard(board: Board) {
+	const project = await requireActiveProject();
+	const registry = await readRegistry();
+	const storage = await resolveProjectStorage(project, registry, { create: false });
+	if (!storage) throw new Error("Trackboi storage has not been created for this project");
+
+	const next = asBoard(board);
+	await atomicWriteJson(await boardPath(storage.rootPath), next);
 	await broadcastBoardChanged();
 	return next;
 }
@@ -741,13 +809,23 @@ export const desktop = {
 		await writeRegistry(registry);
 		return broadcastBoardChanged();
 	},
-	async createCard(input: { title: string; description?: string; column: string }) {
+	async createCard(input: {
+		title: string;
+		description?: string;
+		parentId?: string | null;
+		column: string;
+		scope?: WorkScope;
+	}) {
 		return isTauri ? tauriCreateCard(input) : (await getElectrobunRpc()).request.createCard(input);
 	},
 	async updateCard(cardId: string, patch: CardPatch) {
 		return isTauri
 			? tauriUpdateCard(cardId, patch)
 			: (await getElectrobunRpc()).request.updateCard({ cardId, patch });
+	},
+	async updateBoard(board: Board) {
+		if (isTauri) return tauriUpdateBoard(board);
+		throw new Error("Board settings are only available in the Tauri shell");
 	},
 	async moveCard(cardId: string, toColumn: string, beforeCardId: string | null) {
 		return isTauri

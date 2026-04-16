@@ -1,4 +1,4 @@
-import type { Card, CardPatch, ProjectRegistry, ProjectSnapshot, WindowFrame } from "./types";
+import type { Card, CardPatch, ProjectRegistry, ProjectSnapshot, WindowFrame, WorkScope } from "./types";
 
 export type TrackboiRPCSchema = {
 	bun: {
@@ -25,7 +25,9 @@ export type TrackboiRPCSchema = {
 				params: {
 					title: string;
 					description?: string;
+					parentId?: string | null;
 					column: string;
+					scope?: WorkScope;
 				};
 				response: Card;
 			};

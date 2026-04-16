@@ -7,11 +7,13 @@ import {
 	stat,
 	unlink,
 } from "node:fs/promises";
-import type { Board, Card, CardPatch, Project, ProjectSnapshot } from "../../shared/types";
+import type { Board, Card, CardPatch, FieldValue, Project, ProjectSnapshot } from "../../shared/types";
 import { rankBetween } from "./rank";
 
 const TRACKBOI_DIR = ".trackboi";
 const CARDS_DIR = "cards";
+const BOARDS_DIR = "boards";
+const DEFAULT_BOARD_ID = "default";
 
 const DEFAULT_COLUMNS = [
 	{ id: "todo", name: "To Do" },
@@ -28,7 +30,11 @@ function globalScope() {
 }
 
 function boardPath(projectPath: string) {
-	return join(projectPath, TRACKBOI_DIR, "board.json");
+	return join(projectPath, TRACKBOI_DIR, BOARDS_DIR, `${DEFAULT_BOARD_ID}.json`);
+}
+
+function boardsPath(projectPath: string) {
+	return join(projectPath, TRACKBOI_DIR, BOARDS_DIR);
 }
 
 function cardsPath(projectPath: string) {
@@ -76,7 +82,45 @@ function asBoard(value: unknown): Board {
 			}
 			return { id: column.id, name: column.name };
 		}),
+		customFields: Array.isArray(board.customFields)
+			? board.customFields.flatMap((field) => {
+				if (
+					typeof field !== "object" ||
+					field == null ||
+					typeof field.id !== "string" ||
+					typeof field.name !== "string" ||
+					!["text", "number", "checkbox", "select", "date"].includes(String(field.type))
+				) {
+					return [];
+				}
+
+				return [{
+					id: field.id,
+					name: field.name,
+					type: field.type,
+					options: Array.isArray(field.options)
+						? field.options.filter((option): option is string => typeof option === "string")
+						: undefined,
+				}];
+			})
+			: [],
 	};
+}
+
+function asFieldValues(value: unknown): Record<string, FieldValue> {
+	if (typeof value !== "object" || value == null || Array.isArray(value)) return {};
+	const values: Record<string, FieldValue> = {};
+	for (const [key, fieldValue] of Object.entries(value)) {
+		if (
+			typeof fieldValue === "string" ||
+			typeof fieldValue === "number" ||
+			typeof fieldValue === "boolean" ||
+			fieldValue == null
+		) {
+			values[key] = fieldValue;
+		}
+	}
+	return values;
 }
 
 function asCard(value: unknown, expectedId?: string): Card {
@@ -103,6 +147,7 @@ function asCard(value: unknown, expectedId?: string): Card {
 		id: card.id,
 		title: card.title,
 		description: card.description,
+		parentId: typeof card.parentId === "string" ? card.parentId : null,
 		scope: card.scope?.kind === "branch" && typeof card.scope.ref === "string"
 			? { kind: "branch", ref: card.scope.ref }
 			: globalScope(),
@@ -110,6 +155,7 @@ function asCard(value: unknown, expectedId?: string): Card {
 		rank: card.rank,
 		labels: card.labels.filter((label): label is string => typeof label === "string"),
 		assignee: typeof card.assignee === "string" ? card.assignee : null,
+		fieldValues: asFieldValues(card.fieldValues),
 		createdAt: card.createdAt,
 		updatedAt: card.updatedAt,
 	};
@@ -132,6 +178,7 @@ export async function findNearestGitRoot(startPath: string) {
 
 export async function ensureProject(projectPath: string): Promise<ProjectSnapshot> {
 	const resolvedPath = resolve(projectPath);
+	await mkdir(boardsPath(resolvedPath), { recursive: true });
 	await mkdir(cardsPath(resolvedPath), { recursive: true });
 
 	if (!(await exists(boardPath(resolvedPath)))) {
@@ -139,6 +186,7 @@ export async function ensureProject(projectPath: string): Promise<ProjectSnapsho
 			version: 1,
 			name: basename(resolvedPath),
 			columns: DEFAULT_COLUMNS,
+			customFields: [],
 		};
 		await atomicWriteJson(boardPath(resolvedPath), board);
 	}
@@ -184,7 +232,9 @@ export async function readProject(projectPath: string): Promise<ProjectSnapshot>
 export async function createCard(projectPath: string, input: {
 	title: string;
 	description?: string;
+	parentId?: string | null;
 	column: string;
+	scope?: Card["scope"];
 }) {
 	const snapshot = await readProject(projectPath);
 	if (!snapshot.board.columns.some((column) => column.id === input.column)) {
@@ -200,11 +250,13 @@ export async function createCard(projectPath: string, input: {
 		id: `card_${crypto.randomUUID()}`,
 		title: input.title.trim(),
 		description: input.description?.trim() ?? "",
-		scope: globalScope(),
+		parentId: input.parentId ?? null,
+		scope: input.scope ?? globalScope(),
 		column: input.column,
 		rank: rankBetween(previous, null),
 		labels: [],
 		assignee: null,
+		fieldValues: {},
 		createdAt: timestamp,
 		updatedAt: timestamp,
 	};

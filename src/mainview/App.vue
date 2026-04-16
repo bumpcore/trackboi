@@ -21,14 +21,22 @@ import { desktop } from "./lib/desktop";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card as UiCard } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import type { SelectOption } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type {
+	Column,
+	CustomField,
 	Card as TrackboiCard,
+	FieldType,
+	FieldValue,
 	ProjectIndex,
 	ProjectIndexEntry,
 	ProjectSnapshot,
+	WorkScope,
 	WindowFrame,
 } from "../shared/types";
 
@@ -38,26 +46,106 @@ const loading = ref(true);
 const busy = ref(false);
 const error = ref<string | null>(null);
 const settingsOpen = ref(false);
+const projectSettingsOpen = ref(false);
 const draftTitle = ref("");
 const draftDescription = ref("");
 const draftColumn = ref("todo");
+const subtaskTitle = ref("");
 const storagePathDraft = ref("");
+const fieldNameDraft = ref("");
+const fieldTypeDraft = ref<FieldType>("text");
+const fieldOptionsDraft = ref("");
+const boardNameDraft = ref("");
+const columnNameDrafts = ref<Record<string, string>>({});
+const newColumnName = ref("");
 const editingCard = ref<TrackboiCard | null>(null);
+const editFieldValues = ref<Record<string, FieldValue>>({});
 const editDraft = reactive({
 	title: "",
 	description: "",
+	column: "todo",
 });
 
 type ResizeEdge = "n" | "e" | "s" | "w" | "ne" | "nw" | "se" | "sw";
 type BoardScopeMode = "all" | "branch" | "global";
+type ScopeMode = "branch" | "global" | "existing";
+type Confirmation = {
+	title: string;
+	description: string;
+	confirmLabel: string;
+	destructive?: boolean;
+	onConfirm: () => void | Promise<void>;
+};
 
 const MIN_WINDOW_WIDTH = 760;
 const MIN_WINDOW_HEIGHT = 480;
 const boardScopeMode = ref<BoardScopeMode>("all");
+const draftScopeMode = ref<ScopeMode>("global");
+const editScopeMode = ref<ScopeMode>("global");
+const newCardOpen = ref(false);
+const confirmation = ref<Confirmation | null>(null);
+const confirmDialogOpen = computed({
+	get: () => confirmation.value != null,
+	set: (open) => {
+		if (!open) confirmation.value = null;
+	},
+});
 
 const gitBranchLabel = computed(() => {
 	if (!snapshot.value?.git.isGitRepo) return null;
 	return snapshot.value.git.branch ?? (snapshot.value.git.detached ? "detached" : "git");
+});
+const currentBranch = computed(() => snapshot.value?.git.branch ?? null);
+const canUseBranchScope = computed(() => currentBranch.value != null);
+const columnOptions = computed<SelectOption[]>(() => (
+	snapshot.value?.board.columns.map((column) => ({
+		value: column.id,
+		label: column.name,
+	})) ?? []
+));
+const draftScopeOptions = computed<SelectOption[]>(() => [
+	{
+		value: "branch",
+		label: currentBranch.value ? `Current branch: ${currentBranch.value}` : "Current branch",
+		disabled: !canUseBranchScope.value,
+	},
+	{ value: "global", label: "Global project" },
+]);
+const boardScopeOptions = computed<SelectOption[]>(() => [
+	{ value: "all", label: "All cards" },
+	{ value: "branch", label: "Current branch", disabled: !currentBranch.value },
+	{ value: "global", label: "Global" },
+]);
+const fieldTypeOptions = computed<SelectOption[]>(() => [
+	{ value: "text", label: "Text" },
+	{ value: "number", label: "Number" },
+	{ value: "checkbox", label: "Checkbox" },
+	{ value: "select", label: "Select" },
+	{ value: "date", label: "Date" },
+]);
+const customFields = computed(() => snapshot.value?.board.customFields ?? []);
+const allColumnCardCounts = computed(() => {
+	const counts: Record<string, number> = {};
+	for (const column of snapshot.value?.board.columns ?? []) {
+		counts[column.id] = 0;
+	}
+	for (const card of snapshot.value?.cards ?? []) {
+		counts[card.column] = (counts[card.column] ?? 0) + 1;
+	}
+	return counts;
+});
+const editScopeOptions = computed<SelectOption[]>(() => {
+	const options: SelectOption[] = [];
+
+	if (editScopeMode.value === "existing" && editingCard.value?.scope.kind === "branch") {
+		options.push({
+			value: "existing",
+			label: `Branch: ${editingCard.value.scope.ref}`,
+		});
+	}
+
+	options.push(...draftScopeOptions.value);
+	return options;
 });
 const scopedCards = computed(() => {
 	const cards = snapshot.value?.cards ?? [];
@@ -73,13 +161,28 @@ const scopedCards = computed(() => {
 
 	return cards;
 });
+const visibleParentCards = computed(() => scopedCards.value.filter((card) => card.parentId == null));
+const childCounts = computed(() => {
+	const counts: Record<string, number> = {};
+	for (const card of scopedCards.value) {
+		if (!card.parentId) continue;
+		counts[card.parentId] = (counts[card.parentId] ?? 0) + 1;
+	}
+	return counts;
+});
+const editingSubtasks = computed(() => {
+	if (!editingCard.value) return [];
+	return (snapshot.value?.cards ?? [])
+		.filter((card) => card.parentId === editingCard.value?.id)
+		.sort((left, right) => left.rank.localeCompare(right.rank));
+});
 
 const cardsByColumn = computed(() => {
 	const grouped = new Map<string, TrackboiCard[]>();
 	for (const column of snapshot.value?.board.columns ?? []) {
 		grouped.set(column.id, []);
 	}
-	for (const card of scopedCards.value) {
+	for (const card of visibleParentCards.value) {
 		grouped.get(card.column)?.push(card);
 	}
 	return grouped;
@@ -103,7 +206,20 @@ const visibleProjects = computed(() => {
 });
 const hasProjects = computed(() => registry.value.projects.length > 0);
 const totalCards = computed(() => snapshot.value?.cards.length ?? 0);
-const visibleCardCount = computed(() => scopedCards.value.length);
+const visibleCardCount = computed(() => visibleParentCards.value.length);
+const scopeEmptyMessage = computed(() => {
+	if (!snapshot.value || visibleCardCount.value > 0) return null;
+	if (boardScopeMode.value === "branch" && currentBranch.value) {
+		return `No cards scoped to ${currentBranch.value} yet.`;
+	}
+	if (boardScopeMode.value === "global") {
+		return "No global project cards yet.";
+	}
+	if (totalCards.value === 0) {
+		return "No cards yet.";
+	}
+	return null;
+});
 
 function projectInitial(name: string) {
 	return name.slice(0, 1).toUpperCase();
@@ -121,6 +237,82 @@ function statusClass(status: ProjectIndexEntry["status"]) {
 	return "bg-destructive";
 }
 
+function scopeFromMode(mode: ScopeMode): WorkScope {
+	if (mode === "existing" && editingCard.value) {
+		return editingCard.value.scope;
+	}
+
+	if (mode === "branch" && currentBranch.value) {
+		return { kind: "branch", ref: currentBranch.value };
+	}
+
+	return { kind: "project", ref: "global" };
+}
+
+function scopeModeForCard(card: TrackboiCard): ScopeMode {
+	if (card.scope.kind === "project") return "global";
+	return card.scope.ref === currentBranch.value ? "branch" : "existing";
+}
+
+function formatTimestamp(value?: string) {
+	if (!value) return "Unknown";
+
+	return new Intl.DateTimeFormat(undefined, {
+		month: "short",
+		day: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	}).format(new Date(value));
+}
+
+function fieldIdFromName(name: string) {
+	const slug = name
+		.trim()
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-|-$/g, "");
+
+	return `${slug || "field"}-${crypto.randomUUID().slice(0, 8)}`;
+}
+
+function columnIdFromName(name: string) {
+	const slug = name
+		.trim()
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-|-$/g, "");
+
+	return slug || `column-${crypto.randomUUID().slice(0, 8)}`;
+}
+
+function selectOptionsForField(field: CustomField): SelectOption[] {
+	return (field.options ?? []).map((option) => ({ value: option, label: option }));
+}
+
+function fieldTextValue(fieldId: string) {
+	const value = editFieldValues.value[fieldId];
+	return typeof value === "string" || typeof value === "number" ? String(value) : "";
+}
+
+function setFieldTextValue(field: CustomField, value: string | number | undefined) {
+	const nextValue = value == null ? "" : String(value);
+	editFieldValues.value = {
+		...editFieldValues.value,
+		[field.id]: field.type === "number" ? Number(nextValue) : nextValue,
+	};
+}
+
+function fieldBooleanValue(fieldId: string) {
+	return editFieldValues.value[fieldId] === true;
+}
+
+function setFieldBooleanValue(field: CustomField, value: boolean) {
+	editFieldValues.value = {
+		...editFieldValues.value,
+		[field.id]: value,
+	};
+}
+
 function setError(errorValue: unknown) {
 	error.value = errorValue instanceof Error ? errorValue.message : String(errorValue);
 }
@@ -128,6 +320,43 @@ function setError(errorValue: unknown) {
 function setSnapshot(nextSnapshot: ProjectSnapshot | null) {
 	snapshot.value = nextSnapshot;
 	draftColumn.value = nextSnapshot?.board.columns[0]?.id ?? "todo";
+	draftScopeMode.value = nextSnapshot?.git.branch ? "branch" : "global";
+	syncBoardDrafts(nextSnapshot);
+}
+
+function syncBoardDrafts(nextSnapshot: ProjectSnapshot | null) {
+	boardNameDraft.value = nextSnapshot?.board.name ?? "";
+	columnNameDrafts.value = Object.fromEntries(
+		nextSnapshot?.board.columns.map((column) => [column.id, column.name]) ?? [],
+	);
+}
+
+function confirmAction() {
+	const action = confirmation.value?.onConfirm;
+	confirmation.value = null;
+	void action?.();
+}
+
+function openNewCard(columnId?: string) {
+	editingCard.value = null;
+	draftColumn.value = columnId ?? snapshot.value?.board.columns[0]?.id ?? draftColumn.value;
+	newCardOpen.value = true;
+}
+
+function closeNewCard() {
+	newCardOpen.value = false;
+}
+
+function closeEditingCard() {
+	editingCard.value = null;
+}
+
+function closeSettings() {
+	settingsOpen.value = false;
+}
+
+function closeProjectSettings() {
+	projectSettingsOpen.value = false;
 }
 
 async function refreshRegistry() {
@@ -177,12 +406,19 @@ async function locateProject(projectId: string) {
 async function removeProject(projectId: string) {
 	const project = registry.value.projects.find((project) => project.id === projectId);
 	if (!project) return;
-	if (!window.confirm(`Remove "${project.name}" from Trackboi? Files on disk will stay where they are.`)) return;
 
-	await run(async () => {
-		setSnapshot(await desktop.removeProject(projectId));
-		await refreshRegistry();
-	});
+	confirmation.value = {
+		title: `Remove ${project.name}?`,
+		description: "Trackboi will forget this project, but files on disk will stay where they are.",
+		confirmLabel: "Remove",
+		destructive: true,
+		onConfirm: async () => {
+			await run(async () => {
+				setSnapshot(await desktop.removeProject(projectId));
+				await refreshRegistry();
+			});
+		},
+	};
 }
 
 async function addStorageSearchPath() {
@@ -232,39 +468,197 @@ async function createNewCard() {
 			title,
 			description: draftDescription.value,
 			column: draftColumn.value,
+			scope: scopeFromMode(draftScopeMode.value),
 		});
 		draftTitle.value = "";
 		draftDescription.value = "";
+		newCardOpen.value = false;
 	});
 }
 
 function startEditing(card: TrackboiCard) {
+	newCardOpen.value = false;
 	editingCard.value = card;
 	editDraft.title = card.title;
 	editDraft.description = card.description;
+	editDraft.column = card.column;
+	editFieldValues.value = { ...card.fieldValues };
+	editScopeMode.value = scopeModeForCard(card);
+	subtaskTitle.value = "";
 }
 
 async function saveEditingCard() {
 	if (!editingCard.value) return;
 	const cardId = editingCard.value.id;
+	const nextColumn = editDraft.column;
+	const shouldMove = nextColumn !== editingCard.value.column;
 
 	await run(async () => {
 		await desktop.updateCard(cardId, {
 			title: editDraft.title,
 			description: editDraft.description,
+			scope: scopeFromMode(editScopeMode.value),
+			fieldValues: editFieldValues.value,
 		});
+		if (shouldMove) {
+			await desktop.moveCard(cardId, nextColumn, null);
+		}
 		editingCard.value = null;
 	});
 }
 
-async function deleteExistingCard(card: TrackboiCard) {
-	if (!window.confirm(`Delete "${card.title}"?`)) return;
+async function addCustomField() {
+	const name = fieldNameDraft.value.trim();
+	if (!snapshot.value || !name) return;
+
+	const options = fieldTypeDraft.value === "select"
+		? fieldOptionsDraft.value
+			.split(",")
+			.map((option) => option.trim())
+			.filter(Boolean)
+		: undefined;
+
+	if (fieldTypeDraft.value === "select" && (!options || options.length === 0)) {
+		setError("Select fields need at least one comma-separated option");
+		return;
+	}
+
+	const field: CustomField = {
+		id: fieldIdFromName(name),
+		name,
+		type: fieldTypeDraft.value,
+		...(options ? { options } : {}),
+	};
 
 	await run(async () => {
-		await desktop.deleteCard(card.id);
-		if (editingCard.value?.id === card.id) {
-			editingCard.value = null;
-		}
+		await desktop.updateBoard({
+			...snapshot.value!.board,
+			customFields: [...snapshot.value!.board.customFields, field],
+		});
+		fieldNameDraft.value = "";
+		fieldOptionsDraft.value = "";
+	});
+}
+
+async function removeCustomField(fieldId: string) {
+	if (!snapshot.value) return;
+
+	await run(async () => {
+		await desktop.updateBoard({
+			...snapshot.value!.board,
+			customFields: snapshot.value!.board.customFields.filter((field) => field.id !== fieldId),
+		});
+	});
+}
+
+async function updateBoard(nextBoard: ProjectSnapshot["board"]) {
+	await run(async () => {
+		await desktop.updateBoard(nextBoard);
+	});
+}
+
+async function saveBoardName() {
+	if (!snapshot.value) return;
+	const name = boardNameDraft.value.trim();
+	if (!name) {
+		setError("Board name is required");
+		return;
+	}
+
+	await updateBoard({
+		...snapshot.value.board,
+		name,
+	});
+}
+
+async function addColumn() {
+	if (!snapshot.value) return;
+	const name = newColumnName.value.trim();
+	if (!name) return;
+
+	let id = columnIdFromName(name);
+	const existingIds = new Set(snapshot.value.board.columns.map((column) => column.id));
+	if (existingIds.has(id)) id = `${id}-${crypto.randomUUID().slice(0, 6)}`;
+
+	await updateBoard({
+		...snapshot.value.board,
+		columns: [...snapshot.value.board.columns, { id, name }],
+	});
+	newColumnName.value = "";
+}
+
+async function renameColumn(column: Column) {
+	if (!snapshot.value) return;
+	const name = columnNameDrafts.value[column.id]?.trim();
+	if (!name || name === column.name) return;
+
+	await updateBoard({
+		...snapshot.value.board,
+		columns: snapshot.value.board.columns.map((candidate) => (
+			candidate.id === column.id ? { ...candidate, name } : candidate
+		)),
+	});
+}
+
+function removeColumn(column: Column) {
+	if (!snapshot.value) return;
+	const count = allColumnCardCounts.value[column.id] ?? 0;
+	if (count > 0) {
+		setError(`Move or delete ${count} cards before removing ${column.name}`);
+		return;
+	}
+	if (snapshot.value.board.columns.length <= 1) {
+		setError("Board needs at least one column");
+		return;
+	}
+
+	confirmation.value = {
+		title: `Remove ${column.name}?`,
+		description: "This removes the column from the board. Card files are not touched.",
+		confirmLabel: "Remove",
+		destructive: true,
+		onConfirm: async () => {
+			if (!snapshot.value) return;
+			await updateBoard({
+				...snapshot.value.board,
+				columns: snapshot.value.board.columns.filter((candidate) => candidate.id !== column.id),
+			});
+		},
+	};
+}
+
+async function deleteExistingCard(card: TrackboiCard) {
+	confirmation.value = {
+		title: `Delete ${card.title}?`,
+		description: "This card file will be removed from the Trackboi store.",
+		confirmLabel: "Delete",
+		destructive: true,
+		onConfirm: async () => {
+			await run(async () => {
+				await desktop.deleteCard(card.id);
+				if (editingCard.value?.id === card.id) {
+					editingCard.value = null;
+				}
+			});
+		},
+	};
+}
+
+async function createSubtask() {
+	if (!editingCard.value) return;
+	const title = subtaskTitle.value.trim();
+	if (!title) return;
+
+	const parent = editingCard.value;
+	await run(async () => {
+		await desktop.createCard({
+			title,
+			description: "",
+			parentId: parent.id,
+			column: parent.column,
+			scope: parent.scope,
+		});
+		subtaskTitle.value = "";
 	});
 }
 
@@ -538,6 +932,11 @@ onMounted(loadProject);
 					Add project
 				</Button>
 
+				<Button v-if="snapshot" class="mt-2 w-full" type="button" :disabled="busy" @click="openNewCard()">
+					<Plus class="h-4 w-4" />
+					New card
+				</Button>
+
 				<div v-if="activeProject" class="mt-2 grid grid-cols-2 gap-2">
 					<Button variant="outline" size="sm" type="button" :disabled="busy" @click="locateProject(activeProject.id)">
 						<RefreshCw class="h-3.5 w-3.5" />
@@ -549,35 +948,17 @@ onMounted(loadProject);
 					</Button>
 				</div>
 
-				<UiCard v-if="snapshot" class="mt-5 p-4">
-					<form class="grid gap-3" @submit.prevent="createNewCard">
-						<span class="text-xs font-semibold uppercase text-primary">New card</span>
-						<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-							Title
-							<Input v-model="draftTitle" autocomplete="off" placeholder="Ship the first slice" />
-						</label>
-						<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-							Notes
-							<Textarea v-model="draftDescription" rows="4" placeholder="Small enough to move today." />
-						</label>
-						<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-							Column
-							<Select v-model="draftColumn">
-								<option
-									v-for="column in snapshot.board.columns"
-									:key="column.id"
-									:value="column.id"
-								>
-									{{ column.name }}
-								</option>
-							</Select>
-						</label>
-						<Button class="w-full" type="submit" :disabled="busy || !draftTitle.trim()">
-							<Plus class="h-4 w-4" />
-							Add card
-						</Button>
-					</form>
-				</UiCard>
+				<Button
+					v-if="snapshot"
+					class="mt-2 w-full"
+					variant="outline"
+					type="button"
+					:disabled="busy"
+					@click="projectSettingsOpen = true"
+				>
+					<Settings class="h-4 w-4" />
+					Project settings
+				</Button>
 			</aside>
 
 			<section class="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden px-6 py-5">
@@ -590,11 +971,11 @@ onMounted(loadProject);
 					</div>
 					<div v-if="snapshot" class="flex items-center gap-2">
 						<Badge variant="secondary">{{ visibleCardCount }} shown</Badge>
-						<Select v-model="boardScopeMode" class="w-40">
-							<option value="all">All cards</option>
-							<option value="branch" :disabled="!snapshot.git.branch">Current branch</option>
-							<option value="global">Global</option>
-						</Select>
+						<Select v-model="boardScopeMode" :options="boardScopeOptions" class="w-40" />
+						<Button type="button" :disabled="busy" @click="openNewCard()">
+							<Plus class="h-4 w-4" />
+							New card
+						</Button>
 					</div>
 				</header>
 
@@ -654,98 +1035,408 @@ onMounted(loadProject);
 							:key="column.id"
 							:column="column"
 							:cards="cardsByColumn.get(column.id) ?? []"
+							:child-counts="childCounts"
+							:custom-fields="customFields"
 							@move="moveCard"
+							@create="openNewCard"
 							@edit="startEditing"
 							@delete="deleteExistingCard"
 						/>
 					</div>
+					<p v-if="scopeEmptyMessage" class="mt-4 text-sm text-muted-foreground">
+						{{ scopeEmptyMessage }}
+					</p>
 				</div>
 			</section>
 
-		<aside
-			v-if="editingCard"
-			class="fixed inset-y-0 right-0 z-20 grid w-[min(400px,94vw)] content-start gap-4 border-l border-border bg-card p-5 shadow-2xl"
-		>
-			<header class="flex items-start justify-between gap-3">
-				<div>
-					<p class="text-xs font-semibold uppercase text-primary">Edit card</p>
-					<h2 class="mt-1 text-lg font-semibold">Card details</h2>
-				</div>
-				<Button variant="ghost" size="icon" type="button" @click="editingCard = null">
-					<X class="h-4 w-4" />
-				</Button>
-			</header>
-
-			<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-				Title
-				<Input v-model="editDraft.title" autocomplete="off" />
-			</label>
-
-			<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-				Notes
-				<Textarea v-model="editDraft.description" rows="8" />
-			</label>
-
-			<div class="flex gap-2">
-				<Button type="button" :disabled="busy" @click="saveEditingCard">
-					<Save class="h-4 w-4" />
-					Save
-				</Button>
-				<Button variant="outline" type="button" :disabled="busy" @click="editingCard = null">
-					Cancel
-				</Button>
-			</div>
-		</aside>
-
-		<aside
-			v-if="settingsOpen"
-			class="fixed inset-y-0 right-0 z-30 grid w-[min(420px,94vw)] content-start gap-5 overflow-auto border-l border-border bg-card p-5 shadow-2xl"
-		>
-			<header class="flex items-start justify-between gap-3">
-				<div>
-					<p class="text-xs font-semibold uppercase text-primary">Settings</p>
-					<h2 class="mt-1 text-lg font-semibold">Storage lookup</h2>
-				</div>
-				<Button variant="ghost" size="icon" type="button" @click="settingsOpen = false">
-					<X class="h-4 w-4" />
-				</Button>
-			</header>
-
-			<div class="grid gap-2">
-				<p class="text-sm text-muted-foreground">
-					Trackboi checks these repo-relative paths in order and uses the first database it finds.
-				</p>
-				<div class="grid gap-2">
-					<div
-						v-for="path in registry.storageSearchPaths"
-						:key="path"
-						class="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2"
+			<Transition name="surface">
+				<div
+					v-if="newCardOpen"
+					class="fixed inset-x-0 bottom-0 top-9 z-20 bg-background/55 backdrop-blur-[2px]"
+					@pointerdown.self="closeNewCard"
+				>
+					<aside
+						class="drawer-panel absolute bottom-0 right-0 top-0 z-10 grid w-[min(420px,94vw)] content-start gap-4 overflow-auto border-l border-border bg-card p-5 shadow-2xl"
 					>
-						<span class="min-w-0 truncate font-mono text-xs">{{ path }}</span>
-						<Button variant="ghost" size="icon" type="button" :disabled="busy" @click="removeStorageSearchPath(path)">
+					<header class="flex items-start justify-between gap-3">
+						<div>
+							<p class="text-xs font-semibold uppercase text-primary">New card</p>
+							<h2 class="mt-1 text-lg font-semibold">Card details</h2>
+						</div>
+						<Button variant="ghost" size="icon" type="button" @click="closeNewCard">
+							<X class="h-4 w-4" />
+						</Button>
+					</header>
+
+					<form class="grid gap-4" @submit.prevent="createNewCard">
+						<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+							Title
+							<Input v-model="draftTitle" autocomplete="off" autofocus placeholder="Ship the first slice" />
+						</label>
+
+						<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+							Notes
+							<Textarea v-model="draftDescription" rows="8" placeholder="Small enough to move today." />
+						</label>
+
+						<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+							Column
+							<Select v-model="draftColumn" :options="columnOptions" />
+						</label>
+
+						<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+							Scope
+							<Select v-model="draftScopeMode" :options="draftScopeOptions" />
+						</label>
+
+						<div class="flex gap-2">
+							<Button type="submit" :disabled="busy || !draftTitle.trim()">
+								<Plus class="h-4 w-4" />
+								Add card
+							</Button>
+							<Button variant="outline" type="button" :disabled="busy" @click="closeNewCard">
+								Cancel
+							</Button>
+						</div>
+					</form>
+					</aside>
+				</div>
+			</Transition>
+
+			<Transition name="surface">
+				<div
+					v-if="editingCard"
+					class="fixed inset-x-0 bottom-0 top-9 z-20 bg-background/55 backdrop-blur-[2px]"
+					@pointerdown.self="closeEditingCard"
+				>
+					<aside
+						class="drawer-panel absolute bottom-0 right-0 top-0 z-10 grid w-[min(420px,94vw)] content-start gap-4 overflow-auto border-l border-border bg-card p-5 shadow-2xl"
+					>
+					<header class="flex items-start justify-between gap-3">
+						<div>
+							<p class="text-xs font-semibold uppercase text-primary">Edit card</p>
+							<h2 class="mt-1 text-lg font-semibold">Card details</h2>
+						</div>
+						<Button variant="ghost" size="icon" type="button" @click="closeEditingCard">
+							<X class="h-4 w-4" />
+						</Button>
+					</header>
+
+					<div class="grid gap-2 rounded-md border border-border bg-background/70 p-3 text-xs text-muted-foreground">
+						<div class="flex items-center justify-between gap-3">
+							<span>ID</span>
+							<span class="min-w-0 truncate font-mono text-foreground">{{ editingCard.id }}</span>
+						</div>
+						<div class="flex items-center justify-between gap-3">
+							<span>Created</span>
+							<span class="text-foreground">{{ formatTimestamp(editingCard.createdAt) }}</span>
+						</div>
+						<div class="flex items-center justify-between gap-3">
+							<span>Updated</span>
+							<span class="text-foreground">{{ formatTimestamp(editingCard.updatedAt) }}</span>
+						</div>
+					</div>
+
+					<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+						Title
+						<Input v-model="editDraft.title" autocomplete="off" />
+					</label>
+
+					<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+						Notes
+						<Textarea v-model="editDraft.description" rows="8" />
+					</label>
+
+					<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+						Column
+						<Select v-model="editDraft.column" :options="columnOptions" />
+					</label>
+
+					<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+						Scope
+						<Select v-model="editScopeMode" :options="editScopeOptions" />
+					</label>
+
+					<div v-if="customFields.length > 0" class="grid gap-3 rounded-md border border-border bg-background/50 p-3">
+						<div>
+							<p class="text-xs font-semibold uppercase text-primary">Fields</p>
+							<p class="mt-1 text-xs text-muted-foreground">
+								Project-defined card details.
+							</p>
+						</div>
+
+						<label
+							v-for="field in customFields"
+							:key="field.id"
+							class="grid gap-1.5 text-xs font-medium text-muted-foreground"
+						>
+							{{ field.name }}
+							<div v-if="field.type === 'checkbox'" class="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2">
+								<Checkbox
+									:model-value="fieldBooleanValue(field.id)"
+									@update:model-value="setFieldBooleanValue(field, $event)"
+								/>
+								<span class="text-sm text-foreground">{{ fieldBooleanValue(field.id) ? "Yes" : "No" }}</span>
+							</div>
+							<Select
+								v-else-if="field.type === 'select'"
+								:model-value="fieldTextValue(field.id)"
+								:options="selectOptionsForField(field)"
+								@update:model-value="setFieldTextValue(field, $event)"
+							/>
+							<Input
+								v-else
+								:type="field.type === 'date' ? 'date' : field.type === 'number' ? 'number' : 'text'"
+								:model-value="fieldTextValue(field.id)"
+								@update:model-value="setFieldTextValue(field, $event)"
+							/>
+						</label>
+					</div>
+
+					<div class="grid gap-3 rounded-md border border-border bg-background/50 p-3">
+						<div class="flex items-center justify-between gap-3">
+							<div>
+								<p class="text-xs font-semibold uppercase text-primary">Subtasks</p>
+								<p class="mt-1 text-xs text-muted-foreground">
+									Break this card into smaller slices.
+								</p>
+							</div>
+							<Badge variant="secondary">{{ editingSubtasks.length }}</Badge>
+						</div>
+
+						<div v-if="editingSubtasks.length > 0" class="grid gap-2">
+							<button
+								v-for="subtask in editingSubtasks"
+								:key="subtask.id"
+								class="grid gap-1 rounded-md border border-border bg-card px-3 py-2 text-left transition hover:border-primary/40 hover:bg-secondary/60"
+								type="button"
+								@click="startEditing(subtask)"
+							>
+								<span class="text-sm font-medium text-foreground">{{ subtask.title }}</span>
+								<span class="text-xs text-muted-foreground">{{ subtask.column }}</span>
+							</button>
+						</div>
+
+						<form class="flex gap-2" @submit.prevent="createSubtask">
+							<Input v-model="subtaskTitle" autocomplete="off" placeholder="Add a subtask" />
+							<Button type="submit" :disabled="busy || !subtaskTitle.trim()">
+								<Plus class="h-4 w-4" />
+								Add
+							</Button>
+						</form>
+					</div>
+
+					<div class="flex gap-2">
+						<Button type="button" :disabled="busy || !editDraft.title.trim()" @click="saveEditingCard">
+							<Save class="h-4 w-4" />
+							Save
+						</Button>
+						<Button variant="outline" type="button" :disabled="busy" @click="closeEditingCard">
+							Cancel
+						</Button>
+						<Button
+							class="ml-auto"
+							variant="destructive"
+							type="button"
+							:disabled="busy"
+							@click="deleteExistingCard(editingCard)"
+						>
 							<Trash2 class="h-4 w-4" />
+							Delete
 						</Button>
 					</div>
+					</aside>
 				</div>
-			</div>
+			</Transition>
 
-			<form class="grid gap-2" @submit.prevent="addStorageSearchPath">
-				<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-					Add path
-					<Input v-model="storagePathDraft" autocomplete="off" placeholder=".etc/.trackboi" />
-				</label>
-				<div class="flex gap-2">
-					<Button type="submit" :disabled="busy || !storagePathDraft.trim()">
-						<ListPlus class="h-4 w-4" />
-						Add path
-					</Button>
-					<Button variant="outline" type="button" :disabled="busy" @click="resetStorageSearchPaths">
-						Reset
-					</Button>
+			<Transition name="surface">
+				<div
+					v-if="settingsOpen"
+					class="fixed inset-x-0 bottom-0 top-9 z-30 bg-background/55 backdrop-blur-[2px]"
+					@pointerdown.self="closeSettings"
+				>
+					<aside
+						class="drawer-panel absolute bottom-0 right-0 top-0 z-10 grid w-[min(420px,94vw)] content-start gap-5 overflow-auto border-l border-border bg-card p-5 shadow-2xl"
+					>
+					<header class="flex items-start justify-between gap-3">
+						<div>
+							<p class="text-xs font-semibold uppercase text-primary">Settings</p>
+							<h2 class="mt-1 text-lg font-semibold">Storage lookup</h2>
+						</div>
+						<Button variant="ghost" size="icon" type="button" @click="closeSettings">
+							<X class="h-4 w-4" />
+						</Button>
+					</header>
+
+					<div class="grid gap-2">
+						<p class="text-sm text-muted-foreground">
+							Trackboi checks these repo-relative paths in order and uses the first database it finds.
+						</p>
+						<div class="grid gap-2">
+							<div
+								v-for="path in registry.storageSearchPaths"
+								:key="path"
+								class="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2"
+							>
+								<span class="min-w-0 truncate font-mono text-xs">{{ path }}</span>
+								<Button variant="ghost" size="icon" type="button" :disabled="busy" @click="removeStorageSearchPath(path)">
+									<Trash2 class="h-4 w-4" />
+								</Button>
+							</div>
+						</div>
+					</div>
+
+					<form class="grid gap-2" @submit.prevent="addStorageSearchPath">
+						<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+							Add path
+							<Input v-model="storagePathDraft" autocomplete="off" placeholder=".etc/.trackboi" />
+						</label>
+						<div class="flex gap-2">
+							<Button type="submit" :disabled="busy || !storagePathDraft.trim()">
+								<ListPlus class="h-4 w-4" />
+								Add path
+							</Button>
+							<Button variant="outline" type="button" :disabled="busy" @click="resetStorageSearchPaths">
+								Reset
+							</Button>
+						</div>
+					</form>
+
+					</aside>
 				</div>
-			</form>
-		</aside>
+			</Transition>
+
+			<Transition name="surface">
+				<div
+					v-if="projectSettingsOpen"
+					class="fixed inset-x-0 bottom-0 top-9 z-30 bg-background/55 backdrop-blur-[2px]"
+					@pointerdown.self="closeProjectSettings"
+				>
+					<aside
+						class="drawer-panel absolute bottom-0 right-0 top-0 z-10 grid w-[min(420px,94vw)] content-start gap-5 overflow-auto border-l border-border bg-card p-5 shadow-2xl"
+					>
+					<header class="flex items-start justify-between gap-3">
+						<div>
+							<p class="text-xs font-semibold uppercase text-primary">Project settings</p>
+							<h2 class="mt-1 text-lg font-semibold">{{ snapshot?.project.name ?? "Project" }}</h2>
+						</div>
+						<Button variant="ghost" size="icon" type="button" @click="closeProjectSettings">
+							<X class="h-4 w-4" />
+						</Button>
+					</header>
+
+					<div v-if="snapshot" class="grid gap-3">
+						<div class="grid gap-3">
+							<div>
+								<p class="text-xs font-semibold uppercase text-primary">Board</p>
+								<p class="mt-1 text-sm text-muted-foreground">
+									Name and columns for this board.
+								</p>
+							</div>
+
+							<form class="flex gap-2" @submit.prevent="saveBoardName">
+								<Input v-model="boardNameDraft" autocomplete="off" placeholder="Board name" />
+								<Button type="submit" :disabled="busy || !boardNameDraft.trim()">
+									<Save class="h-4 w-4" />
+									Save
+								</Button>
+							</form>
+
+							<div class="grid gap-2">
+								<div
+									v-for="column in snapshot.board.columns"
+									:key="column.id"
+									class="grid gap-2 rounded-md border border-border bg-background p-3"
+								>
+									<div class="flex items-center justify-between gap-3">
+										<Badge variant="secondary">{{ column.id }}</Badge>
+										<Badge variant="outline">{{ allColumnCardCounts[column.id] ?? 0 }} cards</Badge>
+									</div>
+									<form class="flex gap-2" @submit.prevent="renameColumn(column)">
+										<Input v-model="columnNameDrafts[column.id]" autocomplete="off" />
+										<Button type="submit" variant="outline" :disabled="busy || !columnNameDrafts[column.id]?.trim()">
+											Rename
+										</Button>
+										<Button variant="ghost" size="icon" type="button" :disabled="busy" @click="removeColumn(column)">
+											<Trash2 class="h-4 w-4" />
+										</Button>
+									</form>
+								</div>
+							</div>
+
+							<form class="flex gap-2" @submit.prevent="addColumn">
+								<Input v-model="newColumnName" autocomplete="off" placeholder="New column" />
+								<Button type="submit" :disabled="busy || !newColumnName.trim()">
+									<Plus class="h-4 w-4" />
+									Add
+								</Button>
+							</form>
+						</div>
+
+						<div class="my-2 border-t border-border" />
+
+						<div>
+							<p class="text-xs font-semibold uppercase text-primary">Custom fields</p>
+							<p class="mt-1 text-sm text-muted-foreground">
+								Fields apply to every card in this board.
+							</p>
+						</div>
+
+						<div v-if="customFields.length > 0" class="grid gap-2">
+							<div
+								v-for="field in customFields"
+								:key="field.id"
+								class="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2"
+							>
+								<div class="min-w-0">
+									<p class="truncate text-sm font-medium text-foreground">{{ field.name }}</p>
+									<p class="text-xs text-muted-foreground">
+										{{ field.type }}{{ field.options?.length ? `: ${field.options.join(", ")}` : "" }}
+									</p>
+								</div>
+								<Button variant="ghost" size="icon" type="button" :disabled="busy" @click="removeCustomField(field.id)">
+									<Trash2 class="h-4 w-4" />
+								</Button>
+							</div>
+						</div>
+
+						<UiCard v-else class="border-dashed p-4 text-sm text-muted-foreground">
+							No custom fields yet.
+						</UiCard>
+
+						<form class="grid gap-2" @submit.prevent="addCustomField">
+							<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+								Name
+								<Input v-model="fieldNameDraft" autocomplete="off" placeholder="Priority" />
+							</label>
+							<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+								Type
+								<Select v-model="fieldTypeDraft" :options="fieldTypeOptions" />
+							</label>
+							<label v-if="fieldTypeDraft === 'select'" class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+								Options
+								<Input v-model="fieldOptionsDraft" autocomplete="off" placeholder="Low, Medium, High" />
+							</label>
+							<Button type="submit" :disabled="busy || !fieldNameDraft.trim()">
+								<ListPlus class="h-4 w-4" />
+								Add field
+							</Button>
+						</form>
+					</div>
+					</aside>
+				</div>
+			</Transition>
 		</main>
+
+		<ConfirmDialog
+			v-if="confirmation"
+			v-model:open="confirmDialogOpen"
+			:title="confirmation.title"
+			:description="confirmation.description"
+			:confirm-label="confirmation.confirmLabel"
+			:destructive="confirmation.destructive"
+			@confirm="confirmAction"
+		/>
 	</div>
 </template>
 

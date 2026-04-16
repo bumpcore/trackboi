@@ -9,10 +9,17 @@
 		"dev:hmr": "concurrently \"bun run hmr\" \"bun run start\"",
 		"hmr": "vite --port 5173",
 		"build": "vite build && electrobun build",
-		"build:canary": "vite build && electrobun build --env=canary"
+		"build:canary": "vite build && electrobun build --env=canary",
+		"tauri": "tauri",
+		"tauri:dev": "tauri dev",
+		"tauri:build": "tauri build"
 	},
 	"dependencies": {
 		"@tailwindcss/vite": "^4.2.2",
+		"@tauri-apps/api": "^2.10.1",
+		"@tauri-apps/plugin-dialog": "^2.7.0",
+		"@tauri-apps/plugin-fs": "^2.5.0",
+		"@tauri-apps/plugin-shell": "^2.3.5",
 		"@vueuse/core": "^14.2.1",
 		"@vueuse/integrations": "^14.2.1",
 		"class-variance-authority": "^0.7.1",
@@ -25,6 +32,7 @@
 		"tailwindcss": "^4.2.2"
 	},
 	"devDependencies": {
+		"@tauri-apps/cli": "^2.10.1",
 		"@types/bun": "latest",
 		"@types/node": "^25.6.0",
 		"@types/sortablejs": "^1.15.9",

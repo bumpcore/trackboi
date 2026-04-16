@@ -23,6 +23,10 @@ function now() {
 	return new Date().toISOString();
 }
 
+function globalScope() {
+	return { kind: "project" as const, ref: "global" as const };
+}
+
 function boardPath(projectPath: string) {
 	return join(projectPath, TRACKBOI_DIR, "board.json");
 }
@@ -99,6 +103,9 @@ function asCard(value: unknown, expectedId?: string): Card {
 		id: card.id,
 		title: card.title,
 		description: card.description,
+		scope: card.scope?.kind === "branch" && typeof card.scope.ref === "string"
+			? { kind: "branch", ref: card.scope.ref }
+			: globalScope(),
 		column: card.column,
 		rank: card.rank,
 		labels: card.labels.filter((label): label is string => typeof label === "string"),
@@ -160,7 +167,18 @@ export async function readProject(projectPath: string): Promise<ProjectSnapshot>
 		path: resolvedPath,
 	};
 
-	return { project, board, cards };
+	return {
+		project,
+		git: {
+			isGitRepo: false,
+			root: null,
+			branch: null,
+			detached: false,
+			dirty: null,
+		},
+		board,
+		cards,
+	};
 }
 
 export async function createCard(projectPath: string, input: {
@@ -182,6 +200,7 @@ export async function createCard(projectPath: string, input: {
 		id: `card_${crypto.randomUUID()}`,
 		title: input.title.trim(),
 		description: input.description?.trim() ?? "",
+		scope: globalScope(),
 		column: input.column,
 		rank: rankBetween(previous, null),
 		labels: [],

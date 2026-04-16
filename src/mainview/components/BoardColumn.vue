@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useSortable } from "@vueuse/integrations/useSortable";
 import { computed, ref, watch } from "vue";
-import { GripVertical, Trash2 } from "lucide-vue-next";
+import { CircleDashed, GripVertical, Trash2 } from "lucide-vue-next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card as UiCard } from "@/components/ui/card";
@@ -39,6 +39,7 @@ useSortable(listElement, sortableCards, {
 	dataIdAttr: "data-card-id",
 	ghostClass: "card-ghost",
 	dragClass: "card-dragging",
+	filter: "[data-sortable-ignore]",
 	onEnd(event) {
 		const cardId = (event.item as HTMLElement | null)?.dataset.cardId;
 		if (!cardId || event.to !== listElement.value) return;
@@ -63,6 +64,17 @@ useSortable(listElement, sortableCards, {
 		</header>
 
 		<div ref="listElement" class="grid min-h-64 content-start gap-2.5 p-3">
+			<div
+				v-if="sortableCards.length === 0"
+				class="grid min-h-32 place-items-center rounded-md border border-dashed border-border/80 px-6 text-center"
+				data-sortable-ignore
+			>
+				<div>
+					<CircleDashed class="mx-auto h-5 w-5 text-muted-foreground" />
+					<p class="mt-2 text-xs font-medium text-muted-foreground">Drop cards here</p>
+				</div>
+			</div>
+
 			<UiCard
 				v-for="card in sortableCards"
 				:key="card.id"
@@ -82,6 +94,9 @@ useSortable(listElement, sortableCards, {
 					<span v-if="card.description" class="mt-1 block [overflow-wrap:anywhere] text-xs leading-5 text-muted-foreground">
 						{{ card.description }}
 					</span>
+					<Badge v-if="card.scope.kind === 'branch'" class="mt-2 max-w-full" variant="outline">
+						<span class="truncate">{{ card.scope.ref }}</span>
+					</Badge>
 				</button>
 				<Button
 					class="opacity-0 transition group-hover:opacity-100"

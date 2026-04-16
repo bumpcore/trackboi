@@ -1,0 +1,27 @@
+{
+	"name": "trackboi",
+	"version": "1.0.0",
+	"type": "module",
+	"description": "A local-first Kanban desktop app with an MCP server.",
+	"scripts": {
+		"start": "vite build && electrobun dev",
+		"dev": "electrobun dev --watch",
+		"dev:hmr": "concurrently \"bun run hmr\" \"bun run start\"",
+		"hmr": "vite --port 5173",
+		"build": "vite build && electrobun build",
+		"build:canary": "vite build && electrobun build --env=canary"
+	},
+	"dependencies": {
+		"electrobun": "1.16.0"
+	},
+	"devDependencies": {
+		"@types/bun": "latest",
+		"@types/three": "^0.183.1",
+		"@vitejs/plugin-vue": "^5.2.1",
+		"concurrently": "^9.1.0",
+		"typescript": "^5.7.2",
+		"vite": "^6.0.3",
+		"vue": "^3.5.13",
+		"vue-tsc": "^2.2.0"
+	}
+}

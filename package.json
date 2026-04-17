@@ -5,10 +5,10 @@
 	"main": "src/electron/main.cjs",
 	"description": "A local-first Kanban desktop app with an MCP server.",
 	"scripts": {
-		"dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && TRACKBOI_DEV_SERVER_URL=http://127.0.0.1:5173 electron .\"",
+		"dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && TRACKBOI_DEV_SERVER_URL=http://127.0.0.1:5173 env -u ELECTRON_RUN_AS_NODE electron .\"",
 		"hmr": "vite --port 5173",
 		"build": "vite build",
-		"start": "electron ."
+		"start": "env -u ELECTRON_RUN_AS_NODE electron ."
 	},
 	"dependencies": {
 		"@tailwindcss/vite": "^4.2.2",

@@ -1,0 +1,18 @@
+{
+	"id": "card_01KPESDY3NH3DMD5PCT9ME5589",
+	"boardId": "default",
+	"title": "Revisit markdown editor rough edges",
+	"description": "Sweep remaining markdown editing and rendering issues, especially interaction details and edge cases.",
+	"parentId": null,
+	"scope": {
+		"kind": "project",
+		"ref": "global"
+	},
+	"column": "todo",
+	"rank": "j",
+	"labels": [],
+	"assignee": null,
+	"fieldValues": {},
+	"createdAt": "2026-04-17T22:36:50.165Z",
+	"updatedAt": "2026-04-17T22:36:50.165Z"
+}

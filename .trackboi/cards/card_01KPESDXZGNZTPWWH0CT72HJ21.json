@@ -1,0 +1,18 @@
+{
+	"id": "card_01KPESDXZGNZTPWWH0CT72HJ21",
+	"boardId": "default",
+	"title": "Harden UI fluency and density",
+	"description": "Tighten spacing, motion, hover/drag feel, and overall interaction polish across the board.",
+	"parentId": null,
+	"scope": {
+		"kind": "project",
+		"ref": "global"
+	},
+	"column": "todo",
+	"rank": "U",
+	"labels": [],
+	"assignee": null,
+	"fieldValues": {},
+	"createdAt": "2026-04-17T22:36:50.032Z",
+	"updatedAt": "2026-04-17T22:36:50.032Z"
+}

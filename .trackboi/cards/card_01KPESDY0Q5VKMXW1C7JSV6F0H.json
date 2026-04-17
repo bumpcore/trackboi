@@ -1,0 +1,18 @@
+{
+	"id": "card_01KPESDY0Q5VKMXW1C7JSV6F0H",
+	"boardId": "default",
+	"title": "Improve file watching and targeted refresh reliability",
+	"description": "Audit watcher behavior and make refreshes precise so changes land quickly without noisy full reloads.",
+	"parentId": null,
+	"scope": {
+		"kind": "project",
+		"ref": "global"
+	},
+	"column": "todo",
+	"rank": "j",
+	"labels": [],
+	"assignee": null,
+	"fieldValues": {},
+	"createdAt": "2026-04-17T22:36:50.071Z",
+	"updatedAt": "2026-04-17T22:36:50.071Z"
+}

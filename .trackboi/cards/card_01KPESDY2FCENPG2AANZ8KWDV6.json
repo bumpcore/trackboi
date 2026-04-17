@@ -1,0 +1,18 @@
+{
+	"id": "card_01KPESDY2FCENPG2AANZ8KWDV6",
+	"boardId": "default",
+	"title": "Continue dogfooding and log workflow friction",
+	"description": "Use Trackboi itself for active work and capture every rough edge worth smoothing next.",
+	"parentId": null,
+	"scope": {
+		"kind": "project",
+		"ref": "global"
+	},
+	"column": "todo",
+	"rank": "j",
+	"labels": [],
+	"assignee": null,
+	"fieldValues": {},
+	"createdAt": "2026-04-17T22:36:50.127Z",
+	"updatedAt": "2026-04-17T22:36:50.127Z"
+}

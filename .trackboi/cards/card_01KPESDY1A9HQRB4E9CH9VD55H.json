@@ -1,0 +1,18 @@
+{
+	"id": "card_01KPESDY1A9HQRB4E9CH9VD55H",
+	"boardId": "default",
+	"title": "Refine trays and header hierarchy",
+	"description": "Clarify information hierarchy across header, trays, and utility surfaces with fewer awkward transitions.",
+	"parentId": null,
+	"scope": {
+		"kind": "project",
+		"ref": "global"
+	},
+	"column": "todo",
+	"rank": "j",
+	"labels": [],
+	"assignee": null,
+	"fieldValues": {},
+	"createdAt": "2026-04-17T22:36:50.090Z",
+	"updatedAt": "2026-04-17T22:36:50.090Z"
+}

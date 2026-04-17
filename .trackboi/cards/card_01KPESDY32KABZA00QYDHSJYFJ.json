@@ -1,0 +1,18 @@
+{
+	"id": "card_01KPESDY32KABZA00QYDHSJYFJ",
+	"boardId": "default",
+	"title": "Expand MCP integration test coverage",
+	"description": "Add or broaden end-to-end MCP tests around project, board, and card flows.",
+	"parentId": null,
+	"scope": {
+		"kind": "project",
+		"ref": "global"
+	},
+	"column": "todo",
+	"rank": "j",
+	"labels": [],
+	"assignee": null,
+	"fieldValues": {},
+	"createdAt": "2026-04-17T22:36:50.146Z",
+	"updatedAt": "2026-04-17T22:36:50.146Z"
+}

@@ -1,0 +1,19 @@
+{
+	"version": 1,
+	"name": "trackboi",
+	"columns": [
+		{
+			"id": "todo",
+			"name": "To Do"
+		},
+		{
+			"id": "doing",
+			"name": "Doing"
+		},
+		{
+			"id": "done",
+			"name": "Done"
+		}
+	],
+	"customFields": []
+}

@@ -221,11 +221,15 @@ pub(crate) fn worktree_project_id(canonical_path: &str) -> String {
     format!("worktree:{canonical_path}")
 }
 
+pub(crate) fn workspace_project_id(canonical_path: &str) -> String {
+    format!("workspace:{canonical_path}")
+}
+
 // Discovered-entry ids encode their path as "<source>:<canonical_path>". This lets
 // active_project_from_registry resolve them without running providers, which would
 // recurse (providers read the active project path while computing the view).
 pub(crate) fn decode_discovered_path(project_id: &str) -> Option<String> {
-    for prefix in &["worktree:"] {
+    for prefix in &["worktree:", "workspace:"] {
         if let Some(rest) = project_id.strip_prefix(prefix) {
             return Some(rest.to_string());
         }
@@ -244,19 +248,143 @@ pub(crate) fn find_entry_by_id(
         .find(|entry| entry.project_id == project_id)
 }
 
-pub(crate) fn entry_as_project(entry: ProjectEntry) -> Project {
-    Project {
-        id: entry.project_id,
-        name: entry.name,
-        path: entry.path,
-        storage_path: entry.storage_path,
+pub(crate) struct CodeWorkspaceProvider;
+
+#[derive(serde::Deserialize)]
+struct CodeWorkspaceFile {
+    folders: Vec<CodeWorkspaceFolder>,
+}
+
+#[derive(serde::Deserialize)]
+struct CodeWorkspaceFolder {
+    path: String,
+    #[serde(default)]
+    name: Option<String>,
+}
+
+impl ProjectSourceProvider for CodeWorkspaceProvider {
+    fn source_id(&self) -> String {
+        "code_workspace".into()
     }
+
+    fn kind(&self, context: &ProjectSourceContext) -> ProjectSourceKind {
+        ProjectSourceKind::CodeWorkspace {
+            file_path: active_workspace_file(context)
+                .map(|path| path.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+        }
+    }
+
+    fn label(&self, context: &ProjectSourceContext) -> String {
+        match active_workspace_file(context) {
+            Some(path) => {
+                let name = path
+                    .file_stem()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("workspace");
+                format!("Workspace: {name}")
+            }
+            None => "Workspace folders".into(),
+        }
+    }
+
+    fn enumerate(&self, context: &ProjectSourceContext) -> Vec<ProjectEntry> {
+        let Some(workspace_path) = active_workspace_file(context) else {
+            return vec![];
+        };
+        let Some(workspace_dir) = workspace_path.parent() else {
+            return vec![];
+        };
+        let Some(contents) = std::fs::read_to_string(&workspace_path).ok() else {
+            return vec![];
+        };
+        let Ok(workspace) = serde_json::from_str::<CodeWorkspaceFile>(&contents) else {
+            return vec![];
+        };
+
+        workspace
+            .folders
+            .into_iter()
+            .filter_map(|folder| build_workspace_entry(&folder, workspace_dir, context.registry))
+            .collect()
+    }
+}
+
+fn active_workspace_file(context: &ProjectSourceContext) -> Option<PathBuf> {
+    let project_path = active_project_path(context.registry)?;
+    let dir = PathBuf::from(&project_path);
+    if !dir.is_dir() {
+        return None;
+    }
+    let entries = std::fs::read_dir(&dir).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) == Some("code-workspace") {
+            return Some(path);
+        }
+    }
+    None
+}
+
+fn build_workspace_entry(
+    folder: &CodeWorkspaceFolder,
+    workspace_dir: &Path,
+    registry: &ProjectRegistry,
+) -> Option<ProjectEntry> {
+    let resolved = if Path::new(&folder.path).is_absolute() {
+        PathBuf::from(&folder.path)
+    } else {
+        workspace_dir.join(&folder.path)
+    };
+    let canonical = resolved.canonicalize().unwrap_or(resolved);
+    let path_string = canonical.to_string_lossy().into_owned();
+    let name = folder.name.clone().unwrap_or_else(|| {
+        canonical
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("folder")
+            .to_string()
+    });
+    let synthetic = Project {
+        id: workspace_project_id(&path_string),
+        name: name.clone(),
+        path: path_string.clone(),
+        storage_path: None,
+    };
+    let (storage_path, status) = match resolve_project_storage(&synthetic, registry, false) {
+        Some((root_path, storage_path)) => {
+            let status = if super::storage::board_path(&root_path).exists() {
+                ProjectStatus::Ready
+            } else {
+                ProjectStatus::Uninitialized
+            };
+            (Some(storage_path), status)
+        }
+        None => (None, ProjectStatus::Uninitialized),
+    };
+    if !canonical.exists() {
+        return Some(ProjectEntry {
+            project_id: synthetic.id,
+            name,
+            path: path_string,
+            storage_path,
+            status: ProjectStatus::Missing,
+        });
+    }
+    Some(ProjectEntry {
+        project_id: synthetic.id,
+        name,
+        path: path_string,
+        storage_path,
+        status,
+    })
 }
 
 pub(crate) fn default_providers() -> Vec<Box<dyn ProjectSourceProvider>> {
     vec![
         Box::new(ManualRegistryProvider),
         Box::new(GitWorktreesProvider),
+        Box::new(CodeWorkspaceProvider),
     ]
 }
 
@@ -430,5 +558,45 @@ bare
     fn find_entry_by_id_returns_none_for_missing() {
         let registry = make_registry(vec![]);
         assert!(find_entry_by_id("nonexistent", &registry).is_none());
+    }
+
+    #[test]
+    fn parses_code_workspace_folders() {
+        let json = r#"{
+            "folders": [
+                { "path": "../alpha" },
+                { "name": "Bravo", "path": "/abs/beta" }
+            ]
+        }"#;
+        let workspace: CodeWorkspaceFile =
+            serde_json::from_str(json).expect("valid code-workspace JSON");
+        assert_eq!(workspace.folders.len(), 2);
+        assert_eq!(workspace.folders[0].path, "../alpha");
+        assert_eq!(workspace.folders[1].name.as_deref(), Some("Bravo"));
+    }
+
+    #[test]
+    fn workspace_id_is_deterministic_and_distinct_from_worktree() {
+        assert_eq!(
+            workspace_project_id("/tmp/alpha"),
+            workspace_project_id("/tmp/alpha")
+        );
+        assert_ne!(
+            workspace_project_id("/tmp/alpha"),
+            worktree_project_id("/tmp/alpha")
+        );
+    }
+
+    #[test]
+    fn decode_discovered_path_recognizes_both_prefixes() {
+        assert_eq!(
+            decode_discovered_path("worktree:/tmp/a"),
+            Some("/tmp/a".into())
+        );
+        assert_eq!(
+            decode_discovered_path("workspace:/tmp/b"),
+            Some("/tmp/b".into())
+        );
+        assert_eq!(decode_discovered_path("proj_ulid_abc"), None);
     }
 }

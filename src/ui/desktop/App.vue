@@ -18,7 +18,7 @@ import {
 	X,
 } from "lucide-vue-next";
 import BoardColumn from "./components/BoardColumn.vue";
-import { desktop } from "@/platform/electron/desktop";
+import { desktop } from "@/electron/renderer";
 import Badge from "@/ui/components/Badge.vue";
 import Button from "@/ui/components/Button.vue";
 import UiCard from "@/ui/components/Card.vue";

@@ -1,11 +1,10 @@
 # Source Boundaries
 
-Trackboi keeps the product source boundaries here. The desktop shell is Electron, with
-the main process under `src/electron`.
+Trackboi keeps the product source boundaries intentionally small:
 
-- `core`: TypeScript contracts consumed by the UI and Electron bridge.
-- `ui`: desktop user interface.
-- `platform`: frontend runtime adapters such as Electron IPC/window/dialog calls.
+- `core`: product APIs and shared models. Projects, cards, boards, storage, git/source discovery, and the rules Trackboi knows.
+- `cli`: command-line orchestration. This is where `trackboi cards`, `trackboi mcp`, and future human/agent commands live.
+- `electron`: desktop shell glue only. Window creation, preload IPC, dialogs, watcher forwarding, and renderer adapters.
+- `ui`: Vue desktop interface and local UI primitives.
 
-The Electron main process currently owns local filesystem access, git probing,
-project discovery, and card/board mutations.
+Business logic should not leak into `electron` or `ui`. Those layers call `core`.

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { Board, Card, CardPatch, CustomField, ProjectIndex, ProjectMetadata, ProjectRegistry, ProjectSnapshot, WorkScope } from "@/core/types";
@@ -7,11 +8,27 @@ type BoardChangedListener = (snapshot: ProjectSnapshot | null) => void;
 type ResizeDirection = "East" | "North" | "NorthEast" | "NorthWest" | "South" | "SouthEast" | "SouthWest" | "West";
 
 const listeners = new Set<BoardChangedListener>();
+let projectChangeListenerStarted = false;
+let projectChangeRefreshQueued = false;
 
 async function notifyBoardChanged() {
 	const snapshot = await invoke<ProjectSnapshot | null>("get_active_project");
 	for (const listener of listeners) listener(snapshot);
 	return snapshot;
+}
+
+function startProjectChangeListener() {
+	if (projectChangeListenerStarted) return;
+	projectChangeListenerStarted = true;
+
+	void listen("trackboi://project-changed", () => {
+		if (projectChangeRefreshQueued) return;
+		projectChangeRefreshQueued = true;
+		window.setTimeout(() => {
+			projectChangeRefreshQueued = false;
+			void notifyBoardChanged();
+		}, 120);
+	});
 }
 
 function toResizeDirection(edge: string): ResizeDirection {
@@ -131,6 +148,7 @@ export const desktop = {
 		await window.startResizeDragging(toResizeDirection(edge));
 	},
 	addBoardChangedListener(listener: BoardChangedListener) {
+		startProjectChangeListener();
 		listeners.add(listener);
 	},
 };

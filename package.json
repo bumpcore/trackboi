@@ -6,10 +6,11 @@
 	"scripts": {
 		"dev": "tauri dev",
 		"hmr": "vite --port 5173",
-		"build": "tauri build",
+		"build": "APPIMAGE_EXTRACT_AND_RUN=1 NO_STRIP=true tauri build",
+		"build:appimage": "APPIMAGE_EXTRACT_AND_RUN=1 NO_STRIP=true tauri build --bundles appimage",
 		"tauri": "tauri",
 		"tauri:dev": "tauri dev",
-		"tauri:build": "tauri build"
+		"tauri:build": "APPIMAGE_EXTRACT_AND_RUN=1 NO_STRIP=true tauri build"
 	},
 	"dependencies": {
 		"@tailwindcss/vite": "^4.2.2",

@@ -61,27 +61,27 @@ fn registry_path(app: &AppHandle) -> Result<PathBuf> {
         .join("config.json"))
 }
 
-fn storage_root(project_path: &str, storage_path: &str) -> PathBuf {
+pub(crate) fn storage_root(project_path: &str, storage_path: &str) -> PathBuf {
     Path::new(project_path).join(storage_path)
 }
 
-fn cards_path(root_path: &Path) -> PathBuf {
+pub(crate) fn cards_path(root_path: &Path) -> PathBuf {
     root_path.join("cards")
 }
 
-fn boards_path(root_path: &Path) -> PathBuf {
+pub(crate) fn boards_path(root_path: &Path) -> PathBuf {
     root_path.join("boards")
 }
 
-fn board_path(root_path: &Path) -> PathBuf {
+pub(crate) fn board_path(root_path: &Path) -> PathBuf {
     boards_path(root_path).join(format!("{DEFAULT_BOARD_ID}.json"))
 }
 
-fn project_metadata_path(root_path: &Path) -> PathBuf {
+pub(crate) fn project_metadata_path(root_path: &Path) -> PathBuf {
     root_path.join(PROJECT_METADATA_FILE)
 }
 
-fn card_path(root_path: &Path, card_id: &str) -> PathBuf {
+pub(crate) fn card_path(root_path: &Path, card_id: &str) -> PathBuf {
     cards_path(root_path).join(format!("{card_id}.json"))
 }
 
@@ -105,7 +105,7 @@ pub(crate) fn atomic_write_json<T: Serialize>(path: &Path, value: &T) -> Result<
     Ok(())
 }
 
-fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T> {
+pub(crate) fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T> {
     let content = fs::read_to_string(path).map_err(|error| error.to_string())?;
     serde_json::from_str(&content).map_err(|error| error.to_string())
 }
@@ -212,7 +212,7 @@ pub(crate) fn storage_candidates(
     candidates
 }
 
-fn storage_exists(root_path: &Path) -> bool {
+pub(crate) fn storage_exists(root_path: &Path) -> bool {
     board_path(root_path).exists()
         || project_metadata_path(root_path).exists()
         || cards_path(root_path).exists()
@@ -252,46 +252,6 @@ pub(crate) fn resolve_project_storage(
     Some((storage_root(&project.path, &storage_path), storage_path))
 }
 
-fn default_project_metadata(project: &Project, storage_path: &str) -> ProjectMetadata {
-    ProjectMetadata {
-        version: 1,
-        project_id: project.id.clone(),
-        name: project.name.clone(),
-        storage_path: storage_path.into(),
-        created_at: now(),
-        custom_fields: vec![],
-    }
-}
-
-fn read_project_metadata(
-    root_path: &Path,
-    project: &Project,
-    storage_path: &str,
-) -> Result<ProjectMetadata> {
-    let metadata_path = project_metadata_path(root_path);
-    if !metadata_path.exists() {
-        let metadata = default_project_metadata(project, storage_path);
-        atomic_write_json(&metadata_path, &metadata)?;
-        return Ok(metadata);
-    }
-
-    let mut metadata = read_json::<ProjectMetadata>(&metadata_path)?;
-    metadata.storage_path = storage_path.into();
-    Ok(metadata)
-}
-
-fn write_project_metadata(root_path: &Path, project: &Project, storage_path: &str) -> Result<()> {
-    let metadata_path = project_metadata_path(root_path);
-    if metadata_path.exists() {
-        return Ok(());
-    }
-
-    atomic_write_json(
-        &metadata_path,
-        &default_project_metadata(project, storage_path),
-    )
-}
-
 fn remember_project_storage(app: &AppHandle, project_id: &str, storage_path: &str) -> Result<()> {
     let mut registry = read_registry(app);
     if let Some(project) = registry
@@ -323,7 +283,7 @@ fn find_git_root(start_path: &Path) -> Option<PathBuf> {
     None
 }
 
-fn read_git_context(project_path: &str) -> GitContext {
+pub(crate) fn read_git_context(project_path: &str) -> GitContext {
     let Some(root) = find_git_root(Path::new(project_path)) else {
         return GitContext {
             is_git_repo: false,
@@ -376,106 +336,12 @@ pub(crate) fn project_status(project: &Project, registry: &ProjectRegistry) -> S
     "ready".into()
 }
 
-pub(crate) fn read_project(app: &AppHandle, project: Project) -> Result<ProjectSnapshot> {
-    let registry = read_registry(app);
-    let (root_path, storage_path) = resolve_project_storage(&project, &registry, false)
-        .ok_or_else(|| "Trackboi storage has not been created for this project".to_string())?;
-    let mut metadata = read_project_metadata(&root_path, &project, &storage_path)?;
-    let board = read_json::<Board>(&board_path(&root_path))?;
-    if metadata.custom_fields.is_empty() && !board.custom_fields.is_empty() {
-        metadata.custom_fields = board.custom_fields.clone();
-        atomic_write_json(&project_metadata_path(&root_path), &metadata)?;
-    }
-    let card_dir = cards_path(&root_path);
-    let mut cards = Vec::new();
-
-    if card_dir.exists() {
-        for entry in fs::read_dir(&card_dir).map_err(|error| error.to_string())? {
-            let entry = entry.map_err(|error| error.to_string())?;
-            let path = entry.path();
-            if !path.is_file()
-                || path.extension().and_then(|extension| extension.to_str()) != Some("json")
-            {
-                continue;
-            }
-
-            let mut card = read_json::<Card>(&path)?;
-            if let Some(id) = path.file_stem().and_then(|stem| stem.to_str()) {
-                if card.id != id {
-                    return Err(format!(
-                        "Card id {} does not match filename {}",
-                        card.id, id
-                    ));
-                }
-            }
-            card.scope = normalize_scope(card.scope);
-            if card.board_id != DEFAULT_BOARD_ID {
-                continue;
-            }
-            cards.push(card);
-        }
-    }
-
-    cards.sort_by(|left, right| {
-        left.column
-            .cmp(&right.column)
-            .then(left.rank.cmp(&right.rank))
-    });
-    let git = read_git_context(&project.path);
-
-    Ok(ProjectSnapshot {
-        project: Project {
-            name: if project.name.is_empty() {
-                board.name.clone()
-            } else {
-                project.name
-            },
-            storage_path: Some(storage_path),
-            ..project
-        },
-        metadata,
-        git,
-        board,
-        cards,
-    })
-}
-
 pub(crate) fn ensure_project(app: &AppHandle, project: Project) -> Result<ProjectSnapshot> {
     let registry = read_registry(app);
-    let (root_path, storage_path) = resolve_project_storage(&project, &registry, true)
-        .ok_or_else(|| "Unable to resolve Trackboi storage path".to_string())?;
-
-    fs::create_dir_all(boards_path(&root_path)).map_err(|error| error.to_string())?;
-    fs::create_dir_all(cards_path(&root_path)).map_err(|error| error.to_string())?;
-    write_project_metadata(&root_path, &project, &storage_path)?;
-
-    let path = board_path(&root_path);
-    if !path.exists() {
-        let board = Board {
-            version: 1,
-            name: if project.name.is_empty() {
-                Path::new(&project.path)
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .unwrap_or("Project")
-                    .into()
-            } else {
-                project.name.clone()
-            },
-            columns: default_columns(),
-            custom_fields: vec![],
-        };
-        atomic_write_json(&path, &board)?;
-    }
-
-    remember_project_storage(app, &project.id, &storage_path)?;
-    read_project(
-        app,
-        Project {
-            storage_path: Some(storage_path),
-            ..project
-        },
-    )
+    let store = super::service::ProjectStore::open(project, &registry, true)?;
+    store.ensure_project_files()?;
+    remember_project_storage(app, &store.project().id, &store.storage_path)?;
+    store.read_snapshot()
 }
 
 pub(crate) fn active_snapshot(app: &AppHandle) -> Result<Option<ProjectSnapshot>> {
@@ -500,46 +366,6 @@ pub(crate) fn normalize_scope(scope: WorkScope) -> WorkScope {
     }
 
     global_scope()
-}
-
-pub(crate) fn card_path_for_active_project(app: &AppHandle, card_id: &str) -> Result<PathBuf> {
-    let project = require_active_project(app)?;
-    let registry = read_registry(app);
-    let (root_path, _) = resolve_project_storage(&project, &registry, false)
-        .ok_or_else(|| "Trackboi storage has not been created for this project".to_string())?;
-    Ok(card_path(&root_path, card_id))
-}
-
-pub(crate) fn board_path_for_active_project(app: &AppHandle) -> Result<PathBuf> {
-    let project = require_active_project(app)?;
-    let registry = read_registry(app);
-    let (root_path, _) = resolve_project_storage(&project, &registry, false)
-        .ok_or_else(|| "Trackboi storage has not been created for this project".to_string())?;
-    Ok(board_path(&root_path))
-}
-
-pub(crate) fn project_metadata_path_for_active_project(app: &AppHandle) -> Result<PathBuf> {
-    let project = require_active_project(app)?;
-    let registry = read_registry(app);
-    let (root_path, _) = resolve_project_storage(&project, &registry, false)
-        .ok_or_else(|| "Trackboi storage has not been created for this project".to_string())?;
-    Ok(project_metadata_path(&root_path))
-}
-
-pub(crate) fn card_path_in_root(root_path: &Path, card_id: &str) -> PathBuf {
-    card_path(root_path, card_id)
-}
-
-pub(crate) fn remove_file(path: impl AsRef<Path>) -> Result<()> {
-    fs::remove_file(path).map_err(|error| error.to_string())
-}
-
-pub(crate) fn read_card(path: &Path) -> Result<Card> {
-    read_json(path)
-}
-
-pub(crate) fn read_project_metadata_file(path: &Path) -> Result<ProjectMetadata> {
-    read_json(path)
 }
 
 pub(crate) fn active_storage_root(app: &AppHandle, create: bool) -> Result<PathBuf> {

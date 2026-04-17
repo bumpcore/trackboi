@@ -8,10 +8,8 @@ import {
 	rename,
 	writeTextFile,
 } from "@tauri-apps/plugin-fs";
-import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
 import { appConfigDir, basename, dirname, join } from "@tauri-apps/api/path";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import type { TrackboiRPCSchema } from "../../shared/rpc";
 import type {
 	Board,
 	Card,
@@ -24,38 +22,12 @@ import type {
 	ProjectRegistry,
 	ProjectSnapshot,
 	WorkScope,
-	WindowFrame,
 } from "../../shared/types";
 
 type BoardChangedListener = (snapshot: ProjectSnapshot | null) => void;
 type ResizeDirection = "East" | "North" | "NorthEast" | "NorthWest" | "South" | "SouthEast" | "SouthWest" | "West";
-type ElectrobunRpc = ReturnType<
-	typeof import("electrobun/view").Electroview.defineRPC<TrackboiRPCSchema>
->;
 
-const isTauri = "__TAURI_INTERNALS__" in window;
 const listeners = new Set<BoardChangedListener>();
-let electrobunRpc: ElectrobunRpc | null = null;
-
-async function getElectrobunRpc() {
-	if (electrobunRpc) return electrobunRpc;
-
-	const { Electroview } = await import("electrobun/view");
-	electrobunRpc = Electroview.defineRPC<TrackboiRPCSchema>({
-		maxRequestTime: 10_000,
-		handlers: {
-			requests: {},
-			messages: {},
-		},
-	});
-	new Electroview({ rpc: electrobunRpc });
-
-	for (const listener of listeners) {
-		electrobunRpc.addMessageListener("boardChanged", listener);
-	}
-
-	return electrobunRpc;
-}
 
 const DEFAULT_COLUMNS = [
 	{ id: "todo", name: "To Do" },
@@ -768,39 +740,28 @@ function toResizeDirection(edge: string): ResizeDirection {
 const tauriWindow = () => getCurrentWindow();
 
 export const desktop = {
-	isTauri,
 	async getActiveProject() {
-		return isTauri ? activeSnapshot() : (await getElectrobunRpc()).request.getActiveProject();
+		return activeSnapshot();
 	},
 	async listProjects() {
-		return isTauri ? readRegistry() : (await getElectrobunRpc()).request.listProjects();
+		return readRegistry();
 	},
 	async listProjectIndex() {
-		if (isTauri) return readProjectIndex();
-		const registry = await (await getElectrobunRpc()).request.listProjects();
-		return {
-			projects: registry.projects.map((project) => ({ ...project, status: "ready" as const })),
-			activeProjectId: registry.activeProjectId,
-			storageSearchPaths: DEFAULT_STORAGE_SEARCH_PATHS,
-		};
+		return readProjectIndex();
 	},
 	async setStorageSearchPaths(paths: string[]) {
-		if (isTauri) return writeStorageSearchPaths(paths);
-		throw new Error("Storage search path settings are only available in the Tauri shell");
+		return writeStorageSearchPaths(paths);
 	},
 	async chooseProject() {
-		return isTauri ? tauriChooseProject() : (await getElectrobunRpc()).request.chooseProject();
+		return tauriChooseProject();
 	},
 	async locateProject(projectId: string) {
-		if (isTauri) return tauriLocateProject(projectId);
-		throw new Error("Project location is only available in the Tauri shell");
+		return tauriLocateProject(projectId);
 	},
 	async removeProject(projectId: string) {
-		if (isTauri) return removeProjectFromRegistry(projectId);
-		throw new Error("Project removal is only available in the Tauri shell");
+		return removeProjectFromRegistry(projectId);
 	},
 	async switchProject(projectId: string) {
-		if (!isTauri) return (await getElectrobunRpc()).request.switchProject({ projectId });
 		const registry = await readRegistry();
 		if (!registry.projects.some((project) => project.id === projectId)) {
 			throw new Error(`Unknown project: ${projectId}`);
@@ -816,83 +777,48 @@ export const desktop = {
 		column: string;
 		scope?: WorkScope;
 	}) {
-		return isTauri ? tauriCreateCard(input) : (await getElectrobunRpc()).request.createCard(input);
+		return tauriCreateCard(input);
 	},
 	async updateCard(cardId: string, patch: CardPatch) {
-		return isTauri
-			? tauriUpdateCard(cardId, patch)
-			: (await getElectrobunRpc()).request.updateCard({ cardId, patch });
+		return tauriUpdateCard(cardId, patch);
 	},
 	async updateBoard(board: Board) {
-		if (isTauri) return tauriUpdateBoard(board);
-		throw new Error("Board settings are only available in the Tauri shell");
+		return tauriUpdateBoard(board);
 	},
 	async moveCard(cardId: string, toColumn: string, beforeCardId: string | null) {
-		return isTauri
-			? tauriMoveCard(cardId, toColumn, beforeCardId)
-			: (await getElectrobunRpc()).request.moveCard({ cardId, toColumn, beforeCardId });
+		return tauriMoveCard(cardId, toColumn, beforeCardId);
 	},
 	async deleteCard(cardId: string) {
-		return isTauri ? tauriDeleteCard(cardId) : (await getElectrobunRpc()).request.deleteCard({ cardId });
+		return tauriDeleteCard(cardId);
 	},
 	async minimizeWindow() {
-		if (isTauri) {
-			await tauriWindow().minimize();
-			return { ok: true as const };
-		}
-		return (await getElectrobunRpc()).request.minimizeWindow();
+		await tauriWindow().minimize();
+		return { ok: true as const };
 	},
 	async toggleMaximizeWindow() {
-		if (isTauri) {
-			const window = tauriWindow();
-			if (await window.isMaximized()) await window.unmaximize();
-			else await window.maximize();
-			return { ok: true as const };
-		}
-		return (await getElectrobunRpc()).request.toggleMaximizeWindow();
+		const window = tauriWindow();
+		if (await window.isMaximized()) await window.unmaximize();
+		else await window.maximize();
+		return { ok: true as const };
 	},
 	async closeWindow() {
-		if (isTauri) {
-			await tauriWindow().close();
-			return { ok: true as const };
-		}
-		return (await getElectrobunRpc()).request.closeWindow();
+		await tauriWindow().close();
+		return { ok: true as const };
 	},
 	async startWindowDrag() {
-		if (isTauri) {
-			const window = tauriWindow();
-			if (await window.isMaximized()) {
-				await window.unmaximize();
-			}
-			await window.setFocus();
-			await window.startDragging();
+		const window = tauriWindow();
+		if (await window.isMaximized()) {
+			await window.unmaximize();
 		}
+		await window.setFocus();
+		await window.startDragging();
 	},
 	async startResize(edge: string) {
-		if (isTauri) {
-			const window = tauriWindow();
-			await window.setFocus();
-			await window.startResizeDragging(toResizeDirection(edge));
-		}
-	},
-	async getWindowFrame(): Promise<WindowFrame> {
-		if (!isTauri) return (await getElectrobunRpc()).request.getWindowFrame();
-		const [position, size] = await Promise.all([
-			tauriWindow().outerPosition(),
-			tauriWindow().outerSize(),
-		]);
-		return { x: position.x, y: position.y, width: size.width, height: size.height };
-	},
-	async setWindowFrame(frame: WindowFrame) {
-		if (!isTauri) return (await getElectrobunRpc()).request.setWindowFrame(frame);
-		await Promise.all([
-			tauriWindow().setPosition(new PhysicalPosition(frame.x, frame.y)),
-			tauriWindow().setSize(new PhysicalSize(frame.width, frame.height)),
-		]);
-		return { ok: true as const };
+		const window = tauriWindow();
+		await window.setFocus();
+		await window.startResizeDragging(toResizeDirection(edge));
 	},
 	addBoardChangedListener(listener: BoardChangedListener) {
 		listeners.add(listener);
-		if (!isTauri) void getElectrobunRpc().then((rpc) => rpc.addMessageListener("boardChanged", listener));
 	},
 };

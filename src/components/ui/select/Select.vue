@@ -38,7 +38,7 @@ withDefaults(defineProps<{
 	<SelectRoot v-model="modelValue" :disabled="disabled">
 		<SelectTrigger
 			:class="cn(
-				'electrobun-webkit-app-region-no-drag flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm outline-none transition-colors hover:bg-accent focus-visible:ring-1 focus-visible:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50',
+				'flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm outline-none transition-colors hover:bg-accent focus-visible:ring-1 focus-visible:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50',
 				$props.class,
 			)"
 		>

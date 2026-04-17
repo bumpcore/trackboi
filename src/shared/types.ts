@@ -71,13 +71,6 @@ export type ProjectRegistry = {
 	storageSearchPaths?: string[];
 };
 
-export type WindowFrame = {
-	x: number;
-	y: number;
-	width: number;
-	height: number;
-};
-
 export type GitContext = {
 	isGitRepo: boolean;
 	root: string | null;

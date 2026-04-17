@@ -37,7 +37,6 @@ import type {
 	ProjectIndexEntry,
 	ProjectSnapshot,
 	WorkScope,
-	WindowFrame,
 } from "../shared/types";
 
 const snapshot = ref<ProjectSnapshot | null>(null);
@@ -77,8 +76,6 @@ type Confirmation = {
 	onConfirm: () => void | Promise<void>;
 };
 
-const MIN_WINDOW_WIDTH = 760;
-const MIN_WINDOW_HEIGHT = 480;
 const boardScopeMode = ref<BoardScopeMode>("all");
 const draftScopeMode = ref<ScopeMode>("global");
 const editScopeMode = ref<ScopeMode>("global");
@@ -704,7 +701,7 @@ function resizeCursor(edge: ResizeEdge) {
 }
 
 function resizeHandleClass(edge: ResizeEdge) {
-	const base = "electrobun-webkit-app-region-no-drag fixed z-50";
+	const base = "fixed z-50";
 	const classes: Record<ResizeEdge, string> = {
 		n: "left-3 right-3 top-0 h-2",
 		e: "right-0 top-3 bottom-3 w-2",
@@ -719,80 +716,9 @@ function resizeHandleClass(edge: ResizeEdge) {
 	return `${base} ${classes[edge]}`;
 }
 
-function nextFrameForResize(
-	edge: ResizeEdge,
-	startFrame: WindowFrame,
-	deltaX: number,
-	deltaY: number,
-): WindowFrame {
-	let { x, y, width, height } = startFrame;
-
-	if (edge.includes("e")) {
-		width = Math.max(MIN_WINDOW_WIDTH, startFrame.width + deltaX);
-	}
-
-	if (edge.includes("s")) {
-		height = Math.max(MIN_WINDOW_HEIGHT, startFrame.height + deltaY);
-	}
-
-	if (edge.includes("w")) {
-		const nextWidth = Math.max(MIN_WINDOW_WIDTH, startFrame.width - deltaX);
-		x = startFrame.x + (startFrame.width - nextWidth);
-		width = nextWidth;
-	}
-
-	if (edge.includes("n")) {
-		const nextHeight = Math.max(MIN_WINDOW_HEIGHT, startFrame.height - deltaY);
-		y = startFrame.y + (startFrame.height - nextHeight);
-		height = nextHeight;
-	}
-
-	return { x, y, width, height };
-}
-
 async function startResize(edge: ResizeEdge, event: PointerEvent) {
 	event.preventDefault();
-
-	if (desktop.isTauri) {
-		await desktop.startResize(edge);
-		return;
-	}
-
-	const target = event.currentTarget as HTMLElement | null;
-	target?.setPointerCapture(event.pointerId);
-
-	const startX = event.screenX;
-	const startY = event.screenY;
-	const startFrame = await desktop.getWindowFrame();
-	let pending = false;
-	let latestFrame = startFrame;
-
-	const move = (moveEvent: PointerEvent) => {
-		latestFrame = nextFrameForResize(
-			edge,
-			startFrame,
-			moveEvent.screenX - startX,
-			moveEvent.screenY - startY,
-		);
-
-		if (pending) return;
-		pending = true;
-		requestAnimationFrame(() => {
-			pending = false;
-			void desktop.setWindowFrame(latestFrame);
-		});
-	};
-
-	const stop = () => {
-		target?.releasePointerCapture(event.pointerId);
-		window.removeEventListener("pointermove", move);
-		window.removeEventListener("pointerup", stop);
-		window.removeEventListener("pointercancel", stop);
-	};
-
-	window.addEventListener("pointermove", move);
-	window.addEventListener("pointerup", stop, { once: true });
-	window.addEventListener("pointercancel", stop, { once: true });
+	await desktop.startResize(edge);
 }
 
 desktop.addBoardChangedListener(setSnapshot);
@@ -811,7 +737,7 @@ onMounted(loadProject);
 		/>
 
 		<header
-			class="electrobun-webkit-app-region-drag grid h-9 grid-cols-[58px_260px_minmax(0,1fr)_112px] border-b border-border/80 bg-card/95 max-lg:grid-cols-[58px_minmax(0,1fr)_112px]"
+			class="grid h-9 grid-cols-[58px_260px_minmax(0,1fr)_112px] border-b border-border/80 bg-card/95 max-lg:grid-cols-[58px_minmax(0,1fr)_112px]"
 		>
 			<div class="border-r border-border/80" data-tauri-drag-region @pointerdown="startTitlebarDrag" />
 			<div
@@ -832,7 +758,7 @@ onMounted(loadProject);
 						{{ snapshot?.project.name ?? "Trackboi" }}
 					</span>
 				</div>
-				<div class="electrobun-webkit-app-region-no-drag flex items-center gap-2" data-window-control>
+				<div class="flex items-center gap-2" data-window-control>
 					<Badge v-if="snapshot" variant="secondary">{{ totalCards }} cards</Badge>
 					<Badge v-if="gitBranchLabel" variant="outline" class="max-w-48 gap-1.5">
 						<GitBranch class="h-3 w-3 shrink-0" />
@@ -841,7 +767,7 @@ onMounted(loadProject);
 					<Badge variant="outline">{{ activeStoragePath }}</Badge>
 				</div>
 			</div>
-			<div class="electrobun-webkit-app-region-no-drag flex items-center justify-end border-l border-border/80 px-1" data-window-control>
+			<div class="flex items-center justify-end border-l border-border/80 px-1" data-window-control>
 				<Button variant="ghost" size="icon" type="button" title="Minimize" @click="minimizeWindow">
 					<Minus class="h-4 w-4" />
 				</Button>

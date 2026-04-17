@@ -336,8 +336,8 @@ Decision example:
 ```json
 {
   "id": "decision_x",
-  "title": "Use Tauri instead of Electrobun",
-  "reason": "Custom titlebar and resizing were unstable on Fedora.",
+  "title": "Use Tauri for the desktop shell",
+  "reason": "The app needs a small native shell with reliable Linux window behavior.",
   "scope": {
     "kind": "branch",
     "ref": "spike/tauri-shell"

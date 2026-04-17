@@ -13,16 +13,16 @@ const props = withDefaults(
 );
 
 const variants = {
-	default: "border-transparent bg-primary text-primary-foreground",
-	secondary: "border-transparent bg-secondary text-secondary-foreground",
-	outline: "border-border text-foreground",
+	default: "border-transparent bg-primary/90 text-primary-foreground",
+	secondary: "border-border/40 bg-secondary/70 text-secondary-foreground",
+	outline: "border-border/55 bg-background/20 text-foreground",
 };
 </script>
 
 <template>
 	<div
 		:class="cn(
-			'inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold transition-colors',
+			'inline-flex items-center rounded border px-1.5 py-px text-[11px] font-medium leading-5 transition-colors',
 			variants[props.variant],
 			props.class,
 		)"

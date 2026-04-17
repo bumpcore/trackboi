@@ -21,5 +21,5 @@
 		}
 	},
 	"include": ["src", "env.d.ts"],
-	"exclude": ["node_modules", "dist", "dist-node", "build", "../../package/dist"]
+	"exclude": ["node_modules", "dist", "dist-node", "build", "playgrounds", "../../package/dist"]
 }

@@ -44,6 +44,11 @@ export type Card = {
 	fieldValues: Record<string, FieldValue>;
 	createdAt: string;
 	updatedAt: string;
+	originWorktreeId?: string;
+	originStoragePath?: string;
+	worktreeIds?: string[];
+	conflicted?: boolean;
+	variants?: CardVariant[];
 };
 
 export type WorkScope =
@@ -52,9 +57,20 @@ export type WorkScope =
 		ref: "global";
 	}
 	| {
-		kind: "branch";
+		kind: "track";
 		ref: string;
 	};
+
+export type CardVariant = {
+	worktreeId: string;
+	worktreeName: string;
+	storagePath: string;
+	updatedAt: string;
+	title: string;
+	description: string;
+	column: string;
+	scope: WorkScope;
+};
 
 export type Project = {
 	id: string;
@@ -67,7 +83,6 @@ export type ProjectStatus = "ready" | "uninitialized" | "missing";
 
 export type ProjectSourceKind =
 	| { kind: "manual" }
-	| { kind: "gitWorktrees"; repoRoot: string }
 	| { kind: "codeWorkspace"; filePath: string };
 
 export type ProjectEntry = {
@@ -76,6 +91,8 @@ export type ProjectEntry = {
 	path: string;
 	storagePath?: string;
 	status: ProjectStatus;
+	branch?: string | null;
+	cardCount?: number | null;
 };
 
 export type ProjectSource = ProjectSourceKind & {
@@ -95,6 +112,7 @@ export type ProjectRegistry = {
 	activeProjectId: string | null;
 	storageSearchPaths: string[];
 	activeWorkspaceFile: string | null;
+	selectedWorktreeId: string | null;
 };
 
 export type GitContext = {
@@ -105,12 +123,32 @@ export type GitContext = {
 	dirty: boolean | null;
 };
 
+export type WorktreeContext = {
+	id: string;
+	name: string;
+	path: string;
+	branch: string | null;
+	isPrimary: boolean;
+	storagePath: string | null;
+	storageRoot: string | null;
+	status: ProjectStatus;
+	cardCount: number;
+	colorKey: string;
+};
+
 export type ProjectSnapshot = {
 	project: Project;
 	metadata: ProjectMetadata;
 	git: GitContext;
 	board: Board;
 	cards: Card[];
+};
+
+export type DesktopState = {
+	snapshot: ProjectSnapshot | null;
+	view: ProjectView;
+	worktrees: WorktreeContext[];
+	selectedWorktreeId: string | null;
 };
 
 export type ProjectSnapshotWithInternals = ProjectSnapshot & {
@@ -123,6 +161,7 @@ export type CreateCardInput = {
 	parentId?: string | null;
 	column: string;
 	scope?: WorkScope;
+	targetWorktreeId?: string | null;
 };
 
 export type MoveCardInput = {
@@ -150,6 +189,9 @@ export type TrackboiRuntime = {
 	listView(): ProjectView;
 	activeSnapshot(): ProjectSnapshot | null;
 	activeSnapshotWithInternals(): ProjectSnapshotWithInternals | null;
+	readDesktopState(): DesktopState;
+	invalidateCache(): void;
+	setSelectedWorktree(worktreeId: string | null): DesktopState;
 	chooseProjectPath(projectPath: string): ProjectSnapshot;
 	locateProjectPath(projectId: string, projectPath: string): ProjectSnapshot;
 	removeProject(projectId: string): ProjectSnapshot | null;

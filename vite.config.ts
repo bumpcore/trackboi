@@ -5,14 +5,14 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
 	plugins: [vue(), tailwindcss()],
-	root: "src/ui/desktop",
+	root: "src/ui",
 	resolve: {
 		alias: {
 			"@": path.resolve(__dirname, "./src"),
 		},
 	},
 	build: {
-		outDir: "../../../dist",
+		outDir: "../../dist",
 		emptyOutDir: true,
 	},
 	server: {

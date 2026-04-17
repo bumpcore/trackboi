@@ -32,7 +32,7 @@ export function createCardInStore(
 		description: input.description?.trim() ?? "",
 		parentId: input.parentId ?? null,
 		scope: input.scope ? normalizeScope(input.scope) : snapshot.git.branch
-			? { kind: "branch", ref: snapshot.git.branch }
+			? { kind: "track", ref: snapshot.git.branch }
 			: { kind: "project", ref: "global" },
 		column: input.column,
 		rank: rankBetween(columnCards.at(-1)?.rank ?? null, null),

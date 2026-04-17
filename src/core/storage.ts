@@ -97,6 +97,26 @@ export function ensureProjectFiles(project: Project, rootPath: string, storagePa
 	}
 }
 
+export function normalizeProjectMetadata(metadata: ProjectMetadata, project: Project, storagePath: string): ProjectMetadata {
+	return {
+		version: 1,
+		projectId: typeof metadata.projectId === "string" ? metadata.projectId : project.id,
+		name: typeof metadata.name === "string" ? metadata.name : project.name,
+		storagePath: typeof metadata.storagePath === "string" ? metadata.storagePath : storagePath,
+		createdAt: typeof metadata.createdAt === "string" ? metadata.createdAt : now(),
+		customFields: Array.isArray(metadata.customFields) ? metadata.customFields : [],
+	};
+}
+
+export function normalizeBoard(board: Board, project: Project): Board {
+	return {
+		version: 1,
+		name: typeof board.name === "string" ? board.name : project.name,
+		columns: Array.isArray(board.columns) ? board.columns : defaultColumns(),
+		customFields: Array.isArray(board.customFields) ? board.customFields : [],
+	};
+}
+
 export function projectFromMetadata(store: ProjectStore): Project {
 	try {
 		const metadata = readJson<ProjectMetadata>(projectMetadataPath(store.rootPath));

@@ -2,6 +2,7 @@ import type {
 	Board,
 	CardPatch,
 	CustomField,
+	DesktopState,
 	ProjectSnapshot,
 	WorkScope,
 } from "@/core/types";
@@ -43,6 +44,12 @@ export const desktop = {
 	async listView() {
 		return window.trackboi.listView();
 	},
+	async readDesktopState(): Promise<DesktopState> {
+		return window.trackboi.readDesktopState();
+	},
+	async setSelectedWorktree(worktreeId: string | null): Promise<DesktopState> {
+		return window.trackboi.setSelectedWorktree(worktreeId);
+	},
 	async setStorageSearchPaths(paths: string[]) {
 		return window.trackboi.setStorageSearchPaths(paths);
 	},
@@ -68,9 +75,9 @@ export const desktop = {
 		return snapshot;
 	},
 	async switchProject(projectId: string) {
-		const snapshot = await window.trackboi.switchProject(projectId);
-		for (const listener of listeners) listener(snapshot);
-		return snapshot;
+		const nextState = await window.trackboi.switchProject(projectId);
+		for (const listener of listeners) listener(nextState.snapshot);
+		return nextState;
 	},
 	async createCard(input: {
 		title: string;
@@ -78,6 +85,7 @@ export const desktop = {
 		parentId?: string | null;
 		column: string;
 		scope?: WorkScope;
+		targetWorktreeId?: string | null;
 	}) {
 		const card = await window.trackboi.createCard(input);
 		await notifyBoardChanged();

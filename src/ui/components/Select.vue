@@ -38,7 +38,7 @@ withDefaults(defineProps<{
 	<SelectRoot v-model="modelValue" :disabled="disabled">
 		<SelectTrigger
 			:class="cn(
-				'flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm outline-none transition-colors hover:bg-accent focus-visible:ring-1 focus-visible:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50',
+				'flex h-8 w-full items-center justify-between gap-2 rounded-md border border-input/70 bg-background/35 px-2.5 py-1 text-sm text-foreground outline-none transition-colors hover:bg-accent/70 focus-visible:ring-1 focus-visible:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50',
 				$props.class,
 			)"
 		>
@@ -52,7 +52,7 @@ withDefaults(defineProps<{
 			<SelectContent
 				position="popper"
 				:side-offset="6"
-				class="z-50 max-h-72 min-w-[var(--reka-select-trigger-width)] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out"
+				class="z-50 max-h-72 min-w-[var(--reka-select-trigger-width)] overflow-hidden rounded-md border border-border/70 bg-popover text-popover-foreground shadow-xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out"
 			>
 				<SelectViewport class="p-1">
 					<SelectItem
@@ -61,7 +61,7 @@ withDefaults(defineProps<{
 						:value="option.value"
 						:disabled="option.disabled"
 						:class="cn(
-							'relative flex h-8 cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-45',
+							'relative flex h-7 cursor-default select-none items-center rounded py-1 pl-7 pr-2 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-45',
 						)"
 					>
 						<span class="absolute left-2 grid h-4 w-4 place-items-center">

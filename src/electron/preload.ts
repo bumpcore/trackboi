@@ -5,6 +5,7 @@ import type {
 	CardPatch,
 	CreateCardInput,
 	CustomField,
+	DesktopState,
 	MoveCardInput,
 	ProjectMetadata,
 	ProjectRegistry,
@@ -20,13 +21,15 @@ export type TrackboiApi = {
 	getActiveProject(): Promise<ProjectSnapshot | null>;
 	listProjects(): Promise<ProjectRegistry>;
 	listView(): Promise<ProjectView>;
+	readDesktopState(): Promise<DesktopState>;
+	setSelectedWorktree(worktreeId: string | null): Promise<DesktopState>;
 	setStorageSearchPaths(paths: string[]): Promise<ProjectView>;
 	setActiveWorkspaceFile(filePath: string | null): Promise<ProjectView>;
 	openWorkspaceFile(): Promise<ProjectView | null>;
 	chooseProject(): Promise<ProjectSnapshot | null>;
 	locateProject(projectId: string): Promise<ProjectSnapshot | null>;
 	removeProject(projectId: string): Promise<ProjectSnapshot | null>;
-	switchProject(projectId: string): Promise<ProjectSnapshot | null>;
+	switchProject(projectId: string): Promise<DesktopState>;
 	createCard(input: CreateCardInput): Promise<Card>;
 	updateCard(cardId: string, patch: CardPatch): Promise<Card>;
 	updateBoard(board: Board): Promise<Board>;
@@ -53,6 +56,10 @@ const api: TrackboiApi = {
 	getActiveProject: () => ipcRenderer.invoke("trackboi:get-active-project") as Promise<ProjectSnapshot | null>,
 	listProjects: () => ipcRenderer.invoke("trackboi:list-projects") as Promise<ProjectRegistry>,
 	listView: () => ipcRenderer.invoke("trackboi:list-view") as Promise<ProjectView>,
+	readDesktopState: () => ipcRenderer.invoke("trackboi:read-desktop-state") as Promise<DesktopState>,
+	setSelectedWorktree: (worktreeId) => (
+		ipcRenderer.invoke("trackboi:set-selected-worktree", worktreeId) as Promise<DesktopState>
+	),
 	setStorageSearchPaths: (paths) => (
 		ipcRenderer.invoke("trackboi:set-storage-search-paths", paths) as Promise<ProjectView>
 	),
@@ -67,9 +74,7 @@ const api: TrackboiApi = {
 	removeProject: (projectId) => (
 		ipcRenderer.invoke("trackboi:remove-project", projectId) as Promise<ProjectSnapshot | null>
 	),
-	switchProject: (projectId) => (
-		ipcRenderer.invoke("trackboi:switch-project", projectId) as Promise<ProjectSnapshot | null>
-	),
+	switchProject: (projectId) => ipcRenderer.invoke("trackboi:switch-project", projectId) as Promise<DesktopState>,
 	createCard: (input) => ipcRenderer.invoke("trackboi:create-card", input) as Promise<Card>,
 	updateCard: (cardId, patch) => (
 		ipcRenderer.invoke("trackboi:update-card", cardId, patch) as Promise<Card>

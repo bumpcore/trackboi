@@ -37,25 +37,31 @@ if (cliArgs.length > 0) {
 
 function getActiveProject() {
 	const snapshot = runtime.activeSnapshotWithInternals();
-	if (snapshot?.storageRoot) refreshStorageWatcher(snapshot.storageRoot);
+	const desktopState = runtime.readDesktopState();
+	refreshStorageWatcher(desktopState.worktrees
+		.map((worktree) => worktree.storageRoot)
+		.filter((rootPath): rootPath is string => typeof rootPath === "string" && rootPath.length > 0));
 	return stripInternalSnapshotFields(snapshot);
 }
 
-function refreshStorageWatcher(rootPath: string): void {
+function refreshStorageWatcher(rootPaths: string[]): void {
 	for (const watcher of activeWatchers) watcher.close();
 	activeWatchers = [];
-	for (const targetPath of [
-		rootPath,
-		runtime.paths.boardsPath(rootPath),
-		runtime.paths.cardsPath(rootPath),
-	]) {
-		if (!existsSync(targetPath)) continue;
-		activeWatchers.push(watch(targetPath, () => {
-			if (watcherTimer) clearTimeout(watcherTimer);
-			watcherTimer = setTimeout(() => {
-				mainWindow?.webContents.send("trackboi://project-changed", { rootPath });
-			}, 120);
-		}));
+	for (const rootPath of rootPaths) {
+		for (const targetPath of [
+			rootPath,
+			runtime.paths.boardsPath(rootPath),
+			runtime.paths.cardsPath(rootPath),
+		]) {
+			if (!existsSync(targetPath)) continue;
+			activeWatchers.push(watch(targetPath, () => {
+				if (watcherTimer) clearTimeout(watcherTimer);
+				watcherTimer = setTimeout(() => {
+					runtime.invalidateCache();
+					mainWindow?.webContents.send("trackboi://project-changed", { rootPath });
+				}, 120);
+			}));
+		}
 	}
 }
 
@@ -100,6 +106,10 @@ function registerIpc(): void {
 	ipcMain.handle("trackboi:get-active-project", () => getActiveProject());
 	ipcMain.handle("trackboi:list-projects", () => runtime.readRegistry());
 	ipcMain.handle("trackboi:list-view", () => runtime.listView());
+	ipcMain.handle("trackboi:read-desktop-state", () => runtime.readDesktopState());
+	ipcMain.handle("trackboi:set-selected-worktree", (_event: IpcMainInvokeEvent, worktreeId: string | null) => (
+		runtime.setSelectedWorktree(worktreeId)
+	));
 	ipcMain.handle("trackboi:set-storage-search-paths", (_event: IpcMainInvokeEvent, paths: string[]) => (
 		runtime.setStorageSearchPaths(paths)
 	));
@@ -129,7 +139,7 @@ function registerIpc(): void {
 	});
 	ipcMain.handle("trackboi:switch-project", (_event: IpcMainInvokeEvent, projectId: string) => {
 		runtime.switchProject(projectId);
-		return getActiveProject();
+		return runtime.readDesktopState();
 	});
 	ipcMain.handle("trackboi:create-card", (_event: IpcMainInvokeEvent, input: Parameters<typeof runtime.createCard>[0]) => (
 		runtime.createCard(input)

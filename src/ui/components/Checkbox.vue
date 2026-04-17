@@ -14,7 +14,7 @@ defineProps<{
 	<CheckboxRoot
 		v-model:checked="modelValue"
 		:class="cn(
-			'grid h-5 w-5 shrink-0 place-items-center rounded-md border border-input bg-background text-primary shadow-sm outline-none transition-colors hover:bg-accent focus-visible:ring-1 focus-visible:ring-ring data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground',
+			'grid h-4 w-4 shrink-0 place-items-center rounded border border-input/70 bg-background/35 text-primary outline-none transition-colors hover:bg-accent/70 focus-visible:ring-1 focus-visible:ring-ring data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground',
 			$props.class,
 		)"
 	>

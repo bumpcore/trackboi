@@ -126,7 +126,7 @@ function printCards(runtime: TrackboiRuntime, options: CardsOptions): void {
 
 	console.log(`${snapshot.project.name} (${snapshot.cards.length} cards)`);
 	for (const card of snapshot.cards) {
-		const scope = card.scope.kind === "branch" ? card.scope.ref : "global";
+		const scope = card.scope.kind === "track" ? card.scope.ref : "global";
 		const parent = card.parentId ? ` parent:${card.parentId}` : "";
 		console.log(`- ${card.id} [${card.column}] [${scope}] ${card.title}${parent}`);
 	}

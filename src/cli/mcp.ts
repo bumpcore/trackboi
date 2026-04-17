@@ -15,7 +15,7 @@ const scopeSchema = z.discriminatedUnion("kind", [
 		ref: z.literal("global"),
 	}),
 	z.object({
-		kind: z.literal("branch"),
+		kind: z.literal("track"),
 		ref: z.string().min(1),
 	}),
 ]);
@@ -53,8 +53,16 @@ function registerProjectTools(server: McpServer, runtime: TrackboiRuntime): void
 
 	server.registerTool("get_active_project", {
 		title: "Get active project",
-		description: "Return the active project snapshot, including board, git context, and cards.",
+		description: "Return the active project snapshot, including the unified board, git context, and cards.",
 	}, () => toolResult(() => runtime.activeSnapshot()));
+
+	server.registerTool("list_worktrees", {
+		title: "List worktrees",
+		description: "List worktree contexts for the active project.",
+		inputSchema: {
+			projectId: projectIdSchema,
+		},
+	}, ({ projectId }) => toolResult(() => withProject(runtime, projectId, () => runtime.readDesktopState().worktrees)));
 
 	server.registerTool("switch_project", {
 		title: "Switch project",
@@ -114,14 +122,16 @@ function registerCardTools(server: McpServer, runtime: TrackboiRuntime): void {
 			parentId: z.string().nullable().optional(),
 			column: columnSchema,
 			scope: scopeSchema.optional(),
+			targetWorktreeId: z.string().optional().describe("Optional worktree id to store the new card in."),
 		},
-	}, ({ projectId, title, description, parentId, column, scope }) => toolResult(() => (
+	}, ({ projectId, title, description, parentId, column, scope, targetWorktreeId }) => toolResult(() => (
 		withProject(runtime, projectId, () => runtime.createCard({
 			title,
 			description,
 			parentId,
 			column,
 			scope,
+			targetWorktreeId,
 		}))
 	)));
 

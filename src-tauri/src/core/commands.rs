@@ -166,11 +166,7 @@ pub fn remove_project(app: AppHandle, project_id: String) -> Result<Option<Proje
 #[tauri::command]
 pub fn switch_project(app: AppHandle, project_id: String) -> Result<Option<ProjectSnapshot>> {
     let mut registry = read_registry(&app);
-    if !registry
-        .projects
-        .iter()
-        .any(|project| project.id == project_id)
-    {
+    if super::sources::find_entry_by_id(&project_id, &registry).is_none() {
         return Err(format!("Unknown project: {project_id}"));
     }
 

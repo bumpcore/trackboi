@@ -1,7 +1,8 @@
 use super::model::*;
-use super::storage::{project_status, resolve_project_storage};
+use super::storage::{active_project_path, project_status, resolve_project_storage};
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 
 pub(crate) const MANUAL_SOURCE_ID: &str = "manual";
 
@@ -11,7 +12,7 @@ pub(crate) struct ProjectSourceContext<'a> {
 
 pub(crate) trait ProjectSourceProvider {
     fn source_id(&self) -> String;
-    fn kind(&self) -> ProjectSourceKind;
+    fn kind(&self, context: &ProjectSourceContext) -> ProjectSourceKind;
     fn label(&self, context: &ProjectSourceContext) -> String;
     fn enumerate(&self, context: &ProjectSourceContext) -> Vec<ProjectEntry>;
 }
@@ -23,7 +24,7 @@ impl ProjectSourceProvider for ManualRegistryProvider {
         MANUAL_SOURCE_ID.into()
     }
 
-    fn kind(&self) -> ProjectSourceKind {
+    fn kind(&self, _context: &ProjectSourceContext) -> ProjectSourceKind {
         ProjectSourceKind::Manual
     }
 
@@ -79,7 +80,7 @@ pub(crate) fn assemble_view(
 
         sources.push(ProjectSource {
             id: provider.source_id(),
-            kind: provider.kind(),
+            kind: provider.kind(&context),
             label: provider.label(&context),
             entries: kept,
         });
@@ -92,8 +93,159 @@ pub(crate) fn assemble_view(
     }
 }
 
+pub(crate) struct GitWorktreesProvider;
+
+impl ProjectSourceProvider for GitWorktreesProvider {
+    fn source_id(&self) -> String {
+        "git_worktrees".into()
+    }
+
+    fn kind(&self, context: &ProjectSourceContext) -> ProjectSourceKind {
+        ProjectSourceKind::GitWorktrees {
+            repo_root: active_repo_root(context).unwrap_or_default(),
+        }
+    }
+
+    fn label(&self, context: &ProjectSourceContext) -> String {
+        match active_repo_root(context) {
+            Some(root) => {
+                let name = Path::new(&root)
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("repository");
+                format!("Worktrees of {name}")
+            }
+            None => "Worktrees".into(),
+        }
+    }
+
+    fn enumerate(&self, context: &ProjectSourceContext) -> Vec<ProjectEntry> {
+        let Some(repo_root) = active_repo_root(context) else {
+            return vec![];
+        };
+        let Some(worktree_paths) = list_worktrees(Path::new(&repo_root)) else {
+            return vec![];
+        };
+
+        worktree_paths
+            .into_iter()
+            .filter_map(|path| build_worktree_entry(&path, context.registry))
+            .collect()
+    }
+}
+
+fn active_repo_root(context: &ProjectSourceContext) -> Option<String> {
+    let path = active_project_path(context.registry)?;
+    find_git_root(Path::new(&path)).map(|p| p.to_string_lossy().into_owned())
+}
+
+fn find_git_root(start_path: &Path) -> Option<PathBuf> {
+    let mut current = start_path.to_path_buf();
+    for _ in 0..64 {
+        if current.join(".git").exists() {
+            return Some(current);
+        }
+        if !current.pop() {
+            return None;
+        }
+    }
+    None
+}
+
+fn list_worktrees(repo_root: &Path) -> Option<Vec<PathBuf>> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(repo_root)
+        .arg("worktree")
+        .arg("list")
+        .arg("--porcelain")
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    Some(parse_worktree_list(&String::from_utf8_lossy(&output.stdout)))
+}
+
+fn parse_worktree_list(stdout: &str) -> Vec<PathBuf> {
+    stdout
+        .lines()
+        .filter_map(|line| line.strip_prefix("worktree "))
+        .map(PathBuf::from)
+        .collect()
+}
+
+fn build_worktree_entry(path: &Path, registry: &ProjectRegistry) -> Option<ProjectEntry> {
+    let path_string = path.to_string_lossy().into_owned();
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("worktree")
+        .to_string();
+    let synthetic = Project {
+        id: worktree_project_id(&path_string),
+        name: name.clone(),
+        path: path_string.clone(),
+        storage_path: None,
+    };
+    let (storage_path, status) = match resolve_project_storage(&synthetic, registry, false) {
+        Some((root_path, storage_path)) => {
+            let status = if super::storage::board_path(&root_path).exists() {
+                ProjectStatus::Ready
+            } else {
+                ProjectStatus::Uninitialized
+            };
+            (Some(storage_path), status)
+        }
+        None => (None, ProjectStatus::Uninitialized),
+    };
+    if !path.exists() {
+        return Some(ProjectEntry {
+            project_id: synthetic.id,
+            name,
+            path: path_string,
+            storage_path,
+            status: ProjectStatus::Missing,
+        });
+    }
+    Some(ProjectEntry {
+        project_id: synthetic.id,
+        name,
+        path: path_string,
+        storage_path,
+        status,
+    })
+}
+
+pub(crate) fn worktree_project_id(canonical_path: &str) -> String {
+    format!("worktree:{canonical_path}")
+}
+
+pub(crate) fn find_entry_by_id(
+    project_id: &str,
+    registry: &ProjectRegistry,
+) -> Option<ProjectEntry> {
+    let view = assemble_view(&default_providers(), registry);
+    view.sources
+        .into_iter()
+        .flat_map(|source| source.entries)
+        .find(|entry| entry.project_id == project_id)
+}
+
+pub(crate) fn entry_as_project(entry: ProjectEntry) -> Project {
+    Project {
+        id: entry.project_id,
+        name: entry.name,
+        path: entry.path,
+        storage_path: entry.storage_path,
+    }
+}
+
 pub(crate) fn default_providers() -> Vec<Box<dyn ProjectSourceProvider>> {
-    vec![Box::new(ManualRegistryProvider)]
+    vec![
+        Box::new(ManualRegistryProvider),
+        Box::new(GitWorktreesProvider),
+    ]
 }
 
 #[cfg(test)]
@@ -128,7 +280,7 @@ mod tests {
         fn source_id(&self) -> String {
             self.id.clone()
         }
-        fn kind(&self) -> ProjectSourceKind {
+        fn kind(&self, _: &ProjectSourceContext) -> ProjectSourceKind {
             ProjectSourceKind::Manual
         }
         fn label(&self, _: &ProjectSourceContext) -> String {
@@ -209,5 +361,62 @@ mod tests {
         assert_eq!(view.sources.len(), 1);
         assert_eq!(view.sources[0].entries.len(), 1);
         assert_eq!(view.sources[0].entries[0].project_id, "proj_1");
+    }
+
+    #[test]
+    fn parses_porcelain_worktree_list() {
+        let stdout = "\
+worktree /home/user/repo
+HEAD abcdef
+branch refs/heads/main
+
+worktree /home/user/repo-spike
+HEAD 123456
+branch refs/heads/spike/foo
+
+worktree /home/user/repo-bare
+bare
+";
+        let paths = parse_worktree_list(stdout);
+        assert_eq!(paths.len(), 3);
+        assert_eq!(paths[0], PathBuf::from("/home/user/repo"));
+        assert_eq!(paths[1], PathBuf::from("/home/user/repo-spike"));
+        assert_eq!(paths[2], PathBuf::from("/home/user/repo-bare"));
+    }
+
+    #[test]
+    fn parses_empty_worktree_list() {
+        assert!(parse_worktree_list("").is_empty());
+    }
+
+    #[test]
+    fn worktree_project_id_is_deterministic() {
+        assert_eq!(
+            worktree_project_id("/tmp/alpha"),
+            worktree_project_id("/tmp/alpha")
+        );
+        assert_ne!(
+            worktree_project_id("/tmp/alpha"),
+            worktree_project_id("/tmp/beta")
+        );
+    }
+
+    #[test]
+    fn find_entry_by_id_locates_manual_entry() {
+        let registry = make_registry(vec![Project {
+            id: "proj_1".into(),
+            name: "Alpha".into(),
+            path: "/tmp/alpha".into(),
+            storage_path: Some(".trackboi".into()),
+        }]);
+        let entry = find_entry_by_id("proj_1", &registry);
+        assert!(entry.is_some());
+        assert_eq!(entry.unwrap().name, "Alpha");
+    }
+
+    #[test]
+    fn find_entry_by_id_returns_none_for_missing() {
+        let registry = make_registry(vec![]);
+        assert!(find_entry_by_id("nonexistent", &registry).is_none());
     }
 }

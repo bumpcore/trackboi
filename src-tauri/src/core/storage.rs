@@ -181,11 +181,15 @@ pub(crate) fn write_registry(
 }
 
 pub(crate) fn active_project_from_registry(registry: &ProjectRegistry) -> Option<Project> {
-    registry
-        .active_project_id
-        .as_ref()
-        .and_then(|id| registry.projects.iter().find(|project| &project.id == id))
-        .cloned()
+    let id = registry.active_project_id.as_ref()?;
+    if let Some(project) = registry.projects.iter().find(|project| &project.id == id) {
+        return Some(project.clone());
+    }
+    super::sources::find_entry_by_id(id, registry).map(super::sources::entry_as_project)
+}
+
+pub(crate) fn active_project_path(registry: &ProjectRegistry) -> Option<String> {
+    active_project_from_registry(registry).map(|project| project.path)
 }
 
 pub(crate) fn storage_candidates(

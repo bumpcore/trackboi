@@ -151,9 +151,11 @@ fn sanitize_registry(registry: ProjectRegistry) -> ProjectRegistry {
         .as_ref()
         .and_then(|paths| normalize_storage_search_paths(paths).ok())
         .unwrap_or_else(default_storage_search_paths);
+    // active_project_id may reference a discovered (non-manual) entry, so we cannot
+    // filter it against registry.projects alone. Only fall back to the first manual
+    // entry when no active is set at all; stale ids resolve to None at lookup time.
     let active_project_id = registry
         .active_project_id
-        .filter(|id| registry.projects.iter().any(|project| &project.id == id))
         .or_else(|| registry.projects.first().map(|project| project.id.clone()));
 
     ProjectRegistry {
@@ -185,7 +187,20 @@ pub(crate) fn active_project_from_registry(registry: &ProjectRegistry) -> Option
     if let Some(project) = registry.projects.iter().find(|project| &project.id == id) {
         return Some(project.clone());
     }
-    super::sources::find_entry_by_id(id, registry).map(super::sources::entry_as_project)
+    // Discovered-entry ids encode their own path; synthesize a minimal Project
+    // so we never recurse into assemble_view here.
+    let path = super::sources::decode_discovered_path(id)?;
+    let name = Path::new(&path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("Project")
+        .to_string();
+    Some(Project {
+        id: id.clone(),
+        name,
+        path,
+        storage_path: None,
+    })
 }
 
 pub(crate) fn active_project_path(registry: &ProjectRegistry) -> Option<String> {
@@ -382,4 +397,58 @@ pub(crate) fn active_storage_root(app: &AppHandle, create: bool) -> Result<PathB
 
 pub(crate) fn json_ok() -> Value {
     serde_json::json!({ "ok": true })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sanitize_preserves_discovered_active_id() {
+        let registry = ProjectRegistry {
+            projects: vec![Project {
+                id: "proj_manual".into(),
+                name: "Manual".into(),
+                path: "/tmp/manual".into(),
+                storage_path: Some(".trackboi".into()),
+            }],
+            active_project_id: Some("worktree:/tmp/elsewhere".into()),
+            storage_search_paths: Some(default_storage_search_paths()),
+        };
+        let sanitized = sanitize_registry(registry);
+        assert_eq!(
+            sanitized.active_project_id.as_deref(),
+            Some("worktree:/tmp/elsewhere")
+        );
+    }
+
+    #[test]
+    fn active_project_resolves_discovered_worktree_id_without_recursion() {
+        let registry = ProjectRegistry {
+            projects: vec![],
+            active_project_id: Some("worktree:/tmp/sibling".into()),
+            storage_search_paths: Some(default_storage_search_paths()),
+        };
+        // If this call recurses into assemble_view it would stack-overflow; reaching
+        // this assertion means the resolution stayed on the non-recursive path.
+        let project = active_project_from_registry(&registry).expect("active resolves");
+        assert_eq!(project.path, "/tmp/sibling");
+        assert_eq!(project.id, "worktree:/tmp/sibling");
+    }
+
+    #[test]
+    fn sanitize_falls_back_when_active_is_none() {
+        let registry = ProjectRegistry {
+            projects: vec![Project {
+                id: "proj_manual".into(),
+                name: "Manual".into(),
+                path: "/tmp/manual".into(),
+                storage_path: Some(".trackboi".into()),
+            }],
+            active_project_id: None,
+            storage_search_paths: Some(default_storage_search_paths()),
+        };
+        let sanitized = sanitize_registry(registry);
+        assert_eq!(sanitized.active_project_id.as_deref(), Some("proj_manual"));
+    }
 }

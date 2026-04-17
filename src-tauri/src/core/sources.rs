@@ -221,6 +221,18 @@ pub(crate) fn worktree_project_id(canonical_path: &str) -> String {
     format!("worktree:{canonical_path}")
 }
 
+// Discovered-entry ids encode their path as "<source>:<canonical_path>". This lets
+// active_project_from_registry resolve them without running providers, which would
+// recurse (providers read the active project path while computing the view).
+pub(crate) fn decode_discovered_path(project_id: &str) -> Option<String> {
+    for prefix in &["worktree:"] {
+        if let Some(rest) = project_id.strip_prefix(prefix) {
+            return Some(rest.to_string());
+        }
+    }
+    None
+}
+
 pub(crate) fn find_entry_by_id(
     project_id: &str,
     registry: &ProjectRegistry,

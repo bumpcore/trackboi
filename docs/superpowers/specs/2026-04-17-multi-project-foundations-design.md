@@ -1,7 +1,7 @@
 # Multi-Project Foundations — Design
 
 Date: 2026-04-17
-Branch: spike/tauri-shell
+Branch: desktop-shell
 Roadmap item: #2 of [next-features-roadmap](2026-04-17-next-features-roadmap.md)
 
 ## Goal
@@ -24,33 +24,32 @@ Establish the data model, discovery API, and sidebar UI that item 3 (git worktre
 
 ## Data Model
 
-Three new types replace today's flat `ProjectIndex`.
+Three source-oriented types replace the early flat project list.
 
-```rust
-pub enum ProjectSourceKind {
-    Manual,
-    GitWorktrees { repo_root: String },   // item 3
-    CodeWorkspace { file_path: String },  // item 4
+```ts
+type ProjectSourceKind =
+	| { kind: "manual" }
+	| { kind: "gitWorktrees"; repoRoot: string }
+	| { kind: "codeWorkspace"; filePath: string };
+
+type ProjectSource = ProjectSourceKind & {
+	id: string;
+	label: string;
+	entries: ProjectEntry[];
 }
 
-pub struct ProjectSource {
-    pub id: String,
-    pub kind: ProjectSourceKind,
-    pub label: String,
-    pub entries: Vec<ProjectEntry>,
+type ProjectEntry = {
+	projectId: string;
+	name: string;
+	path: string;        // canonical absolute
+	storagePath?: string;
+	status: ProjectStatus;
 }
 
-pub struct ProjectEntry {
-    pub project_id: String,
-    pub name: String,
-    pub path: String,                 // canonical absolute
-    pub storage_path: Option<String>,
-    pub status: ProjectStatus,
-}
-
-pub struct ProjectView {
-    pub sources: Vec<ProjectSource>,
-    pub active_project_id: Option<String>,
+type ProjectView = {
+	sources: ProjectSource[];
+	activeProjectId: string | null;
+	storageSearchPaths: string[];
 }
 ```
 
@@ -59,17 +58,15 @@ pub struct ProjectView {
 
 ## Discovery API
 
-Each source implements:
+Each source is assembled by a small provider function:
 
-```rust
-trait ProjectSourceProvider {
-    fn enumerate(&self, context: &ProjectSourceContext) -> Vec<ProjectEntry>;
-}
+```ts
+type ProjectSourceProvider = (context: ProjectSourceContext) => ProjectSource | null;
 
-pub struct ProjectSourceContext<'a> {
-    pub registry: &'a ProjectRegistry,
-    pub active_project_path: Option<&'a str>,
-}
+type ProjectSourceContext = {
+	registry: ProjectRegistry;
+	activeProjectPath: string | null;
+};
 ```
 
 The view assembler runs each registered provider, collects their entries, deduplicates by canonical storage path (first-seen wins), and returns a `ProjectView`.

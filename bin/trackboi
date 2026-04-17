@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SELF_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+ROOT_DIR="$(CDPATH= cd -- "$SELF_DIR/.." && pwd)"
+COMMAND="${1:-}"
+
+is_cli_command() {
+	case "$1" in
+		mcp|projects|cards|help|--help|-h) return 0 ;;
+		*) return 1 ;;
+	esac
+}
+
+first_existing_file() {
+	for candidate in "$@"; do
+		if [[ -f "$candidate" ]]; then
+			printf '%s\n' "$candidate"
+			return 0
+		fi
+	done
+	return 1
+}
+
+first_executable_file() {
+	for candidate in "$@"; do
+		if [[ -x "$candidate" ]]; then
+			printf '%s\n' "$candidate"
+			return 0
+		fi
+	done
+	return 1
+}
+
+ELECTRON_BINARY="${TRACKBOI_ELECTRON:-}"
+if [[ -z "$ELECTRON_BINARY" ]]; then
+	ELECTRON_BINARY="$(first_executable_file \
+		"$ROOT_DIR/node_modules/electron/dist/electron" \
+		"$ROOT_DIR/../MacOS/Trackboi" \
+		"$ROOT_DIR/../../Trackboi" \
+		"$ROOT_DIR/Trackboi" \
+		"$ROOT_DIR/trackboi" \
+	)"
+fi
+
+if is_cli_command "$COMMAND"; then
+	CLI_ENTRY="$(first_existing_file \
+		"$ROOT_DIR/dist-node/cli/main.cjs" \
+		"$ROOT_DIR/cli/main.cjs" \
+		"$ROOT_DIR/app/dist-node/cli/main.cjs" \
+		"$ROOT_DIR/app.asar.unpacked/dist-node/cli/main.cjs" \
+	)"
+	export ELECTRON_RUN_AS_NODE=1
+	exec "$ELECTRON_BINARY" "$CLI_ENTRY" "$@"
+fi
+
+DESKTOP_ENTRY="$(first_existing_file \
+	"$ROOT_DIR/dist-node/electron/main.cjs" \
+	"$ROOT_DIR/electron/main.cjs" \
+	"$ROOT_DIR/app/dist-node/electron/main.cjs" \
+	"$ROOT_DIR/app.asar.unpacked/dist-node/electron/main.cjs" \
+	|| true
+)"
+
+unset ELECTRON_RUN_AS_NODE
+if [[ -n "$DESKTOP_ENTRY" ]]; then
+	exec "$ELECTRON_BINARY" "$DESKTOP_ENTRY" "$@"
+fi
+
+exec "$ELECTRON_BINARY" "$@"

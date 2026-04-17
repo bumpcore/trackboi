@@ -93,8 +93,8 @@ export type ProjectView = {
 export type ProjectRegistry = {
 	projects: Project[];
 	activeProjectId: string | null;
-	storageSearchPaths?: string[];
-	activeWorkspaceFile?: string | null;
+	storageSearchPaths: string[];
+	activeWorkspaceFile: string | null;
 };
 
 export type GitContext = {
@@ -113,6 +113,53 @@ export type ProjectSnapshot = {
 	cards: Card[];
 };
 
+export type ProjectSnapshotWithInternals = ProjectSnapshot & {
+	storageRoot: string;
+};
+
+export type CreateCardInput = {
+	title: string;
+	description?: string;
+	parentId?: string | null;
+	column: string;
+	scope?: WorkScope;
+};
+
+export type MoveCardInput = {
+	cardId: string;
+	toColumn: string;
+	beforeCardId?: string | null;
+};
+
 export type CardPatch = Partial<
 	Pick<Card, "boardId" | "title" | "description" | "parentId" | "scope" | "column" | "rank" | "labels" | "assignee" | "fieldValues">
 >;
+
+export type RuntimePaths = {
+	boardsPath(rootPath: string): string;
+	cardsPath(rootPath: string): string;
+	boardPath(rootPath: string): string;
+	cardPath(rootPath: string, cardId: string): string;
+	projectMetadataPath(rootPath: string): string;
+};
+
+export type TrackboiRuntime = {
+	paths: RuntimePaths;
+	readRegistry(): ProjectRegistry;
+	writeRegistry(registry: ProjectRegistry): ProjectRegistry;
+	listView(): ProjectView;
+	activeSnapshot(): ProjectSnapshot | null;
+	activeSnapshotWithInternals(): ProjectSnapshotWithInternals | null;
+	chooseProjectPath(projectPath: string): ProjectSnapshot;
+	locateProjectPath(projectId: string, projectPath: string): ProjectSnapshot;
+	removeProject(projectId: string): ProjectSnapshot | null;
+	switchProject(projectId: string): ProjectSnapshot | null;
+	setStorageSearchPaths(paths: string[]): ProjectView;
+	setActiveWorkspaceFile(filePath: string | null): ProjectView;
+	createCard(input: CreateCardInput): Card;
+	updateCard(cardId: string, patch: CardPatch): Card;
+	updateBoard(board: Board): Board;
+	updateCustomFields(customFields: CustomField[]): ProjectMetadata;
+	moveCard(input: MoveCardInput): Card;
+	deleteCard(cardId: string): { ok: true };
+};

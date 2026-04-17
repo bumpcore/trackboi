@@ -1,7 +1,7 @@
 # Trackboi — Next Features Roadmap
 
 Date: 2026-04-17
-Branch: spike/tauri-shell
+Branch: desktop-shell
 
 This is a roadmap, not a spec. It sequences four upcoming work items and records the shared design decisions that span them. Each numbered item will get its own design spec and implementation plan when it is picked up.
 
@@ -22,7 +22,7 @@ Classification: bug investigation. Uses `systematic-debugging`, not feature desi
 
 Why first: every other item on this list depends on the UI reflecting disk state. Worktree switching, workspace folders, and commit-link ingestion all change files on disk and expect the board to update. Fixing this first means the later features do not have to work around a broken feedback loop.
 
-Current watcher lives in `src-tauri/src/core/watcher.rs` and emits `trackboi://project-changed` to the webview. Investigation should establish whether the event fires, whether the webview subscribes, and whether the subsequent refresh actually re-reads the snapshot.
+Current watcher lives in `src/electron/main.ts` and emits `trackboi://project-changed` to the renderer through the preload bridge. Investigation should establish whether the event fires, whether the renderer subscribes, and whether the subsequent refresh actually re-reads the snapshot.
 
 ### 2. Multi-project foundations
 

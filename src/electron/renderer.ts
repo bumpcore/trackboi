@@ -1,14 +1,11 @@
 import type {
 	Board,
-	Card,
 	CardPatch,
 	CustomField,
-	ProjectMetadata,
-	ProjectRegistry,
 	ProjectSnapshot,
-	ProjectView,
 	WorkScope,
 } from "@/core/types";
+import type { TrackboiApi } from "./preload";
 
 type BoardChangedListener = (snapshot: ProjectSnapshot | null) => void;
 
@@ -137,37 +134,6 @@ export const desktop = {
 
 declare global {
 	interface Window {
-		trackboi: {
-			getActiveProject(): Promise<ProjectSnapshot | null>;
-			listProjects(): Promise<ProjectRegistry>;
-			listView(): Promise<ProjectView>;
-			setStorageSearchPaths(paths: string[]): Promise<ProjectView>;
-			setActiveWorkspaceFile(filePath: string | null): Promise<ProjectView>;
-			openWorkspaceFile(): Promise<ProjectView | null>;
-			chooseProject(): Promise<ProjectSnapshot | null>;
-			locateProject(projectId: string): Promise<ProjectSnapshot | null>;
-			removeProject(projectId: string): Promise<ProjectSnapshot | null>;
-			switchProject(projectId: string): Promise<ProjectSnapshot | null>;
-			createCard(input: {
-				title: string;
-				description?: string;
-				parentId?: string | null;
-				column: string;
-				scope?: WorkScope;
-			}): Promise<Card>;
-			updateCard(cardId: string, patch: CardPatch): Promise<Card>;
-			updateBoard(board: Board): Promise<Board>;
-			updateCustomFields(customFields: CustomField[]): Promise<ProjectMetadata>;
-			moveCard(cardId: string, toColumn: string, beforeCardId: string | null): Promise<Card>;
-			deleteCard(cardId: string): Promise<{ ok: true }>;
-			onProjectChanged(listener: (payload: { rootPath: string }) => void): () => void;
-			window: {
-				minimize(): Promise<void>;
-				toggleMaximize(): Promise<void>;
-				close(): Promise<void>;
-				startDrag(): Promise<void>;
-				startResize(edge: string): Promise<void>;
-			};
-		};
+		trackboi: TrackboiApi;
 	}
 }

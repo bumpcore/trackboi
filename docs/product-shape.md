@@ -135,7 +135,7 @@ For v1, a card has one primary scope.
 {
   "scope": {
     "kind": "branch",
-    "ref": "spike/tauri-shell"
+    "ref": "spike/desktop-shell"
   }
 }
 ```
@@ -208,9 +208,9 @@ Possible v2 placement model:
 
 ```json
 {
-  "id": "branch_spike_tauri_shell",
+  "id": "branch_spike_desktop_shell",
   "kind": "branch",
-  "ref": "spike/tauri-shell",
+  "ref": "spike/desktop-shell",
   "placements": {
     "card_x": { "column": "doing", "rank": "V" }
   }
@@ -230,10 +230,10 @@ V1 card direction:
   "id": "card_x",
   "boardId": "default",
   "title": "Fix custom titlebar drag",
-  "description": "Tauri window drag fails when permissions are missing.",
+  "description": "Frameless desktop window drag needs stable platform behavior.",
   "scope": {
     "kind": "branch",
-    "ref": "spike/tauri-shell"
+    "ref": "spike/desktop-shell"
   },
   "parentId": null,
   "column": "doing",
@@ -336,11 +336,11 @@ Decision example:
 ```json
 {
   "id": "decision_x",
-  "title": "Use Tauri for the desktop shell",
-  "reason": "The app needs a small native shell with reliable Linux window behavior.",
+  "title": "Use Electron for the desktop shell",
+  "reason": "The app needs a boring, well-documented desktop shell and a headless CLI/MCP path using the bundled runtime.",
   "scope": {
     "kind": "branch",
-    "ref": "spike/tauri-shell"
+    "ref": "spike/desktop-shell"
   },
   "createdAt": "2026-04-17T00:00:00.000Z"
 }

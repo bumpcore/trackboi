@@ -295,7 +295,7 @@ impl ProjectSourceProvider for CodeWorkspaceProvider {
         let Some(workspace_dir) = workspace_path.parent() else {
             return vec![];
         };
-        let Some(contents) = std::fs::read_to_string(&workspace_path).ok() else {
+        let Ok(contents) = std::fs::read_to_string(&workspace_path) else {
             return vec![];
         };
         let Ok(workspace) = serde_json::from_str::<CodeWorkspaceFile>(&contents) else {
@@ -311,19 +311,8 @@ impl ProjectSourceProvider for CodeWorkspaceProvider {
 }
 
 fn active_workspace_file(context: &ProjectSourceContext) -> Option<PathBuf> {
-    let project_path = active_project_path(context.registry)?;
-    let dir = PathBuf::from(&project_path);
-    if !dir.is_dir() {
-        return None;
-    }
-    let entries = std::fs::read_dir(&dir).ok()?;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.extension().and_then(|ext| ext.to_str()) == Some("code-workspace") {
-            return Some(path);
-        }
-    }
-    None
+    let path = context.registry.active_workspace_file.as_ref()?;
+    Some(PathBuf::from(path))
 }
 
 fn build_workspace_entry(
@@ -398,6 +387,7 @@ mod tests {
             active_project_id: projects.first().map(|project| project.id.clone()),
             projects,
             storage_search_paths: Some(default_storage_search_paths()),
+            active_workspace_file: None,
         }
     }
 

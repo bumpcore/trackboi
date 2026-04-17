@@ -5,6 +5,7 @@ import {
 	FolderOpen,
 	GitBranch,
 	HelpCircle,
+	Layers,
 	ListPlus,
 	Maximize2,
 	Minus,
@@ -461,6 +462,31 @@ async function resetStorageSearchPaths() {
 	});
 }
 
+const activeWorkspaceFile = computed<string | null>(() => {
+	const source = view.value.sources.find((source) => source.kind === "codeWorkspace");
+	if (!source) return null;
+	const filePath = "filePath" in source ? source.filePath : "";
+	return filePath && filePath.length > 0 ? filePath : null;
+});
+
+function workspaceFileLabel(path: string) {
+	const trimmed = path.split("/").filter(Boolean).pop() ?? path;
+	return trimmed.replace(/\.code-workspace$/, "");
+}
+
+async function openWorkspaceFile() {
+	await run(async () => {
+		const next = await desktop.openWorkspaceFile();
+		if (next) view.value = next;
+	});
+}
+
+async function closeWorkspaceFile() {
+	await run(async () => {
+		view.value = await desktop.setActiveWorkspaceFile(null);
+	});
+}
+
 async function switchProject(projectId: string) {
 	if (projectId === view.value.activeProjectId) return;
 
@@ -874,6 +900,31 @@ onMounted(loadProject);
 					<FolderOpen class="h-4 w-4" />
 					Add project
 				</Button>
+
+				<Button
+					v-if="!activeWorkspaceFile"
+					class="mt-2 w-full"
+					variant="outline"
+					type="button"
+					:disabled="busy"
+					@click="openWorkspaceFile"
+				>
+					<Layers class="h-4 w-4" />
+					Open workspace…
+				</Button>
+
+				<div
+					v-else
+					class="mt-2 flex items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs"
+				>
+					<Layers class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+					<span class="min-w-0 truncate font-medium" :title="activeWorkspaceFile">
+						{{ workspaceFileLabel(activeWorkspaceFile) }}
+					</span>
+					<Button variant="ghost" size="icon" type="button" :disabled="busy" title="Close workspace" @click="closeWorkspaceFile">
+						<X class="h-3 w-3" />
+					</Button>
+				</div>
 
 				<Button v-if="snapshot" class="mt-2 w-full" type="button" :disabled="busy" @click="openNewCard()">
 					<Plus class="h-4 w-4" />

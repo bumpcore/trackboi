@@ -60,6 +60,17 @@ export const desktop = {
 	async setStorageSearchPaths(paths: string[]) {
 		return invoke<ProjectView>("set_storage_search_paths", { paths });
 	},
+	async setActiveWorkspaceFile(filePath: string | null) {
+		return invoke<ProjectView>("set_active_workspace_file", { filePath });
+	},
+	async openWorkspaceFile() {
+		const selected = await openDialog({
+			multiple: false,
+			filters: [{ name: "Code Workspace", extensions: ["code-workspace"] }],
+		});
+		if (typeof selected !== "string") return null;
+		return invoke<ProjectView>("set_active_workspace_file", { filePath: selected });
+	},
 	async chooseProject() {
 		const selected = await openDialog({ directory: true, multiple: false });
 		if (typeof selected !== "string") return this.getActiveProject();

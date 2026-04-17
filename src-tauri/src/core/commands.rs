@@ -47,6 +47,17 @@ pub fn list_view(app: AppHandle) -> ProjectView {
 }
 
 #[tauri::command]
+pub fn set_active_workspace_file(
+    app: AppHandle,
+    file_path: Option<String>,
+) -> Result<ProjectView> {
+    let mut registry = read_registry(&app);
+    registry.active_workspace_file = file_path.filter(|path| !path.trim().is_empty());
+    write_registry(&app, registry)?;
+    Ok(list_view(app))
+}
+
+#[tauri::command]
 pub fn set_storage_search_paths(app: AppHandle, paths: Vec<String>) -> Result<ProjectView> {
     let mut registry = read_registry(&app);
     registry.storage_search_paths = Some(normalize_storage_search_paths(&paths)?);

@@ -55,6 +55,7 @@ impl ProjectStore {
             projects: vec![project.clone()],
             active_project_id: Some(project.id.clone()),
             storage_search_paths: Some(default_storage_search_paths()),
+            active_workspace_file: None,
         };
 
         Self::open(project, &registry, create)

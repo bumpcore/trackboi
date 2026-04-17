@@ -115,6 +115,7 @@ fn empty_registry() -> ProjectRegistry {
         projects: vec![],
         active_project_id: None,
         storage_search_paths: Some(default_storage_search_paths()),
+        active_workspace_file: None,
     }
 }
 
@@ -162,6 +163,7 @@ fn sanitize_registry(registry: ProjectRegistry) -> ProjectRegistry {
         projects: registry.projects,
         active_project_id,
         storage_search_paths: Some(storage_search_paths),
+        active_workspace_file: registry.active_workspace_file,
     }
 }
 
@@ -414,6 +416,7 @@ mod tests {
             }],
             active_project_id: Some("worktree:/tmp/elsewhere".into()),
             storage_search_paths: Some(default_storage_search_paths()),
+            active_workspace_file: None,
         };
         let sanitized = sanitize_registry(registry);
         assert_eq!(
@@ -428,6 +431,7 @@ mod tests {
             projects: vec![],
             active_project_id: Some("worktree:/tmp/sibling".into()),
             storage_search_paths: Some(default_storage_search_paths()),
+            active_workspace_file: None,
         };
         // If this call recurses into assemble_view it would stack-overflow; reaching
         // this assertion means the resolution stayed on the non-recursive path.
@@ -447,6 +451,7 @@ mod tests {
             }],
             active_project_id: None,
             storage_search_paths: Some(default_storage_search_paths()),
+            active_workspace_file: None,
         };
         let sanitized = sanitize_registry(registry);
         assert_eq!(sanitized.active_project_id.as_deref(), Some("proj_manual"));

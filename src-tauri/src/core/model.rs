@@ -86,6 +86,8 @@ pub struct ProjectRegistry {
     pub active_project_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub storage_search_paths: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_workspace_file: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

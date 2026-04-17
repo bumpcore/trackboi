@@ -1,9 +1,9 @@
 use super::model::*;
 use super::service::ProjectStore;
+use super::sources::{assemble_view, default_providers};
 use super::storage::{
     active_snapshot, active_storage_root, ensure_project, json_ok, normalize_storage_search_paths,
-    project_status, read_registry, require_active_project, resolve_project_storage,
-    storage_candidates, write_registry,
+    read_registry, require_active_project, resolve_project_storage, write_registry,
 };
 use super::watcher::watch_storage_root;
 use super::Result;
@@ -41,32 +41,18 @@ pub fn list_projects(app: AppHandle) -> ProjectRegistry {
 }
 
 #[tauri::command]
-pub fn list_project_index(app: AppHandle) -> ProjectIndex {
+pub fn list_view(app: AppHandle) -> ProjectView {
     let registry = read_registry(&app);
-    ProjectIndex {
-        projects: registry
-            .projects
-            .iter()
-            .map(|project| ProjectIndexEntry {
-                id: project.id.clone(),
-                name: project.name.clone(),
-                path: project.path.clone(),
-                storage_path: project.storage_path.clone(),
-                status: project_status(project, &registry),
-            })
-            .collect(),
-        active_project_id: registry.active_project_id.clone(),
-        storage_search_paths: storage_candidates(&registry, None),
-    }
+    assemble_view(&default_providers(), &registry)
 }
 
 #[tauri::command]
-pub fn set_storage_search_paths(app: AppHandle, paths: Vec<String>) -> Result<ProjectIndex> {
+pub fn set_storage_search_paths(app: AppHandle, paths: Vec<String>) -> Result<ProjectView> {
     let mut registry = read_registry(&app);
     registry.storage_search_paths = Some(normalize_storage_search_paths(&paths)?);
     write_registry(&app, registry)?;
     refresh_storage_watcher(&app);
-    Ok(list_project_index(app))
+    Ok(list_view(app))
 }
 
 #[tauri::command]

@@ -88,21 +88,47 @@ pub struct ProjectRegistry {
     pub storage_search_paths: Option<Vec<String>>,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectStatus {
+    Ready,
+    Uninitialized,
+    Missing,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ProjectIndexEntry {
-    pub id: String,
-    pub name: String,
-    pub path: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub storage_path: Option<String>,
-    pub status: String,
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub enum ProjectSourceKind {
+    Manual,
+    GitWorktrees { repo_root: String },
+    CodeWorkspace { file_path: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ProjectIndex {
-    pub projects: Vec<ProjectIndexEntry>,
+pub struct ProjectEntry {
+    pub project_id: String,
+    pub name: String,
+    pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub storage_path: Option<String>,
+    pub status: ProjectStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectSource {
+    pub id: String,
+    #[serde(flatten)]
+    pub kind: ProjectSourceKind,
+    pub label: String,
+    pub entries: Vec<ProjectEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectView {
+    pub sources: Vec<ProjectSource>,
     pub active_project_id: Option<String>,
     pub storage_search_paths: Vec<String>,
 }

@@ -2,6 +2,7 @@ pub mod commands;
 pub(crate) mod model;
 pub(crate) mod rank;
 pub(crate) mod service;
+pub(crate) mod sources;
 pub(crate) mod storage;
 pub(crate) mod watcher;
 

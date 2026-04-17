@@ -65,12 +65,27 @@ export type Project = {
 
 export type ProjectStatus = "ready" | "uninitialized" | "missing";
 
-export type ProjectIndexEntry = Project & {
+export type ProjectSourceKind =
+	| { kind: "manual" }
+	| { kind: "gitWorktrees"; repoRoot: string }
+	| { kind: "codeWorkspace"; filePath: string };
+
+export type ProjectEntry = {
+	projectId: string;
+	name: string;
+	path: string;
+	storagePath?: string;
 	status: ProjectStatus;
 };
 
-export type ProjectIndex = {
-	projects: ProjectIndexEntry[];
+export type ProjectSource = ProjectSourceKind & {
+	id: string;
+	label: string;
+	entries: ProjectEntry[];
+};
+
+export type ProjectView = {
+	sources: ProjectSource[];
 	activeProjectId: string | null;
 	storageSearchPaths: string[];
 };

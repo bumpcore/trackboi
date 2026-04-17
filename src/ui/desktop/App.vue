@@ -33,14 +33,14 @@ import type {
 	Card as TrackboiCard,
 	FieldType,
 	FieldValue,
-	ProjectIndex,
-	ProjectIndexEntry,
+	ProjectEntry,
 	ProjectSnapshot,
+	ProjectView,
 	WorkScope,
 } from "@/core/types";
 
 const snapshot = ref<ProjectSnapshot | null>(null);
-const registry = ref<ProjectIndex>({ projects: [], activeProjectId: null, storageSearchPaths: [] });
+const view = ref<ProjectView>({ sources: [], activeProjectId: null, storageSearchPaths: [] });
 const loading = ref(true);
 const busy = ref(false);
 const error = ref<string | null>(null);
@@ -202,23 +202,20 @@ const cardsByColumn = computed(() => {
 	return grouped;
 });
 
-const activeProject = computed(() => (
-	registry.value.projects.find((project) => project.id === registry.value.activeProjectId) ?? null
+const allEntries = computed<ProjectEntry[]>(() => (
+	view.value.sources.flatMap((source) => source.entries)
 ));
+const activeProject = computed<ProjectEntry | null>(() => {
+	const id = view.value.activeProjectId;
+	if (!id) return null;
+	return allEntries.value.find((entry) => entry.projectId === id) ?? null;
+});
 const activeProjectInitial = computed(() => (
 	(activeProject.value?.name ?? snapshot.value?.project.name ?? "Trackboi").slice(0, 1).toUpperCase()
 ));
 const activeProjectPath = computed(() => activeProject.value?.path ?? snapshot.value?.project.path ?? "Choose a project");
 const activeStoragePath = computed(() => activeProject.value?.storagePath ?? snapshot.value?.project.storagePath ?? ".trackboi");
-const visibleProjects = computed(() => {
-	const seenPaths = new Set<string>();
-	return registry.value.projects.filter((project) => {
-		if (seenPaths.has(project.path)) return false;
-		seenPaths.add(project.path);
-		return true;
-	});
-});
-const hasProjects = computed(() => registry.value.projects.length > 0);
+const hasProjects = computed(() => allEntries.value.length > 0);
 const totalCards = computed(() => snapshot.value?.cards.length ?? 0);
 const visibleCardCount = computed(() => visibleParentCards.value.length);
 const scopeEmptyMessage = computed(() => {
@@ -239,13 +236,13 @@ function projectInitial(name: string) {
 	return name.slice(0, 1).toUpperCase();
 }
 
-function statusLabel(status: ProjectIndexEntry["status"]) {
+function statusLabel(status: ProjectEntry["status"]) {
 	if (status === "ready") return "Ready";
 	if (status === "uninitialized") return "New";
 	return "Missing";
 }
 
-function statusClass(status: ProjectIndexEntry["status"]) {
+function statusClass(status: ProjectEntry["status"]) {
 	if (status === "ready") return "bg-primary";
 	if (status === "uninitialized") return "bg-amber-400";
 	return "bg-destructive";
@@ -374,7 +371,7 @@ function closeProjectSettings() {
 }
 
 async function refreshRegistry() {
-	registry.value = await desktop.listProjectIndex();
+	view.value = await desktop.listView();
 }
 
 async function run(action: () => Promise<void>) {
@@ -418,11 +415,11 @@ async function locateProject(projectId: string) {
 }
 
 async function removeProject(projectId: string) {
-	const project = registry.value.projects.find((project) => project.id === projectId);
-	if (!project) return;
+	const entry = allEntries.value.find((entry) => entry.projectId === projectId);
+	if (!entry) return;
 
 	confirmation.value = {
-		title: `Remove ${project.name}?`,
+		title: `Remove ${entry.name}?`,
 		description: "Trackboi will forget this project, but files on disk will stay where they are.",
 		confirmLabel: "Remove",
 		destructive: true,
@@ -440,32 +437,32 @@ async function addStorageSearchPath() {
 	if (!path) return;
 
 	await run(async () => {
-		registry.value = await desktop.setStorageSearchPaths([...registry.value.storageSearchPaths, path]);
+		view.value = await desktop.setStorageSearchPaths([...view.value.storageSearchPaths, path]);
 		storagePathDraft.value = "";
 	});
 }
 
 async function removeStorageSearchPath(path: string) {
-	if (registry.value.storageSearchPaths.length <= 1) {
+	if (view.value.storageSearchPaths.length <= 1) {
 		setError("Trackboi needs at least one storage search path");
 		return;
 	}
 
 	await run(async () => {
-		registry.value = await desktop.setStorageSearchPaths(
-			registry.value.storageSearchPaths.filter((candidate) => candidate !== path),
+		view.value = await desktop.setStorageSearchPaths(
+			view.value.storageSearchPaths.filter((candidate) => candidate !== path),
 		);
 	});
 }
 
 async function resetStorageSearchPaths() {
 	await run(async () => {
-		registry.value = await desktop.setStorageSearchPaths([".trackboi", ".etc/.trackboi", ".etc/trackboi"]);
+		view.value = await desktop.setStorageSearchPaths([".trackboi", ".etc/.trackboi", ".etc/trackboi"]);
 	});
 }
 
 async function switchProject(projectId: string) {
-	if (projectId === registry.value.activeProjectId) return;
+	if (projectId === view.value.activeProjectId) return;
 
 	await run(async () => {
 		setSnapshot(await desktop.switchProject(projectId));
@@ -799,23 +796,30 @@ onMounted(loadProject);
 				</div>
 
 				<div class="mt-5 grid gap-3">
-					<button
-						v-for="project in visibleProjects"
-						:key="project.id"
-						class="relative grid h-9 w-9 place-items-center rounded-md border text-sm font-semibold transition"
-						:class="project.id === registry.activeProjectId
-							? 'border-foreground bg-secondary text-foreground'
-							: 'border-border bg-background text-muted-foreground hover:border-muted-foreground hover:text-foreground'"
-						type="button"
-						:title="`${project.name} - ${statusLabel(project.status)}`"
-						@click="switchProject(project.id)"
-					>
-						{{ projectInitial(project.name) }}
-						<span
-							class="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border border-background"
-							:class="statusClass(project.status)"
+					<template v-for="(source, sourceIndex) in view.sources" :key="source.id">
+						<div
+							v-if="sourceIndex > 0 && source.entries.length > 0"
+							class="mx-auto h-px w-6 bg-border"
+							:title="source.label"
 						/>
-					</button>
+						<button
+							v-for="entry in source.entries"
+							:key="entry.projectId"
+							class="relative grid h-9 w-9 place-items-center rounded-md border text-sm font-semibold transition"
+							:class="entry.projectId === view.activeProjectId
+								? 'border-foreground bg-secondary text-foreground'
+								: 'border-border bg-background text-muted-foreground hover:border-muted-foreground hover:text-foreground'"
+							type="button"
+							:title="`${entry.name} — ${source.label} (${statusLabel(entry.status)})`"
+							@click="switchProject(entry.projectId)"
+						>
+							{{ projectInitial(entry.name) }}
+							<span
+								class="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border border-background"
+								:class="statusClass(entry.status)"
+							/>
+						</button>
+					</template>
 
 					<Button variant="ghost" size="icon" type="button" :disabled="busy" title="Add project" @click="chooseProject">
 						<Plus class="h-4 w-4" />
@@ -877,11 +881,11 @@ onMounted(loadProject);
 				</Button>
 
 				<div v-if="activeProject" class="mt-2 grid grid-cols-2 gap-2">
-					<Button variant="outline" size="sm" type="button" :disabled="busy" @click="locateProject(activeProject.id)">
+					<Button variant="outline" size="sm" type="button" :disabled="busy" @click="locateProject(activeProject.projectId)">
 						<RefreshCw class="h-3.5 w-3.5" />
 						Locate
 					</Button>
-					<Button variant="outline" size="sm" type="button" :disabled="busy" @click="removeProject(activeProject.id)">
+					<Button variant="outline" size="sm" type="button" :disabled="busy" @click="removeProject(activeProject.projectId)">
 						<Trash2 class="h-3.5 w-3.5" />
 						Remove
 					</Button>
@@ -944,11 +948,11 @@ onMounted(loadProject);
 							</div>
 						</div>
 						<div class="flex flex-wrap gap-2">
-							<Button type="button" :disabled="busy" @click="locateProject(activeProject.id)">
+							<Button type="button" :disabled="busy" @click="locateProject(activeProject.projectId)">
 								<RefreshCw class="h-4 w-4" />
 								Locate folder
 							</Button>
-							<Button variant="outline" type="button" :disabled="busy" @click="removeProject(activeProject.id)">
+							<Button variant="outline" type="button" :disabled="busy" @click="removeProject(activeProject.projectId)">
 								<Trash2 class="h-4 w-4" />
 								Remove from Trackboi
 							</Button>
@@ -1219,7 +1223,7 @@ onMounted(loadProject);
 						</p>
 						<div class="grid gap-2">
 							<div
-								v-for="path in registry.storageSearchPaths"
+								v-for="path in view.storageSearchPaths"
 								:key="path"
 								class="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2"
 							>

@@ -320,20 +320,20 @@ pub(crate) fn read_git_context(project_path: &str) -> GitContext {
     }
 }
 
-pub(crate) fn project_status(project: &Project, registry: &ProjectRegistry) -> String {
+pub(crate) fn project_status(project: &Project, registry: &ProjectRegistry) -> ProjectStatus {
     if !Path::new(&project.path).exists() {
-        return "missing".into();
+        return ProjectStatus::Missing;
     }
 
     let Some((root_path, _)) = resolve_project_storage(project, registry, false) else {
-        return "uninitialized".into();
+        return ProjectStatus::Uninitialized;
     };
 
     if !board_path(&root_path).exists() {
-        return "uninitialized".into();
+        return ProjectStatus::Uninitialized;
     }
 
-    "ready".into()
+    ProjectStatus::Ready
 }
 
 pub(crate) fn ensure_project(app: &AppHandle, project: Project) -> Result<ProjectSnapshot> {

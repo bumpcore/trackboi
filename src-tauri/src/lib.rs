@@ -21,7 +21,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             core::commands::get_active_project,
             core::commands::list_projects,
-            core::commands::list_project_index,
+            core::commands::list_view,
             core::commands::set_storage_search_paths,
             core::commands::choose_project,
             core::commands::locate_project,

@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import type { Board, Card, CardPatch, CustomField, ProjectIndex, ProjectMetadata, ProjectRegistry, ProjectSnapshot, WorkScope } from "@/core/types";
+import type { Board, Card, CardPatch, CustomField, ProjectMetadata, ProjectRegistry, ProjectSnapshot, ProjectView, WorkScope } from "@/core/types";
 
 type BoardChangedListener = (snapshot: ProjectSnapshot | null) => void;
 type ResizeDirection = "East" | "North" | "NorthEast" | "NorthWest" | "South" | "SouthEast" | "SouthWest" | "West";
@@ -54,11 +54,11 @@ export const desktop = {
 	async listProjects() {
 		return invoke<ProjectRegistry>("list_projects");
 	},
-	async listProjectIndex() {
-		return invoke<ProjectIndex>("list_project_index");
+	async listView() {
+		return invoke<ProjectView>("list_view");
 	},
 	async setStorageSearchPaths(paths: string[]) {
-		return invoke<ProjectIndex>("set_storage_search_paths", { paths });
+		return invoke<ProjectView>("set_storage_search_paths", { paths });
 	},
 	async chooseProject() {
 		const selected = await openDialog({ directory: true, multiple: false });

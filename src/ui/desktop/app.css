@@ -77,6 +77,21 @@ select {
 	font: inherit;
 }
 
+[data-electron-drag-region] {
+	-webkit-app-region: drag;
+}
+
+[data-window-control],
+button,
+input,
+textarea,
+select,
+[role="button"],
+[role="listbox"],
+[role="option"] {
+	-webkit-app-region: no-drag;
+}
+
 #app {
 	min-height: 100vh;
 }

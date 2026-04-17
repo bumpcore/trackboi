@@ -94,6 +94,7 @@ export type ProjectRegistry = {
 	projects: Project[];
 	activeProjectId: string | null;
 	storageSearchPaths?: string[];
+	activeWorkspaceFile?: string | null;
 };
 
 export type GitContext = {

@@ -18,7 +18,7 @@ import {
 	X,
 } from "lucide-vue-next";
 import BoardColumn from "./components/BoardColumn.vue";
-import { desktop } from "@/platform/tauri/desktop";
+import { desktop } from "@/platform/electron/desktop";
 import Badge from "@/ui/components/Badge.vue";
 import Button from "@/ui/components/Button.vue";
 import UiCard from "@/ui/components/Card.vue";
@@ -766,6 +766,7 @@ onMounted(loadProject);
 			v-for="edge in (['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'] as ResizeEdge[])"
 			:key="edge"
 			:class="resizeHandleClass(edge)"
+			class="pointer-events-none"
 			:style="{ cursor: resizeCursor(edge) }"
 			@pointerdown="startResize(edge, $event)"
 		/>
@@ -773,10 +774,10 @@ onMounted(loadProject);
 		<header
 			class="grid h-9 grid-cols-[58px_260px_minmax(0,1fr)_112px] border-b border-border/80 bg-card/95 max-lg:grid-cols-[58px_minmax(0,1fr)_112px]"
 		>
-			<div class="border-r border-border/80" data-tauri-drag-region @pointerdown="startTitlebarDrag" />
+			<div class="border-r border-border/80" data-electron-drag-region @pointerdown="startTitlebarDrag" />
 			<div
 				class="flex items-center gap-2 border-r border-border/80 px-3 max-lg:hidden"
-				data-tauri-drag-region
+				data-electron-drag-region
 				@pointerdown="startTitlebarDrag"
 			>
 				<PanelLeft class="h-3.5 w-3.5 text-muted-foreground" />
@@ -784,6 +785,7 @@ onMounted(loadProject);
 			</div>
 			<div
 				class="flex items-center justify-between px-4"
+				data-electron-drag-region
 				@dblclick="handleTitlebarDoubleClick"
 				@pointerdown="startTitlebarDrag"
 			>

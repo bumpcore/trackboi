@@ -5,7 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
 	plugins: [vue(), tailwindcss()],
-	root: "src/mainview",
+	root: "src/ui",
 	resolve: {
 		alias: {
 			"@": path.resolve(__dirname, "./src"),

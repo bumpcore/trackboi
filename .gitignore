@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 dist/
+dist-node/
 build/
 artifacts/
 
@@ -10,6 +11,11 @@ artifacts/
 .codex
 .vscode/
 .idea/
+
+# Local Trackboi data
+.trackboi/
+.etc/.trackboi/
+.etc/trackboi/
 
 # Logs and caches
 *.log

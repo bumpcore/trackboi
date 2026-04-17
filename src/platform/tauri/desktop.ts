@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import type { Board, Card, CardPatch, ProjectIndex, ProjectRegistry, ProjectSnapshot, WorkScope } from "@/core/types";
+import type { Board, Card, CardPatch, CustomField, ProjectIndex, ProjectMetadata, ProjectRegistry, ProjectSnapshot, WorkScope } from "@/core/types";
 
 type BoardChangedListener = (snapshot: ProjectSnapshot | null) => void;
 type ResizeDirection = "East" | "North" | "NorthEast" | "NorthWest" | "South" | "SouthEast" | "SouthWest" | "West";
@@ -87,6 +87,11 @@ export const desktop = {
 		const nextBoard = await invoke<Board>("update_board", { board });
 		await notifyBoardChanged();
 		return nextBoard;
+	},
+	async updateCustomFields(customFields: CustomField[]) {
+		const metadata = await invoke<ProjectMetadata>("update_custom_fields", { customFields });
+		await notifyBoardChanged();
+		return metadata;
 	},
 	async moveCard(cardId: string, toColumn: string, beforeCardId: string | null) {
 		const card = await invoke<Card>("move_card", { input: { cardId, toColumn, beforeCardId } });

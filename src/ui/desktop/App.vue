@@ -92,6 +92,10 @@ const gitBranchLabel = computed(() => {
 	if (!snapshot.value?.git.isGitRepo) return null;
 	return snapshot.value.git.branch ?? (snapshot.value.git.detached ? "detached" : "git");
 });
+const gitDirtyLabel = computed(() => {
+	if (!snapshot.value?.git.isGitRepo || snapshot.value.git.dirty !== true) return null;
+	return "dirty";
+});
 const currentBranch = computed(() => snapshot.value?.git.branch ?? null);
 const canUseBranchScope = computed(() => currentBranch.value != null);
 const columnOptions = computed<SelectOption[]>(() => (
@@ -120,7 +124,9 @@ const fieldTypeOptions = computed<SelectOption[]>(() => [
 	{ value: "select", label: "Select" },
 	{ value: "date", label: "Date" },
 ]);
-const customFields = computed(() => snapshot.value?.board.customFields ?? []);
+const customFields = computed(() => (
+	snapshot.value?.metadata.customFields ?? snapshot.value?.board.customFields ?? []
+));
 const allColumnCardCounts = computed(() => {
 	const counts: Record<string, number> = {};
 	for (const column of snapshot.value?.board.columns ?? []) {
@@ -159,19 +165,30 @@ const scopedCards = computed(() => {
 	return cards;
 });
 const visibleParentCards = computed(() => scopedCards.value.filter((card) => card.parentId == null));
-const childCounts = computed(() => {
-	const counts: Record<string, number> = {};
+type ChildProgress = {
+	total: number;
+	done: number;
+};
+
+const childProgress = computed(() => {
+	const progress: Record<string, ChildProgress> = {};
 	for (const card of scopedCards.value) {
 		if (!card.parentId) continue;
-		counts[card.parentId] = (counts[card.parentId] ?? 0) + 1;
+		progress[card.parentId] ??= { total: 0, done: 0 };
+		progress[card.parentId].total += 1;
+		if (card.column === "done") progress[card.parentId].done += 1;
 	}
-	return counts;
+	return progress;
 });
 const editingSubtasks = computed(() => {
 	if (!editingCard.value) return [];
 	return (snapshot.value?.cards ?? [])
 		.filter((card) => card.parentId === editingCard.value?.id)
 		.sort((left, right) => left.rank.localeCompare(right.rank));
+});
+const editingSubtaskProgress = computed(() => {
+	if (!editingCard.value) return { total: 0, done: 0 };
+	return childProgress.value[editingCard.value.id] ?? { total: 0, done: 0 };
 });
 
 const cardsByColumn = computed(() => {
@@ -528,10 +545,7 @@ async function addCustomField() {
 	};
 
 	await run(async () => {
-		await desktop.updateBoard({
-			...snapshot.value!.board,
-			customFields: [...snapshot.value!.board.customFields, field],
-		});
+		await desktop.updateCustomFields([...customFields.value, field]);
 		fieldNameDraft.value = "";
 		fieldOptionsDraft.value = "";
 	});
@@ -541,10 +555,7 @@ async function removeCustomField(fieldId: string) {
 	if (!snapshot.value) return;
 
 	await run(async () => {
-		await desktop.updateBoard({
-			...snapshot.value!.board,
-			customFields: snapshot.value!.board.customFields.filter((field) => field.id !== fieldId),
-		});
+		await desktop.updateCustomFields(customFields.value.filter((field) => field.id !== fieldId));
 	});
 }
 
@@ -764,6 +775,7 @@ onMounted(loadProject);
 						<GitBranch class="h-3 w-3 shrink-0" />
 						<span class="truncate">{{ gitBranchLabel }}</span>
 					</Badge>
+					<Badge v-if="gitDirtyLabel" variant="outline">{{ gitDirtyLabel }}</Badge>
 					<Badge variant="outline">{{ activeStoragePath }}</Badge>
 				</div>
 			</div>
@@ -851,6 +863,7 @@ onMounted(loadProject);
 						<GitBranch class="h-3 w-3 shrink-0" />
 						<span class="truncate">{{ gitBranchLabel }}</span>
 					</Badge>
+					<Badge v-if="gitDirtyLabel" class="mt-2" variant="outline">{{ gitDirtyLabel }}</Badge>
 				</div>
 
 				<Button class="mt-6 w-full" variant="outline" type="button" :disabled="busy" @click="chooseProject">
@@ -961,7 +974,7 @@ onMounted(loadProject);
 							:key="column.id"
 							:column="column"
 							:cards="cardsByColumn.get(column.id) ?? []"
-							:child-counts="childCounts"
+							:child-progress="childProgress"
 							:custom-fields="customFields"
 							@move="moveCard"
 							@create="openNewCard"
@@ -1054,6 +1067,10 @@ onMounted(loadProject);
 							<span class="min-w-0 truncate font-mono text-foreground">{{ editingCard.id }}</span>
 						</div>
 						<div class="flex items-center justify-between gap-3">
+							<span>Board</span>
+							<span class="min-w-0 truncate font-mono text-foreground">{{ editingCard.boardId }}</span>
+						</div>
+						<div class="flex items-center justify-between gap-3">
 							<span>Created</span>
 							<span class="text-foreground">{{ formatTimestamp(editingCard.createdAt) }}</span>
 						</div>
@@ -1127,7 +1144,9 @@ onMounted(loadProject);
 									Break this card into smaller slices.
 								</p>
 							</div>
-							<Badge variant="secondary">{{ editingSubtasks.length }}</Badge>
+							<Badge variant="secondary">
+								{{ editingSubtaskProgress.done }}/{{ editingSubtaskProgress.total }}
+							</Badge>
 						</div>
 
 						<div v-if="editingSubtasks.length > 0" class="grid gap-2">
@@ -1304,7 +1323,7 @@ onMounted(loadProject);
 						<div>
 							<p class="text-xs font-semibold uppercase text-primary">Custom fields</p>
 							<p class="mt-1 text-sm text-muted-foreground">
-								Fields apply to every card in this board.
+								Fields apply to every card in this project.
 							</p>
 						</div>
 

@@ -1,7 +1,7 @@
 pub mod commands;
-mod model;
-mod rank;
-mod storage;
+pub(crate) mod model;
+pub(crate) mod rank;
+pub(crate) mod storage;
 
 pub(crate) type Result<T> = std::result::Result<T, String>;
 

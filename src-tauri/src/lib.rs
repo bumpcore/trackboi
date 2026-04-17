@@ -1,4 +1,4 @@
-mod core;
+pub(crate) mod core;
 pub mod mcp;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -27,6 +27,7 @@ pub fn run() {
             core::commands::create_card,
             core::commands::update_card,
             core::commands::update_board,
+            core::commands::update_custom_fields,
             core::commands::move_card,
             core::commands::delete_card,
         ])

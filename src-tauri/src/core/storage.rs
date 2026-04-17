@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use tauri::{AppHandle, Manager};
 
 pub(crate) fn now() -> String {
@@ -251,6 +252,34 @@ pub(crate) fn resolve_project_storage(
     Some((storage_root(&project.path, &storage_path), storage_path))
 }
 
+fn default_project_metadata(project: &Project, storage_path: &str) -> ProjectMetadata {
+    ProjectMetadata {
+        version: 1,
+        project_id: project.id.clone(),
+        name: project.name.clone(),
+        storage_path: storage_path.into(),
+        created_at: now(),
+        custom_fields: vec![],
+    }
+}
+
+fn read_project_metadata(
+    root_path: &Path,
+    project: &Project,
+    storage_path: &str,
+) -> Result<ProjectMetadata> {
+    let metadata_path = project_metadata_path(root_path);
+    if !metadata_path.exists() {
+        let metadata = default_project_metadata(project, storage_path);
+        atomic_write_json(&metadata_path, &metadata)?;
+        return Ok(metadata);
+    }
+
+    let mut metadata = read_json::<ProjectMetadata>(&metadata_path)?;
+    metadata.storage_path = storage_path.into();
+    Ok(metadata)
+}
+
 fn write_project_metadata(root_path: &Path, project: &Project, storage_path: &str) -> Result<()> {
     let metadata_path = project_metadata_path(root_path);
     if metadata_path.exists() {
@@ -259,13 +288,7 @@ fn write_project_metadata(root_path: &Path, project: &Project, storage_path: &st
 
     atomic_write_json(
         &metadata_path,
-        &serde_json::json!({
-          "version": 1,
-          "projectId": project.id,
-          "name": project.name,
-          "storagePath": storage_path,
-          "createdAt": now(),
-        }),
+        &default_project_metadata(project, storage_path),
     )
 }
 
@@ -318,13 +341,22 @@ fn read_git_context(project_path: &str) -> GitContext {
                 .strip_prefix("ref: refs/heads/")
                 .map(|branch| branch.to_string())
         });
+    let dirty = Command::new("git")
+        .arg("-C")
+        .arg(&root)
+        .arg("status")
+        .arg("--porcelain")
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| !output.stdout.is_empty());
 
     GitContext {
         is_git_repo: true,
         root: Some(root.to_string_lossy().to_string()),
         detached: branch.is_none(),
         branch,
-        dirty: None,
+        dirty,
     }
 }
 
@@ -348,7 +380,12 @@ pub(crate) fn read_project(app: &AppHandle, project: Project) -> Result<ProjectS
     let registry = read_registry(app);
     let (root_path, storage_path) = resolve_project_storage(&project, &registry, false)
         .ok_or_else(|| "Trackboi storage has not been created for this project".to_string())?;
+    let mut metadata = read_project_metadata(&root_path, &project, &storage_path)?;
     let board = read_json::<Board>(&board_path(&root_path))?;
+    if metadata.custom_fields.is_empty() && !board.custom_fields.is_empty() {
+        metadata.custom_fields = board.custom_fields.clone();
+        atomic_write_json(&project_metadata_path(&root_path), &metadata)?;
+    }
     let card_dir = cards_path(&root_path);
     let mut cards = Vec::new();
 
@@ -372,6 +409,9 @@ pub(crate) fn read_project(app: &AppHandle, project: Project) -> Result<ProjectS
                 }
             }
             card.scope = normalize_scope(card.scope);
+            if card.board_id != DEFAULT_BOARD_ID {
+                continue;
+            }
             cards.push(card);
         }
     }
@@ -393,6 +433,7 @@ pub(crate) fn read_project(app: &AppHandle, project: Project) -> Result<ProjectS
             storage_path: Some(storage_path),
             ..project
         },
+        metadata,
         git,
         board,
         cards,
@@ -477,6 +518,14 @@ pub(crate) fn board_path_for_active_project(app: &AppHandle) -> Result<PathBuf> 
     Ok(board_path(&root_path))
 }
 
+pub(crate) fn project_metadata_path_for_active_project(app: &AppHandle) -> Result<PathBuf> {
+    let project = require_active_project(app)?;
+    let registry = read_registry(app);
+    let (root_path, _) = resolve_project_storage(&project, &registry, false)
+        .ok_or_else(|| "Trackboi storage has not been created for this project".to_string())?;
+    Ok(project_metadata_path(&root_path))
+}
+
 pub(crate) fn card_path_in_root(root_path: &Path, card_id: &str) -> PathBuf {
     card_path(root_path, card_id)
 }
@@ -486,6 +535,10 @@ pub(crate) fn remove_file(path: impl AsRef<Path>) -> Result<()> {
 }
 
 pub(crate) fn read_card(path: &Path) -> Result<Card> {
+    read_json(path)
+}
+
+pub(crate) fn read_project_metadata_file(path: &Path) -> Result<ProjectMetadata> {
     read_json(path)
 }
 

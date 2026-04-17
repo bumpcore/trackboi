@@ -10,7 +10,7 @@ import type { Card as TrackboiCard, Column, CustomField, FieldValue } from "@/co
 const props = defineProps<{
 	column: Column;
 	cards: TrackboiCard[];
-	childCounts: Record<string, number>;
+	childProgress: Record<string, { total: number; done: number }>;
 	customFields: CustomField[];
 }>();
 
@@ -122,8 +122,8 @@ function fieldDisplayValue(field: CustomField, value: FieldValue | undefined) {
 					<Badge v-if="card.scope.kind === 'branch'" class="mt-2 max-w-full" variant="outline">
 						<span class="truncate">{{ card.scope.ref }}</span>
 					</Badge>
-					<Badge v-if="props.childCounts[card.id]" class="mt-2" variant="secondary">
-						{{ props.childCounts[card.id] }} subtasks
+					<Badge v-if="props.childProgress[card.id]" class="mt-2" variant="secondary">
+						{{ props.childProgress[card.id].done }}/{{ props.childProgress[card.id].total }} subtasks
 					</Badge>
 					<div v-if="props.customFields.length > 0" class="mt-2 flex flex-wrap gap-1.5">
 						<Badge

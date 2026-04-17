@@ -3,14 +3,19 @@ use super::rank::rank_between;
 use super::storage::{
     active_snapshot, active_storage_root, atomic_write_json, card_path_for_active_project,
     card_path_in_root, ensure_project, json_ok, normalize_scope, normalize_storage_search_paths,
-    project_status, read_card, read_project, read_registry, remove_file, require_active_project,
+    project_metadata_path_for_active_project, project_status, read_card, read_project,
+    read_project_metadata_file, read_registry, remove_file, require_active_project,
     resolve_project_storage, scope_for_git_context, storage_candidates, write_registry,
 };
-use super::Result;
+use super::{Result, DEFAULT_BOARD_ID};
 use serde_json::{Map, Value};
 use std::path::Path;
 use tauri::AppHandle;
-use uuid::Uuid;
+use ulid::Ulid;
+
+fn new_id(prefix: &str) -> String {
+    format!("{prefix}_{}", Ulid::new())
+}
 
 fn apply_card_patch(mut card: Card, patch: Value) -> Result<Card> {
     let Some(patch) = patch.as_object() else {
@@ -45,6 +50,11 @@ fn apply_card_patch(mut card: Card, patch: Value) -> Result<Card> {
     if let Some(value) = patch.get("rank") {
         if let Some(rank) = value.as_str() {
             card.rank = rank.into();
+        }
+    }
+    if let Some(value) = patch.get("boardId") {
+        if let Some(board_id) = value.as_str() {
+            card.board_id = board_id.into();
         }
     }
     if let Some(value) = patch.get("labels") {
@@ -128,7 +138,7 @@ pub fn choose_project(app: AppHandle, project_path: String) -> Result<Option<Pro
     }
 
     let project = Project {
-        id: format!("project_{}", Uuid::new_v4()),
+        id: new_id("project"),
         name: Path::new(&project_path)
             .file_name()
             .and_then(|name| name.to_str())
@@ -245,7 +255,8 @@ pub fn create_card(app: AppHandle, input: CreateCardInput) -> Result<Card> {
     }
 
     let card = Card {
-        id: format!("card_{}", Uuid::new_v4()),
+        id: new_id("card"),
+        board_id: DEFAULT_BOARD_ID.into(),
         title,
         description: input.description.unwrap_or_default().trim().into(),
         parent_id: input.parent_id,
@@ -279,6 +290,18 @@ pub fn update_board(app: AppHandle, board: Board) -> Result<Board> {
     let path = super::storage::board_path_for_active_project(&app)?;
     atomic_write_json(&path, &board)?;
     Ok(board)
+}
+
+#[tauri::command]
+pub fn update_custom_fields(
+    app: AppHandle,
+    custom_fields: Vec<CustomField>,
+) -> Result<ProjectMetadata> {
+    let path = project_metadata_path_for_active_project(&app)?;
+    let mut metadata = read_project_metadata_file(&path)?;
+    metadata.custom_fields = custom_fields;
+    atomic_write_json(&path, &metadata)?;
+    Ok(metadata)
 }
 
 #[tauri::command]

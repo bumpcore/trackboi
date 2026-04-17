@@ -21,8 +21,18 @@ export type Board = {
 	customFields: CustomField[];
 };
 
+export type ProjectMetadata = {
+	version: 1;
+	projectId: string;
+	name: string;
+	storagePath: string;
+	createdAt: string;
+	customFields: CustomField[];
+};
+
 export type Card = {
 	id: string;
+	boardId: string;
 	title: string;
 	description: string;
 	parentId: string | null;
@@ -81,11 +91,12 @@ export type GitContext = {
 
 export type ProjectSnapshot = {
 	project: Project;
+	metadata: ProjectMetadata;
 	git: GitContext;
 	board: Board;
 	cards: Card[];
 };
 
 export type CardPatch = Partial<
-	Pick<Card, "title" | "description" | "parentId" | "scope" | "column" | "rank" | "labels" | "assignee" | "fieldValues">
+	Pick<Card, "boardId" | "title" | "description" | "parentId" | "scope" | "column" | "rank" | "labels" | "assignee" | "fieldValues">
 >;

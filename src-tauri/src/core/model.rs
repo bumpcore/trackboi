@@ -31,6 +31,18 @@ pub struct Board {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ProjectMetadata {
+    pub version: u8,
+    pub project_id: String,
+    pub name: String,
+    pub storage_path: String,
+    pub created_at: String,
+    #[serde(default)]
+    pub custom_fields: Vec<CustomField>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkScope {
     pub kind: String,
     #[serde(rename = "ref")]
@@ -41,6 +53,8 @@ pub struct WorkScope {
 #[serde(rename_all = "camelCase")]
 pub struct Card {
     pub id: String,
+    #[serde(default = "default_board_id")]
+    pub board_id: String,
     pub title: String,
     pub description: String,
     pub parent_id: Option<String>,
@@ -107,6 +121,7 @@ pub struct GitContext {
 #[serde(rename_all = "camelCase")]
 pub struct ProjectSnapshot {
     pub project: Project,
+    pub metadata: ProjectMetadata,
     pub git: GitContext,
     pub board: Board,
     pub cards: Vec<Card>,
@@ -132,4 +147,8 @@ pub struct MoveCardInput {
     pub to_column: String,
     #[serde(default)]
     pub before_card_id: Option<String>,
+}
+
+fn default_board_id() -> String {
+    "default".into()
 }

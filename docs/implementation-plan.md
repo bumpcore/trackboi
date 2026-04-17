@@ -20,7 +20,8 @@ Goal: every primitive in the app should feel like Trackboi, not like a browser f
 
 Goal: make the repo-local data model boring, inspectable, and ready for bigger features.
 
-- Resolve storage roots in this order by default: `.etc/.trackboi`, `.etc/trackboi`, `.trackboi`.
+- Resolve existing storage roots in this order by default: `.trackboi`, `.etc/.trackboi`, `.etc/trackboi`.
+- For new storage, use `.etc/.trackboi` when the project already has a `.etc` directory; otherwise use `.trackboi`.
 - Keep storage roots configurable per app install.
 - Move toward a directory shape that can support multiple boards:
   - `project.json`

@@ -11,6 +11,11 @@ artifacts/
 .vscode/
 .idea/
 
+# Local Trackboi data
+.trackboi/
+.etc/.trackboi/
+.etc/trackboi/
+
 # Logs and caches
 *.log
 .eslintcache

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 const modelValue = defineModel<string | number>();
 

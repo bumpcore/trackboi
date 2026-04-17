@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Check } from "lucide-vue-next";
 import { CheckboxIndicator, CheckboxRoot } from "reka-ui";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 const modelValue = defineModel<boolean>({ default: false });
 

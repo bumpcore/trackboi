@@ -1,6 +1,11 @@
-// Prevents additional console window on Windows in release, DO NOT REMOVE!!
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-
 fn main() {
-  app_lib::run();
+    if std::env::args().nth(1).as_deref() == Some("mcp") {
+        if let Err(error) = app_lib::mcp::run_stdio() {
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
+        return;
+    }
+
+    app_lib::run();
 }

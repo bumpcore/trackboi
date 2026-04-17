@@ -1,0 +1,11 @@
+pub mod commands;
+mod model;
+mod rank;
+mod storage;
+
+pub(crate) type Result<T> = std::result::Result<T, String>;
+
+pub(crate) const DEFAULT_BOARD_ID: &str = "default";
+pub(crate) const PROJECT_METADATA_FILE: &str = "project.json";
+pub(crate) const DEFAULT_STORAGE_SEARCH_PATHS: [&str; 3] =
+    [".trackboi", ".etc/.trackboi", ".etc/trackboi"];

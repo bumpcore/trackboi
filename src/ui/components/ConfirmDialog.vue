@@ -9,7 +9,7 @@ import {
 	AlertDialogRoot,
 	AlertDialogTitle,
 } from "reka-ui";
-import { Button } from "@/components/ui/button";
+import Button from "@/ui/components/Button.vue";
 
 const open = defineModel<boolean>("open", { default: false });
 

@@ -17,16 +17,16 @@ import {
 	X,
 } from "lucide-vue-next";
 import BoardColumn from "./components/BoardColumn.vue";
-import { desktop } from "./lib/desktop";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card as UiCard } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
-import type { SelectOption } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { desktop } from "@/platform/tauri/desktop";
+import Badge from "@/ui/components/Badge.vue";
+import Button from "@/ui/components/Button.vue";
+import UiCard from "@/ui/components/Card.vue";
+import Checkbox from "@/ui/components/Checkbox.vue";
+import ConfirmDialog from "@/ui/components/ConfirmDialog.vue";
+import Input from "@/ui/components/Input.vue";
+import Select from "@/ui/components/Select.vue";
+import type { SelectOption } from "@/ui/components/Select.vue";
+import Textarea from "@/ui/components/Textarea.vue";
 import type {
 	Column,
 	CustomField,
@@ -37,7 +37,7 @@ import type {
 	ProjectIndexEntry,
 	ProjectSnapshot,
 	WorkScope,
-} from "../shared/types";
+} from "@/core/types";
 
 const snapshot = ref<ProjectSnapshot | null>(null);
 const registry = ref<ProjectIndex>({ projects: [], activeProjectId: null, storageSearchPaths: [] });
@@ -443,7 +443,7 @@ async function removeStorageSearchPath(path: string) {
 
 async function resetStorageSearchPaths() {
 	await run(async () => {
-		registry.value = await desktop.setStorageSearchPaths([".etc/.trackboi", ".etc/trackboi", ".trackboi"]);
+		registry.value = await desktop.setStorageSearchPaths([".trackboi", ".etc/.trackboi", ".etc/trackboi"]);
 	});
 }
 
@@ -1368,6 +1368,6 @@ onMounted(loadProject);
 
 <!--
 	Most visual language lives in Tailwind utility classes and the local shadcn-style
-	primitives under src/components/ui. Keep bespoke CSS out of this file unless the
+	primitives under src/ui/components. Keep bespoke CSS out of this file unless the
 	app needs behavior Tailwind cannot express cleanly.
 -->

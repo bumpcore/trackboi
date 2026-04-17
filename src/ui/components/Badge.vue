@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 const props = withDefaults(
 	defineProps<{
@@ -30,4 +30,3 @@ const variants = {
 		<slot />
 	</div>
 </template>
-

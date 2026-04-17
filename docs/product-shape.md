@@ -47,12 +47,12 @@ Trackboi looks for its database under a project root using an ordered list of ca
 Default candidates:
 
 ```txt
+.trackboi
 .etc/.trackboi
 .etc/trackboi
-.trackboi
 ```
 
-This lets users hide Trackboi metadata under an existing project config folder if they prefer.
+Trackboi defaults to `.trackboi`. If a project already has a `.etc` directory, new storage should be created under `.etc/.trackboi` to fit that repo's existing layout.
 
 The lookup paths should be configurable later. The config should support adding, removing, and reordering candidates.
 
@@ -60,7 +60,7 @@ Example app config:
 
 ```json
 {
-  "storageSearchPaths": [".etc/.trackboi", ".etc/trackboi", ".trackboi"]
+  "storageSearchPaths": [".trackboi", ".etc/.trackboi", ".etc/trackboi"]
 }
 ```
 
@@ -381,7 +381,7 @@ Potential later layout:
 
 ## Near-Term Implementation Order
 
-1. Add storage resolver support for `.etc/.trackboi`, `.etc/trackboi`, and `.trackboi`.
+1. Add storage resolver support for `.trackboi`, `.etc/.trackboi`, and `.etc/trackboi`.
 2. Add `project.json` metadata inside the storage root.
 3. Store each project's resolved storage path in the app registry.
 4. Add git context detection.

@@ -8,131 +8,13 @@
   "permissions": [
     "core:default",
     "core:window:allow-close",
-    "core:window:allow-inner-size",
-    "core:window:allow-internal-toggle-maximize",
     "core:window:allow-is-maximized",
     "core:window:allow-maximize",
     "core:window:allow-minimize",
-    "core:window:allow-outer-position",
-    "core:window:allow-outer-size",
-    "core:window:allow-set-position",
     "core:window:allow-set-focus",
-    "core:window:allow-set-size",
     "core:window:allow-start-dragging",
     "core:window:allow-start-resize-dragging",
-    "core:window:allow-toggle-maximize",
     "core:window:allow-unmaximize",
-    "dialog:default",
-    "fs:default",
-    {
-      "identifier": "fs:allow-read-dir",
-      "allow": [
-        { "path": "$APPCONFIG" },
-        { "path": "$APPCONFIG/**/*" },
-        { "path": "$HOME/**/.git/HEAD" },
-        { "path": "$HOME/**/.git" },
-        { "path": "$HOME/**/.git/**/*" },
-        { "path": "$HOME/**/.etc" },
-        { "path": "$HOME/**/.etc/**/*" },
-        { "path": "$HOME/**/.etc/.trackboi" },
-        { "path": "$HOME/**/.etc/.trackboi/**/*" },
-        { "path": "$HOME/**/.etc/trackboi" },
-        { "path": "$HOME/**/.etc/trackboi/**/*" },
-        { "path": "$HOME/**/.trackboi" },
-        { "path": "$HOME/**/.trackboi/**/*" },
-        { "path": "$HOME/**/*" }
-      ]
-    },
-    {
-      "identifier": "fs:allow-read-text-file",
-      "allow": [
-        { "path": "$APPCONFIG/**/*" },
-        { "path": "$HOME/**/.git/HEAD" },
-        { "path": "$HOME/**/.git/**/*" },
-        { "path": "$HOME/**/.etc/**/*" },
-        { "path": "$HOME/**/.etc/.trackboi/**/*" },
-        { "path": "$HOME/**/.etc/trackboi/**/*" },
-        { "path": "$HOME/**/.trackboi/**/*" },
-        { "path": "$HOME/**/*" }
-      ]
-    },
-    {
-      "identifier": "fs:allow-write-text-file",
-      "allow": [
-        { "path": "$APPCONFIG/**/*" },
-        { "path": "$HOME/**/.etc/**/*" },
-        { "path": "$HOME/**/.etc/.trackboi/**/*" },
-        { "path": "$HOME/**/.etc/trackboi/**/*" },
-        { "path": "$HOME/**/.trackboi/**/*" },
-        { "path": "$HOME/**/*" }
-      ]
-    },
-    {
-      "identifier": "fs:allow-exists",
-      "allow": [
-        { "path": "$APPCONFIG" },
-        { "path": "$APPCONFIG/**/*" },
-        { "path": "$HOME" },
-        { "path": "$HOME/**/.git" },
-        { "path": "$HOME/**/.git/HEAD" },
-        { "path": "$HOME/**/.git/**/*" },
-        { "path": "$HOME/**/.etc" },
-        { "path": "$HOME/**/.etc/**/*" },
-        { "path": "$HOME/**/.etc/.trackboi" },
-        { "path": "$HOME/**/.etc/.trackboi/**/*" },
-        { "path": "$HOME/**/.etc/trackboi" },
-        { "path": "$HOME/**/.etc/trackboi/**/*" },
-        { "path": "$HOME/**/.trackboi" },
-        { "path": "$HOME/**/.trackboi/**/*" },
-        { "path": "$HOME/**/*" }
-      ]
-    },
-    {
-      "identifier": "fs:allow-mkdir",
-      "allow": [
-        { "path": "$APPCONFIG" },
-        { "path": "$APPCONFIG/**/*" },
-        { "path": "$HOME/**/.etc" },
-        { "path": "$HOME/**/.etc/**/*" },
-        { "path": "$HOME/**/.etc/.trackboi" },
-        { "path": "$HOME/**/.etc/.trackboi/**/*" },
-        { "path": "$HOME/**/.etc/trackboi" },
-        { "path": "$HOME/**/.etc/trackboi/**/*" },
-        { "path": "$HOME/**/.trackboi" },
-        { "path": "$HOME/**/.trackboi/**/*" },
-        { "path": "$HOME/**/*" }
-      ]
-    },
-    {
-      "identifier": "fs:allow-rename",
-      "allow": [
-        { "path": "$APPCONFIG/**/*" },
-        { "path": "$HOME/**/.etc/**/*" },
-        { "path": "$HOME/**/.etc/.trackboi/**/*" },
-        { "path": "$HOME/**/.etc/trackboi/**/*" },
-        { "path": "$HOME/**/.trackboi/**/*" },
-        { "path": "$HOME/**/*" }
-      ]
-    },
-    {
-      "identifier": "fs:allow-remove",
-      "allow": [
-        { "path": "$HOME/**/.etc/**/*" },
-        { "path": "$HOME/**/.etc/.trackboi/**/*" },
-        { "path": "$HOME/**/.etc/trackboi/**/*" },
-        { "path": "$HOME/**/.trackboi/**/*" },
-        { "path": "$HOME/**/*" }
-      ]
-    },
-    "fs:allow-watch",
-    {
-      "identifier": "fs:scope",
-      "allow": [
-        "$APPCONFIG",
-        "$APPCONFIG/**/*",
-        "$HOME/**/*"
-      ]
-    },
-    "shell:default"
+    "dialog:default"
   ]
 }

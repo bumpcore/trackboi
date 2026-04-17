@@ -2,10 +2,10 @@
 import { useSortable } from "@vueuse/integrations/useSortable";
 import { computed, ref, watch } from "vue";
 import { CircleDashed, GripVertical, Plus, Trash2 } from "lucide-vue-next";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card as UiCard } from "@/components/ui/card";
-import type { Card as TrackboiCard, Column, CustomField, FieldValue } from "../../shared/types";
+import Badge from "@/ui/components/Badge.vue";
+import Button from "@/ui/components/Button.vue";
+import UiCard from "@/ui/components/Card.vue";
+import type { Card as TrackboiCard, Column, CustomField, FieldValue } from "@/core/types";
 
 const props = defineProps<{
 	column: Column;

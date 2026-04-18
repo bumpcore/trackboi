@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { AlertTriangle, FolderOpen, GitBranch, Layers, Plus, RefreshCw, Settings, Trash2, X } from "lucide-vue-next";
+import { AlertTriangle, FolderOpen, GitBranch, Layers, Plus, RefreshCw, Route, Settings, Trash2, X } from "lucide-vue-next";
 import type { Card as TrackboiCard, CustomField, ProjectEntry, ProjectSnapshot, WorktreeContext } from "@/core/types";
 import Badge from "@/ui/components/Badge.vue";
 import BoardColumn from "@/ui/components/BoardColumn.vue";
@@ -19,12 +19,15 @@ const props = defineProps<{
 	branchLabel: string | null;
 	busy: boolean;
 	canRemoveActiveProject: boolean;
-	cardsByColumn: Map<string, TrackboiCard[]>;
+	cardsByColumn: Record<string, TrackboiCard[]>;
 	childProgress: Record<string, ChildProgress>;
 	customFields: CustomField[];
 	error: string | null;
 	hasProjects: boolean;
 	loading: boolean;
+	trackFilterOptions: SelectOption[];
+	trackFilterValue: string;
+	trackLabels: Record<string, string>;
 	worktreeFilterId: string | null;
 	selectedWorktreeId: string | null;
 	scopeEmptyMessage: string | null;
@@ -47,8 +50,10 @@ const emit = defineEmits<{
 	openWorkspace: [];
 	openNewCard: [];
 	projectSettings: [];
+	createTrack: [];
 	removeProject: [projectId: string];
 	selectWorktree: [worktreeId: string];
+	selectTrack: [trackId: string];
 }>();
 
 function forwardMove(cardId: string, toColumn: string, beforeCardId: string | null) {
@@ -58,6 +63,15 @@ function forwardMove(cardId: string, toColumn: string, beforeCardId: string | nu
 function forwardWorktreeSelection(worktreeId: string | undefined) {
 	if (!worktreeId) return;
 	emit("selectWorktree", worktreeId);
+}
+
+function forwardTrackSelection(trackId: string | undefined) {
+	if (!trackId) return;
+	emit("selectTrack", trackId);
+}
+
+function clearTrackSelection() {
+	emit("selectTrack", "__all__");
 }
 
 const worktreeFilterValue = computed(() => (
@@ -143,9 +157,26 @@ function workspaceFileLabel(filePath: string) {
 						:options="worktreeOptions"
 						class="w-44"
 						placeholder="Worktree"
-						@update:model-value="forwardWorktreeSelection"
-					/>
-					<Select v-model="boardScopeMode" :options="boardScopeOptions" class="w-40" />
+							@update:model-value="forwardWorktreeSelection"
+						/>
+						<Select
+							:model-value="trackFilterValue"
+							:options="trackFilterOptions"
+							class="w-48"
+							placeholder="Track"
+							@update:model-value="forwardTrackSelection"
+						/>
+						<Tooltip v-if="trackFilterValue !== '__all__'" content="Clear track filter" side="bottom">
+							<Button variant="outline" size="icon" type="button" :disabled="busy" @click="clearTrackSelection">
+								<X class="h-4 w-4" />
+							</Button>
+						</Tooltip>
+						<Tooltip content="Create track" side="bottom">
+							<Button variant="outline" size="icon" type="button" :disabled="busy" @click="$emit('createTrack')">
+								<Route class="h-4 w-4" />
+							</Button>
+						</Tooltip>
+						<Select v-model="boardScopeMode" :options="boardScopeOptions" class="w-40" />
 					<Tooltip content="Project settings" side="bottom">
 						<Button variant="outline" size="icon" type="button" :disabled="busy" @click="$emit('projectSettings')">
 							<Settings class="h-4 w-4" />
@@ -220,15 +251,16 @@ function workspaceFileLabel(filePath: string) {
 				</Button>
 			</UiCard>
 
-			<div v-else class="flex min-w-max items-start gap-3.5 p-5">
+			<div v-else class="flex min-w-max items-start gap-4 p-5">
 				<BoardColumn
 					v-for="column in snapshot.board.columns"
 					:key="column.id"
 					:column="column"
-					:cards="cardsByColumn.get(column.id) ?? []"
-					:child-progress="childProgress"
-					:custom-fields="customFields"
-					@move="forwardMove"
+						:cards="cardsByColumn[column.id] ?? []"
+						:child-progress="childProgress"
+						:custom-fields="customFields"
+						:track-labels="trackLabels"
+						@move="forwardMove"
 					@create="emit('createCard', $event)"
 					@edit="emit('editCard', $event)"
 					@delete="emit('deleteCard', $event)"

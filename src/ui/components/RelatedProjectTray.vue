@@ -52,6 +52,7 @@ function selectWorktree(worktreeId: string) {
 			<SelectRoot
 				v-if="selectedWorktree"
 				:model-value="selectedWorktree.id"
+				:modal="false"
 				:disabled="busy"
 				@update:model-value="selectWorktree"
 			>

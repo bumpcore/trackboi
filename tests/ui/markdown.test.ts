@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { Editor } from "@tiptap/core";
 import { Markdown } from "@tiptap/markdown";
 import StarterKit from "@tiptap/starter-kit";
-import { renderInlineMarkdown, renderMarkdown } from "../../src/ui/lib/markdown";
+import { renderInlineMarkdown, renderMarkdown, renderMarkdownPreview } from "../../src/ui/lib/markdown";
 
 const editors: Editor[] = [];
 
@@ -33,6 +33,16 @@ describe("markdown rendering", () => {
 		expect(html).toContain("<pre");
 		expect(html).toContain("<code>");
 		expect(html).not.toContain("<script>");
+	});
+
+	test("renders cheap preview markdown without block wrappers or shiki output", () => {
+		const html = renderMarkdownPreview("## Section\n\n- one\n- two\n\n```ts\nconst x = 1\n```");
+
+		expect(html).toContain("Section");
+		expect(html).toContain("one");
+		expect(html).toContain("[code]");
+		expect(html).not.toContain("<h2>");
+		expect(html).not.toContain("shiki");
 	});
 });
 

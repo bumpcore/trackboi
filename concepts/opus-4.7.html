@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>trackboi · spike/tauri-shell</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['-apple-system','BlinkMacSystemFont','"Inter"','"Segoe UI"','ui-sans-serif','system-ui','sans-serif'],
+          mono: ['ui-monospace','"SF Mono"','"JetBrains Mono"','Menlo','Monaco','Consolas','monospace']
+        }
+      }
+    }
+  }
+</script>
+<style>
+  html,body { background:#08080a; }
+  body {
+    font-feature-settings: 'ss01','ss03','cv11';
+    letter-spacing: -0.004em;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  *:focus { outline: none; }
+  /* Scrollbars */
+  .scroll-thin::-webkit-scrollbar { width:7px; height:7px; }
+  .scroll-thin::-webkit-scrollbar-track { background: transparent; }
+  .scroll-thin::-webkit-scrollbar-thumb { background:#24262c; border-radius:4px; }
+  .scroll-thin::-webkit-scrollbar-thumb:hover { background:#383b44; }
+  /* subtle topography */
+  .grain::before {
+    content:""; position:absolute; inset:0; pointer-events:none;
+    background:
+      radial-gradient(1200px 600px at 20% -10%, rgba(255,255,255,0.025), transparent 60%),
+      radial-gradient(800px 500px at 120% 110%, rgba(212,162,76,0.03), transparent 60%);
+  }
+  /* Collapsible */
+  [data-collapsed="true"] .collapse-body { display:none; }
+  [data-collapsed="true"] .collapse-chev { transform: rotate(-90deg); }
+  .collapse-chev { transition: transform 140ms ease; }
+  details > summary { list-style:none; cursor:pointer; }
+  details > summary::-webkit-details-marker { display:none; }
+  /* kbd */
+  .kbd {
+    display:inline-flex; align-items:center; justify-content:center;
+    min-width:16px; height:17px; padding:0 4px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size:10px; color:#b3b6be;
+    background:#16171b; border:1px solid #2a2c33;
+    border-bottom-width:2px; border-radius:3px;
+    line-height:1; letter-spacing:0;
+  }
+  /* Card drop highlight */
+  .col-drop-target {
+    box-shadow: inset 0 0 0 1px rgba(212,162,76,0.4);
+    background-image: linear-gradient(180deg, rgba(212,162,76,0.05), rgba(212,162,76,0.01));
+  }
+  /* Selected card accent rail */
+  [data-selected="true"].card-row {
+    background:#1c1d23;
+    box-shadow:
+      inset 3px 0 0 0 #d4a24c,
+      inset 0 0 0 1px #34363e,
+      0 1px 0 0 rgba(0,0,0,0.4);
+  }
+  /* Hover card */
+  .card-row:hover {
+    background:#1a1b20;
+    box-shadow: inset 0 0 0 1px #2d2f37;
+  }
+  /* segmented */
+  [data-active="true"].segment { background:#2a2c33; color:#edeef1; }
+  [data-active="false"].segment { background:transparent; color:#8f929c; }
+  /* tabs */
+  [data-active="true"].tab {
+    color:#edeef1;
+    box-shadow: inset 0 -1px 0 0 #d4a24c;
+  }
+  [data-active="false"].tab {
+    color:#8f929c;
+  }
+  [data-active="false"].tab:hover { color:#d4d6dc; }
+  /* filter chip */
+  [data-active="true"].fchip {
+    background:#2a2c33;
+    border-color:#3b3e47;
+    color:#edeef1;
+  }
+  [data-active="false"].fchip {
+    background:#121317;
+    border-color:#24262c;
+    color:#8f929c;
+  }
+  [data-active="false"].fchip:hover { color:#d4d6dc; border-color:#2f323a; }
+  /* sidebar item */
+  [data-active="true"].side-item {
+    background:#1b1c22;
+    color:#edeef1;
+    box-shadow: inset 2px 0 0 0 #d4a24c;
+  }
+  [data-active="false"].side-item:hover { background:#141519; color:#d4d6dc; }
+  /* subtask */
+  [data-done="true"] .st-title { color:#6b6e78; text-decoration: line-through; text-decoration-color:#4b4e58; }
+  [data-done="true"] .st-box {
+    background:#d4a24c; border-color:#d4a24c;
+  }
+  [data-done="true"] .st-box svg { opacity:1; }
+  [data-done="false"] .st-box svg { opacity:0; }
+
+  /* soft horizontal dividers */
+  .hrule { background-image: linear-gradient(90deg, transparent, #24262c 20%, #24262c 80%, transparent); height:1px; }
+
+  /* Tiny blinking dot */
+  @keyframes pulse-dot { 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+  .pulse-dot { animation: pulse-dot 2.2s ease-in-out infinite; }
+
+  /* selected track ribbon */
+  .track-ribbon {
+    background: repeating-linear-gradient(
+      135deg,
+      rgba(212,162,76,0.12) 0 6px,
+      rgba(212,162,76,0.06) 6px 12px
+    );
+  }
+</style>
+</head>
+
+<body class="h-screen w-screen text-[13px] text-zinc-200 overflow-hidden">
+
+<!-- ============== APP SHELL ============== -->
+<div class="h-full w-full flex flex-col bg-[#0a0a0c]">
+
+  <!-- ============== TITLEBAR ============== -->
+  <div class="relative flex items-center h-[34px] bg-[#0d0e11] border-b border-[#1c1d22] px-3 shrink-0 select-none">
+    <!-- traffic lights -->
+    <div class="flex items-center gap-[7px] w-[68px]">
+      <div class="w-[11px] h-[11px] rounded-full bg-[#3b2327] border border-[#5a3135]"></div>
+      <div class="w-[11px] h-[11px] rounded-full bg-[#3d3320] border border-[#5e4a29]"></div>
+      <div class="w-[11px] h-[11px] rounded-full bg-[#243425] border border-[#355337]"></div>
+    </div>
+
+    <!-- app label & path -->
+    <div class="flex items-center gap-2 pl-2">
+      <div class="w-[18px] h-[18px] rounded-[5px] bg-gradient-to-br from-[#d4a24c] to-[#8a6930] flex items-center justify-center shadow-inner">
+        <div class="w-2 h-2 bg-[#0a0a0c] rounded-[1.5px]"></div>
+      </div>
+      <span class="font-mono text-[11.5px] text-zinc-400 tracking-tight">
+        <span class="text-zinc-300">trackboi</span>
+        <span class="text-zinc-600 px-1">·</span>
+        <span class="text-zinc-500">~/projects/trackboi</span>
+        <span class="text-zinc-600 px-1">·</span>
+        <span class="text-[#d4a24c]">spike/tauri-shell</span>
+      </span>
+    </div>
+
+    <!-- center command bar -->
+    <div class="absolute left-1/2 -translate-x-1/2 flex items-center">
+      <button data-open-cmd class="group flex items-center gap-2 h-[22px] px-2 pr-1.5 rounded-[5px] bg-[#131418] border border-[#22242a] hover:border-[#2e3039] transition-colors">
+        <svg class="w-3 h-3 text-zinc-500" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+        <span class="text-[11.5px] text-zinc-400 font-mono tracking-tight">Go to card, branch, file…</span>
+        <span class="flex items-center gap-0.5 ml-6"><span class="kbd">⌘</span><span class="kbd">K</span></span>
+      </button>
+    </div>
+
+    <!-- right side -->
+    <div class="ml-auto flex items-center gap-2">
+      <div class="flex items-center gap-1.5 px-2 h-[22px] rounded-[5px] bg-[#131418] border border-[#22242a]">
+        <span class="w-1.5 h-1.5 rounded-full bg-[#6ca892] pulse-dot"></span>
+        <span class="font-mono text-[10.5px] text-zinc-400">mcp · 3 agents connected</span>
+      </div>
+      <button class="w-[22px] h-[22px] rounded-[5px] bg-[#131418] border border-[#22242a] flex items-center justify-center hover:border-[#2e3039]">
+        <svg class="w-3 h-3 text-zinc-400" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+      <div class="w-[22px] h-[22px] rounded-full bg-gradient-to-br from-[#4b4e58] to-[#22232a] flex items-center justify-center text-[10px] font-mono text-zinc-300 border border-[#2a2c33]">AD</div>
+    </div>
+  </div>
+
+  <!-- ============== MAIN ROW ============== -->
+  <div class="flex flex-1 min-h-0">
+
+    <!-- ===== ICON RAIL ===== -->
+    <div class="w-[46px] bg-[#0b0c0f] border-r border-[#17181c] flex flex-col items-center py-2 gap-1 shrink-0">
+      <!-- app switcher -->
+      <button class="w-8 h-8 rounded-[7px] flex items-center justify-center text-zinc-400 hover:bg-[#15161b] hover:text-zinc-100" title="Workspace switcher">
+        <svg class="w-[14px] h-[14px]" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M3 5h7v7H3zM14 5h7v4h-7zM14 12h7v7h-7zM3 15h7v4H3z"/></svg>
+      </button>
+      <div class="h-px w-6 bg-[#1c1d22] my-1"></div>
+      <!-- primary nav -->
+      <button class="w-8 h-8 rounded-[7px] flex items-center justify-center bg-[#1b1c22] text-[#d4a24c]" title="Boards">
+        <svg class="w-[15px] h-[15px]" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/></svg>
+      </button>
+      <button class="w-8 h-8 rounded-[7px] flex items-center justify-center text-zinc-500 hover:bg-[#15161b] hover:text-zinc-200" title="Notes">
+        <svg class="w-[15px] h-[15px]" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M4 4h12l4 4v12H4z"/><path d="M16 4v4h4"/><path d="M8 12h8M8 16h5"/></svg>
+      </button>
+      <button class="w-8 h-8 rounded-[7px] flex items-center justify-center text-zinc-500 hover:bg-[#15161b] hover:text-zinc-200 relative" title="Agents">
+        <svg class="w-[15px] h-[15px]" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M8 12h.01M16 12h.01M9 16h6"/></svg>
+        <span class="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-[#6ca892]"></span>
+      </button>
+      <button class="w-8 h-8 rounded-[7px] flex items-center justify-center text-zinc-500 hover:bg-[#15161b] hover:text-zinc-200" title="Timeline">
+        <svg class="w-[15px] h-[15px]" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M3 6h18M3 12h12M3 18h7"/></svg>
+      </button>
+      <button class="w-8 h-8 rounded-[7px] flex items-center justify-center text-zinc-500 hover:bg-[#15161b] hover:text-zinc-200" title="Worktrees">
+        <svg class="w-[15px] h-[15px]" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="12" r="2.5"/><path d="M6 8.5v7M8.5 6H16M16 18H8.5M15.5 12H8"/></svg>
+      </button>
+      <div class="mt-auto flex flex-col items-center gap-1">
+        <button class="w-8 h-8 rounded-[7px] flex items-center justify-center text-zinc-500 hover:bg-[#15161b] hover:text-zinc-200" title="Sync status">
+          <svg class="w-[14px] h-[14px]" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3L20 9M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M20 4v5h-5M4 20v-5h5"/></svg>
+        </button>
+        <button class="w-8 h-8 rounded-[7px] flex items-center justify-center text-zinc-500 hover:bg-[#15161b] hover:text-zinc-200" title="Settings">
+          <svg class="w-[14px] h-[14px]" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- ===== PROJECT SIDEBAR ===== -->
+    <aside class="w-[244px] bg-[#0b0c0f] border-r border-[#17181c] flex flex-col shrink-0">
+      <!-- workspace header -->
+      <div class="px-3 pt-3 pb-2">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-mono uppercase tracking-[0.14em] text-zinc-500">workspace</span>
+          <button class="text-zinc-500 hover:text-zinc-200">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+        <button class="mt-1.5 w-full flex items-center justify-between group">
+          <div class="flex items-center gap-2">
+            <div class="w-[18px] h-[18px] rounded-[4px] bg-[#1f1a12] flex items-center justify-center">
+              <span class="text-[10px] text-[#d4a24c] font-mono">trk</span>
+            </div>
+            <span class="text-zinc-200 text-[13px] font-medium">trackboi</span>
+          </div>
+          <svg class="w-3 h-3 text-zinc-500 group-hover:text-zinc-300" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </div>
+
+      <div class="hrule mx-3"></div>
+
+      <!-- search -->
+      <div class="px-3 py-2">
+        <div class="flex items-center gap-1.5 h-[26px] px-2 rounded-[5px] bg-[#111216] border border-[#1e2025] focus-within:border-[#2c2e37]">
+          <svg class="w-3 h-3 text-zinc-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input placeholder="Filter…" class="bg-transparent text-[12px] flex-1 placeholder-zinc-600 text-zinc-200"/>
+          <span class="kbd">/</span>
+        </div>
+      </div>
+
+      <!-- scrollable region -->
+      <div class="flex-1 min-h-0 overflow-y-auto scroll-thin px-1.5">
+
+        <!-- Projects section -->
+        <div class="pt-1.5 pb-2">
+          <div class="flex items-center justify-between px-2 py-1">
+            <span class="text-[10px] font-mono uppercase tracking-[0.14em] text-zinc-500">projects</span>
+            <span class="text-[10px] font-mono text-zinc-600">5</span>
+          </div>
+
+          <button data-sidebar-item data-group="project" data-active="true" class="side-item w-full flex items-center gap-2 pl-2 pr-2 py-1 rounded-[5px] text-zinc-300">
+            <svg class="w-3 h-3 text-[#d4a24c]" fill="currentColor" viewBox="0 0 8 8"><rect width="8" height="8" rx="2"/></svg>
+            <span class="text-[12.5px] flex-1 text-left truncate">trackboi</span>
+            <span class="font-mono text-[10px] text-zinc-400 bg-[#1d1e23] px-1 rounded">42</span>
+          </button>
+          <button data-sidebar-item data-group="project" data-active="false" class="side-item w-full flex items-center gap-2 pl-2 pr-2 py-1 rounded-[5px]">
+            <svg class="w-3 h-3 text-[#6bb6c8]" fill="currentColor" viewBox="0 0 8 8"><rect width="8" height="8" rx="2"/></svg>
+            <span class="text-[12.5px] flex-1 text-left truncate text-zinc-400">orbital-inbox</span>
+            <span class="font-mono text-[10px] text-zinc-500">18</span>
+          </button>
+          <button data-sidebar-item data-group="project" data-active="false" class="side-item w-full flex items-center gap-2 pl-2 pr-2 py-1 rounded-[5px]">
+            <svg class="w-3 h-3 text-[#8b7ec8]" fill="currentColor" viewBox="0 0 8 8"><rect width="8" height="8" rx="2"/></svg>
+            <span class="text-[12.5px] flex-1 text-left truncate text-zinc-400">lattice-engine</span>
+            <span class="font-mono text-[10px] text-zinc-500">7</span>
+          </button>
+          <button data-sidebar-item data-group="project" data-active="false" class="side-item w-full flex items-center gap-2 pl-2 pr-2 py-1 rounded-[5px]">
+            <svg class="w-3 h-3 text-[#c87a7a]" fill="currentColor" viewBox="0 0 8 8"><rect width="8" height="8" rx="2"/></svg>
+            <span class="text-[12.5px] flex-1 text-left truncate text-zinc-400">paperhouse-cli</span>
+            <span class="font-mono text-[10px] text-zinc-500">11</span>
+          </button>
+          <button data-sidebar-item data-group="project" data-active="false" class="side-item w-full flex items-center gap-2 pl-2 pr-2 py-1 rounded-[5px]">
+            <svg class="w-3 h-3 text-[#6ca892]" fill="currentColor" viewBox="0 0 8 8"><rect width="8" height="8" rx="2"/></svg>
+            <span class="text-[12.5px] flex-1 text-left truncate text-zinc-400">kite-runner</span>
+            <span class="font-mono text-[10px] text-zinc-500">3</span>
+          </button>
+        </div>
+
+        <div class="hrule mx-2 my-1"></div>
+
+        <!-- Worktrees section -->
+        <div class="pt-1.5 pb-2">
+          <div data-collapsible data-collapsed="false" class="">
+            <button data-collapse-toggle class="w-full flex items-center justify-between px-2 py-1 group">
+              <div class="flex items-center gap-1.5">
+                <svg class="collapse-chev w-3 h-3 text-zinc-500 group-hover:text-zinc-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+                <span class="text-[10px] font-mono uppercase tracking-[0.14em] text-zinc-500">worktrees</span>
+              </div>
+              <span class="text-[10px] font-mono text-zinc-600">3</span>
+            </button>
+            <div class="collapse-body">
+              <button data-sidebar-item data-group="wt" data-active="true" class="side-item w-full flex items-center gap-2 pl-2 pr-2 py-1 rounded-[5px]">
+                <svg class="w-3 h-3 text-[#d4a24c]" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><path d="M6 8v8a4 4 0 0 0 4 4h6"/></svg>
+                <div class="flex-1 text-left min-w-0">
+                  <div class="text-[12px] font-mono text-zinc-200 truncate">spike/tauri-shell</div>
+                  <div class="text-[10px] font-mono text-zinc-500 truncate">wt/tauri-shell</div>
+                </div>
+                <span class="w-1.5 h-1.5 rounded-full bg-[#d4a24c]"></span>
+              </button>
+              <button data-sidebar-item data-group="wt" data-active="false" class="side-item w-full flex items-center gap-2 pl-2 pr-2 py-1 rounded-[5px]">
+                <svg class="w-3 h-3 text-zinc-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><path d="M6 8v8a4 4 0 0 0 4 4h6"/></svg>
+                <div class="flex-1 text-left min-w-0">
+                  <div class="text-[12px] font-mono text-zinc-400 truncate">master</div>
+                  <div class="text-[10px] font-mono text-zinc-500 truncate">trackboi/</div>
+                </div>
+              </button>
+              <button data-sidebar-item data-group="wt" data-active="false" class="side-item w-full flex items-center gap-2 pl-2 pr-2 py-1 rounded-[5px]">
+                <svg class="w-3 h-3 text-zinc-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><path d="M6 8v8a4 4 0 0 0 4 4h6"/></svg>
+                <div class="flex-1 text-left min-w-0">
+                  <div class="text-[12px] font-mono text-zinc-400 truncate">fix/editor-layout</div>
+                  <div class="text-[10px] font-mono text-zinc-500 truncate">wt/editor-fix</div>
+                </div>
+                <span class="text-[9px] font-mono text-[#c87a7a] bg-[#2b1a1e] px-1 rounded">!</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="hrule mx-2 my-1"></div>
+
+        <!-- Views / filters -->
+        <div class="pt-1.5 pb-2">
+          <div class="flex items-center justify-between px-2 py-1">
+            <span class="text-[10px] font-mono uppercase tracking-[0.14em] text-zinc-500">saved views</span>
+          </div>
+          <button data-sidebar-item data-group="view" data-active="false" class="side-item w-full flex items-center gap-2 px-2 py-1 rounded-[5px] text-zinc-400">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 4h18l-7 9v6l-4-2v-4z"/></svg>
+            <span class="text-[12px] flex-1 text-left">Agent-assigned</span>
+            <span class="font-mono text-[10px] text-zinc-500">5</span>
+          </button>
+          <button data-sidebar-item data-group="view" data-active="false" class="side-item w-full flex items-center gap-2 px-2 py-1 rounded-[5px] text-zinc-400">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 4h18l-7 9v6l-4-2v-4z"/></svg>
+            <span class="text-[12px] flex-1 text-left">Blocked by branch</span>
+            <span class="font-mono text-[10px] text-zinc-500">2</span>
+          </button>
+          <button data-sidebar-item data-group="view" data-active="false" class="side-item w-full flex items-center gap-2 px-2 py-1 rounded-[5px] text-zinc-400">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 4h18l-7 9v6l-4-2v-4z"/></svg>
+            <span class="text-[12px] flex-1 text-left">My track</span>
+            <span class="font-mono text-[10px] text-zinc-500">9</span>
+          </button>
+        </div>
+
+        <div class="hrule mx-2 my-1"></div>
+
+        <!-- Stats card -->
+        <div class="p-2">
+          <div class="rounded-[6px] border border-[#1c1d22] bg-[#101114] p-2.5">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-[10px] font-mono uppercase tracking-wide text-zinc-500">cycle · w16</span>
+              <span class="text-[10px] font-mono text-[#6ca892]">on track</span>
+            </div>
+            <div class="h-1 w-full rounded-full bg-[#1c1d22] overflow-hidden flex">
+              <div class="h-full bg-[#6ca892]" style="width:38%"></div>
+              <div class="h-full bg-[#d4a24c]" style="width:22%"></div>
+              <div class="h-full bg-[#3a3c44]" style="width:40%"></div>
+            </div>
+            <div class="mt-2 flex justify-between text-[10px] font-mono text-zinc-500">
+              <span><span class="text-zinc-300">12</span> done</span>
+              <span><span class="text-zinc-300">7</span> wip</span>
+              <span><span class="text-zinc-300">13</span> left</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ===== BOARD AREA ===== -->
+    <section class="flex-1 min-w-0 flex flex-col bg-[#0a0a0c] relative grain">
+
+      <!-- BOARD HEADER -->
+      <div class="relative px-4 pt-3 pb-2 border-b border-[#17181c] bg-[#0b0c0f]">
+        <div class="flex items-center gap-3">
+          <h1 class="text-[16px] font-semibold text-zinc-100 tracking-tight">Board</h1>
+          <span class="text-zinc-700">/</span>
+          <div class="flex items-center gap-1.5 font-mono text-[12px] text-zinc-300">
+            <svg class="w-3 h-3 text-[#d4a24c]" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><path d="M6 8v8a4 4 0 0 0 4 4h6"/></svg>
+            <span>spike/tauri-shell</span>
+            <span class="ml-1 px-1 py-[1px] rounded text-[9.5px] font-mono bg-[#1f1a12] text-[#d4a24c] border border-[#2a2315]">track</span>
+          </div>
+
+          <div class="ml-auto flex items-center gap-1.5">
+            <!-- Scope segmented -->
+            <div data-segmented class="flex items-center bg-[#121317] border border-[#1e2025] rounded-[6px] p-[2px] h-[26px]">
+              <button data-segment data-active="false" class="segment h-[20px] px-2 rounded-[4px] text-[11px] font-mono transition-colors">All</button>
+              <button data-segment data-active="false" class="segment h-[20px] px-2 rounded-[4px] text-[11px] font-mono transition-colors">Project</button>
+              <button data-segment data-active="true" class="segment h-[20px] px-2 rounded-[4px] text-[11px] font-mono transition-colors">Track</button>
+            </div>
+
+            <!-- View type -->
+            <div data-segmented class="flex items-center bg-[#121317] border border-[#1e2025] rounded-[6px] p-[2px] h-[26px]">
+              <button data-segment data-active="true" class="segment h-[20px] px-2 rounded-[4px] flex items-center gap-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/></svg>
+                <span class="text-[11px] font-mono">Kanban</span>
+              </button>
+              <button data-segment data-active="false" class="segment h-[20px] px-2 rounded-[4px] flex items-center gap-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+                <span class="text-[11px] font-mono">List</span>
+              </button>
+              <button data-segment data-active="false" class="segment h-[20px] px-2 rounded-[4px] flex items-center gap-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 4h6v6H3zM3 14h6v6H3zM13 4h8M13 10h8M13 16h8"/></svg>
+                <span class="text-[11px] font-mono">Graph</span>
+              </button>
+            </div>
+
+            <div class="h-[22px] w-px bg-[#1e2025] mx-1"></div>
+
+            <button class="h-[26px] px-2 flex items-center gap-1.5 rounded-[6px] bg-[#121317] border border-[#1e2025] hover:border-[#2c2e37] text-zinc-300">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 5h18l-7 9v5l-4-2v-3z"/></svg>
+              <span class="text-[11.5px] font-mono">Filter</span>
+              <span class="kbd">F</span>
+            </button>
+            <button class="h-[26px] px-2.5 flex items-center gap-1.5 rounded-[6px] bg-[#1f1a12] border border-[#3a2e18] hover:border-[#4c3c1e] text-[#eac07a]">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+              <span class="text-[11.5px] font-mono">New card</span>
+              <span class="kbd">N</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter strip -->
+        <div class="mt-2.5 flex items-center gap-1.5 flex-wrap">
+          <span class="text-[10px] font-mono uppercase tracking-[0.14em] text-zinc-500 mr-1">filter</span>
+          <button data-filter data-active="true" class="fchip h-[22px] px-2 rounded-full border text-[11px] font-mono flex items-center gap-1">
+            <span>status:open</span>
+          </button>
+          <button data-filter data-active="true" class="fchip h-[22px] px-2 rounded-full border text-[11px] font-mono flex items-center gap-1">
+            <span>track:spike/tauri-shell</span>
+            <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+          <button data-filter data-active="false" class="fchip h-[22px] px-2 rounded-full border text-[11px] font-mono">
+            priority:high
+          </button>
+          <button data-filter data-active="false" class="fchip h-[22px] px-2 rounded-full border text-[11px] font-mono">
+            assignee:@me
+          </button>
+          <button data-filter data-active="false" class="fchip h-[22px] px-2 rounded-full border text-[11px] font-mono">
+            agent:claude-opus
+          </button>
+          <button data-filter data-active="false" class="fchip h-[22px] px-2 rounded-full border text-[11px] font-mono">
+            field:component
+          </button>
+          <button data-filter data-active="false" class="fchip h-[22px] px-2 rounded-full border text-[11px] font-mono flex items-center gap-1">
+            <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            <span>add</span>
+          </button>
+          <div class="ml-auto flex items-center gap-2 font-mono text-[11px] text-zinc-500">
+            <span><span class="text-zinc-300">32</span> cards</span>
+            <span class="text-zinc-700">·</span>
+            <span><span class="text-zinc-300">7</span> in progress</span>
+            <span class="text-zinc-700">·</span>
+            <span><span class="text-zinc-300">2</span> blocked</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOARD COLUMNS -->
+      <div class="flex-1 min-h-0 overflow-x-auto overflow-y-hidden scroll-thin">
+        <div class="h-full inline-flex gap-[14px] px-4 py-3 min-w-full">
+
+          <!-- COLUMN: Backlog -->
+          <div class="w-[280px] shrink-0 flex flex-col bg-[#0c0d10] border border-[#17181c] rounded-[8px]">
+            <div class="px-3 pt-2.5 pb-2 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#4b4e58]"></span>
+                <span class="text-[11.5px] font-mono uppercase tracking-[0.12em] text-zinc-300">Backlog</span>
+                <span class="text-[10.5px] font-mono text-zinc-500 bg-[#16171b] px-1.5 rounded">6</span>
+              </div>
+              <div class="flex items-center gap-0.5">
+                <button class="w-[18px] h-[18px] rounded flex items-center justify-center text-zinc-500 hover:text-zinc-200 hover:bg-[#17181c]"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+                <button class="w-[18px] h-[18px] rounded flex items-center justify-center text-zinc-500 hover:text-zinc-200 hover:bg-[#17181c]"><svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></button>
+              </div>
+            </div>
+            <div class="h-px mx-2 bg-[#17181c]"></div>
+            <div class="flex-1 p-2 space-y-1.5 overflow-y-auto scroll-thin">
+              <!-- card -->
+              <div data-card data-selected="false" class="card-row relative rounded-[6px] bg-[#141519] border border-[#1e2025] p-2.5 cursor-pointer transition-colors">
+                <div class="flex items-start gap-2">
+                  <span class="mt-[3px] font-mono text-[10px] text-zinc-500">TRK-051</span>
+                  <span class="text-[10px] font-mono text-zinc-500 bg-[#1a1b20] px-1 rounded border border-[#24262c]">feat</span>
+                </div>
+                <div class="mt-1 text-[12.5px] text-zinc-200 leading-snug">Per-card activity ledger with agent vs human attribution</div>
+                <div class="mt-2 flex items-center justify-between text-[10.5px] font-mono text-zinc-500">
+                  <span class="flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>3</span>
+                  <span class="flex items-center gap-1 text-[#8b7ec8]"><span class="w-1.5 h-1.5 rounded-full bg-[#8b7ec8]"></span>global</span>
+                </div>
+              </div>
+              <div data-card data-selected="false" class="card-row relative rounded-[6px] bg-[#141519] border border-[#1e2025] p-2.5 cursor-pointer transition-colors">
+                <div class="flex items-start gap-2">
+                  <span class="mt-[3px] font-mono text-[10px] text-zinc-500">TRK-052</span>
+                  <span class="text-[10px] font-mono text-zinc-500 bg-[#1a1b20] px-1 rounded border border-[#24262c]">infra</span>
+                </div>
+                <div class="mt-1 text-[12.5px] text-zinc-200 leading-snug">Move storage adapter to Tauri fs plugin</div>
+                <div class="mt-1.5 text-[11px] text-zinc-500 leading-snug line-clamp-2">Electrobun IPC worked but Tauri exposes safer capability scopes for .trackboi/ …</div>
+                <div class="mt-2 flex items-center justify-between text-[10.5px] font-mono text-zinc-500">
+                  <span class="flex items-center gap-1.5">
+                    <span class="px-1 rounded bg-[#1d1a13] border border-[#2a2215] text-[#d4a24c]">spike/tauri-shell</span>
+                  </span>
+                </div>
+              </div>
+              <div data-card data-selected="false" class="card-row relative rounded-[6px] bg-[#141519] border border-[#1e2025] p-2.5 cursor-pointer transition-colors">
+                <div class="flex items-start gap-2">
+                  <span class="mt-[3px] font-mono text-[10px] text-zinc-500">TRK-058</span>
+                  <span class="text-[10px] font-mono text-zinc-500 bg-[#1a1b20] px-1 rounded border border-[#24262c]">chore</span>
+                </div>
+                <div class="mt-1 text-[12.5px] text-zinc-300 leading-snug">Delete the Electrobun renderer once Tauri reaches parity</div>
+                <div class="mt-2 flex items-center justify-between text-[10.5px] font-mono text-zinc-500">
+                  <span class="flex items-center gap-1">0 / 4 subtasks</span>
+                </div>
+              </div>
+              <div data-card data-selected="false" class="card-row relative rounded-[6px] bg-[#141519] border border-[#1e2025] p-2.5 cursor-pointer transition-colors">
+                <div class="flex items-start gap-2">
+                  <span class="mt-[3px] font-mono text-[10px] text-zinc-500">TRK-060</span>
+                  <span class="text-[10px] font-mono text-zinc-500 bg-[#1a1b20] px-1 rounded border border-[#24262c]">docs</span>
+                </div>
+                <div class="mt-1 text-[12.5px] text-zinc-300 leading-snug">Write the MCP capability reference</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- COLUMN: Ready -->
+          <div class="w-[280px] shrink-0 flex flex-col bg-[#0c0d10] border border-[#17181c] rounded-[8px]">
+            <div class="px-3 pt-2.5 pb-2 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#6bb6c8]"></span>
+                <span class="text-[11.5px] font-mono uppercase tracking-[0.12em] text-zinc-300">Ready</span>
+                <span class="text-[10.5px] font-mono text-zinc-500 bg-[#16171b] px-1.5 rounded">4</span>
+              </div>
+              <div class="flex items-center gap-0.5">
+                <button class="w-[18px] h-[18px] rounded flex items-center justify-center text-zinc-500 hover:text-zinc-200 hover:bg-[#17181c]"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+              </div>
+            </div>
+            <div class="h-px mx-2 bg-[#17181c]"></div>
+            <div class="flex-1 p-2 space-y-1.5 overflow-y-auto scroll-thin">
+              <div data-card data-selected="false" class="card-row relative rounded-[6px] bg-[#141519] border border-[#1e2025] p-2.5 cursor-pointer transition-colors">
+                <div class="flex items-start gap-2">
+                  <span class="mt-[3px] font-mono text-[10px] text-zinc-500">TRK-044</span>
+                  <span class="text-[10px] font-mono text-zinc-500 bg-[#1a1b20] px-1 rounded border border-[#24262c]">feat</span>
+                  <span class="ml-auto flex items-center gap-1 text-[10px] font-mono text-[#c87a7a]"><span class="w-1.5 h-1.5 rounded-full bg-[#c87a7a]"></span>hi</span>
+                </div>
+                <div class="mt-1 text-[12.5px] text-zinc-200 leading-snug">Custom field schema per project (text / enum / url)</div>
+                <div class="mt-2 flex items-center gap-1 flex-wrap">
+                  <span class="px-1 rounded bg-[#1d1a13] border border-[#2a2215] text-[10px] font-mono text-[#d4a24c]">spike/tauri-shell</span>
+                  <span class="px-1 rounded bg-[#161920] border border-[#22262e] text-[10px] font-mono text-[#6bb6c8]">component:core</span>
+                </div>
+              </div>
+              <div data-card data-selected="false" class="card-row relative rounded-[6px] bg-[#141519] border border-[#1e2025] p-2.5 cursor-pointer transition-colors">
+                <div class="flex items-start gap-2">
+                  <span class="mt-[3px] font-mono text-[10px] text-zinc-500">TRK-047</span>
+                  <span class="text-[10px] font-mono text-zinc-500 bg-[#1a1b20] px-1 rounded border border-[#24262c]">feat</span>
+                </div>
+                <div class="mt-1 text-[12.5px] text-zinc-200 leading-snug">Surface MCP <span class="font-mono text-zinc-400">list_cards</span> results in a test harness</div>
+                <div class="mt-2 flex items-center justify-between">
+                  <span class="text-[10px] font-mono text-zinc-500">2 / 5 subtasks</span>
+                  <div class="flex -space-x-1">
+                    <div class="w-4 h-4 rounded-full bg-gradient-to-br from-[#8b7ec8] to-[#3e3659] border border-[#0c0d10] flex items-center justify-center text-[8px] font-mono text-white">co</div>
+                    <div class="w-4 h-4 rounded-full bg-gradient-to-br from-[#6b6e78] to-[#2a2c33] border border-[#0c0d10] flex items-center justify-center text-[8px] font-mono text-white">AD</div>
+                  </div>
+                </div>
+              </div>
+              <div data-card data-selected="false" class="card-row relative rounded-[6px] bg-[#141519] border border-[#1e2025] p-2.5 cursor-pointer transition-colors">
+                <div class="flex items-start gap-2">
+                  <span class="mt-[3px] font-mono text-[10px] text-zinc-500">TRK-050</span>
+                  <span class="text-[10px] font-mono text-zinc-500 bg-[#1a1b20] px-1 rounded border border-[#24262c]">fix</span>
+                </div>
+                <div class="mt-1 text-[12.5px] text-zinc-300 leading-snug">Column drag reorder persists but doesn't sync between windows</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- COLUMN: In Progress -->
+          <div class="w-[300px] shrink-0 flex flex-col bg-[#0c0d10] border border-[#1f2028] rounded-[8px] relative track-ribbon">
+            <div class="px-3 pt-2.5 pb-2 flex items-center justify-between relative">
+              <div class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#d4a24c]"></span>
+                <span class="text-[11.5px] font-mono uppercase tracking-[0.12em] text-zinc-200">In Progress</span>
+                <span class="text-[10.5px] font-mono text-zinc-400 bg-[#1f1a12] border border-[#2a2315] px-1.5 rounded">3</span>
+                <span class="text-[10px] font-mono text-zinc-500">wip limit 4</span>
+              </div>
+              <div class="flex items-center gap-0.5">
+                <button class="w-[18px] h-[18px] rounded flex items-center justify-center text-zinc-500 hover:text-zinc-200 hover:bg-[#17181c]"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+              </div>
+            </div>
+            <div class="h-px mx-2 bg-[#2a2315]"></div>
+            <div class="flex-1 p-2 space-y-1.5 overflow-y-auto scroll-thin">
+              <!-- SELECTED card -->
+              <div data-card data-selected="true" class="card-row relative rounded-[6px] bg-[#141519] border border-[#2a2c33] p-2.5 cursor-pointer transition-colors">
+                <div class="flex items-start gap-2">
+                  <span class="mt-[3px] font-mono text-[10px] text-zinc-400">TRK-042</span>
+                  <span class="text-[10px] font-mono text-[#eac07a] bg-[#1f1a12] px-1 rounded border border-[#2a2315]">feat</span>
+                  <span class="ml-auto flex items-center gap-1 text-[10px] font-mono text-[#d4a24c]"><span class="w-1.5 h-1.5 rounded-full bg-[#d4a24c]"></span>editing</span>
+                </div>
+                <div class="mt-1 text-[13px] font-medium text-zinc-100 leading-snug">Rebuild card editor as a desktop inspector panel</div>
+                <div class="mt-1.5 font-mono text-[11px] text-zinc-500 leading-snug">
+                  <span class="text-zinc-400">›</span> The current editor reads as a web form. It needs to feel like a real issue workspace with split structure, not a modal…
+                </div>
+                <!-- subtask progress -->
+                <div class="mt-2.5">
+                  <div class="flex items-center justify-between text-[10px] font-mono text-zinc-500 mb-1">
+                    <span>subtasks</span>
+                    <span><span class="text-zinc-300">3</span> / 6</span>
+                  </div>
+                  <div class="h-[3px] w-full rounded-full bg-[#1c1d22] overflow-hidden">
+                    <div class="h-full rounded-full bg-[#d4a24c]" style="width:50%"></div>
+                  </div>
+                </div>
+                <div class="mt-2.5 flex items-center gap-1 flex-wrap">
+                  <span class="px-1 py-[1px] rounded bg-[#1d1a13] border border-[#2a2315] text-[10px] font-mono text-[#d4a24c]">spike/tauri-shell</span>
+                  <span class="px-1 py-[1px] rounded bg-[#161920] border border-[#22262e] text-[10px] font-mono text-[#6bb6c8]">component:ui</span>
+                  <span class="px-1 py-[1px] rounded bg-[#1a1620] border border-[#261e2e] text-[10px] font-mono text-[#a890d8]">ai-paired</span>
+                  <span class="ml-auto font-mono text-[10px] text-zinc-500">3 notes</span>
+                </div>
+              </div>
+
+              <div data-card data-selected="false" class="card-row relative rounded-[6px] bg-[#141519] border border-[#1e2025] p-2.5 cursor-pointer transition-colors">
+                <div class="flex items-start gap-2">
+                  <span class="mt-[3px] font-mono text-[10px] text-zinc-500">TRK-038</span>
+                  <span class="text-[10px] font-mono text-zinc-500 bg-[#1a1b20] px-1 rounded border border-[#24262c]">infra</span>
+                </div>
+                <div class="mt-1 text-[12.5px] text-zinc-200 leading-snug">Rewire IPC bridge from Electrobun to Tauri invoke</div>
+                <div class="mt-2 flex items-center justify-between">
+                  <span class="text-[10px] font-mono text-zinc-500">4 / 7 subtasks</span>
+                  <div class="h-[3px] w-20 rounded-full bg-[#1c1d22] overflow-hidden">
+                    <div class="h-full rounded-full bg-[#6ca892]" style="width:57%"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div data-card data-selected="false" class="card-row relative rounded-[6px] bg-[#141519] border border-[#1e2025] p-2.5 cursor-pointer transition-colors">
+                <div class="flex items-start gap-2">
+                  <span class="mt-[3px] font-mono text-[10px] text-zinc-500">TRK-046</span>
+                  <span class="text-[10px] font-mono text-zinc-500 bg-[#1a1b20] px-1 rounded border border-[#24262c]">fix</span>
+                  <span class="ml-auto flex items-center gap-1 text-[10px] font-mono text-[#c87a7a]">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+                    diverged
+                  </span>
+                </div>
+                <div class="mt-1 text-[12.5px] text-zinc-200 leading-snug">Worktree <span class="font-mono text-[11.5px]">wt/editor-fix</span> diverged from track branch</div>
+                <div class="mt-1.5 text-[11px] font-mono text-zinc-500">
+                  <span class="text-[#c87a7a]">!</span> 4 commits ahead, 11 behind · needs rebase
+                </div>
+              </div>
+
+              <!-- drop target placeholder -->
+              <div class="col-drop-target h-14 rounded-[6px] flex items-center justify-center">
+                <span class="text-[10.5px] font-mono text-[#d4a24c]/70">drop to move · ⇧⌃↵</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- COLUMN: Review -->
+          <div class="w-[280px] shrink-0 flex flex-col bg-[#0c0d10] border border-[#17181c] rounded-[8px]">
+            <div class="px-3 pt-2.5 pb-2 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#8b7ec8]"></span>
+                <span class="text-[11.5px] font-mono uppercase tracking-[0.12em] text-zinc-300">Review</span>
+                <span class="text-[10.5px] font-mono text-zinc-500 bg-[#16171b] px-1.5 rounded">2</span>
+              </div>
+            </div>
+            <div class="h-px mx-2 bg-[#17181c]"></div>
+            <div class="flex-1 p-2 space-y-1.5 overflow-y-auto scroll-thin">
+              <div data-card data-selected="false" class="card-row relative rounded-[6px] bg-[#141519] border border-[#1e2025] p-2.5 cursor-pointer transition-colors">
+                <div class="flex items-start gap-2">
+                  <span class="mt-[3px] font-mono text-[10px] text-zinc-500">TRK-031</span>
+                  <span class="text-[10px] font-mono text-zinc-500 bg-[#1a1b20] px-1 rounded border border-[#24262c]">feat</span>
+                </div>
+                <div class="mt-1 text-[12.5px] text-zinc-200 leading-snug">Add track scope to card placement logic</div>
+                <div class="mt-2 flex items-center gap-1">
+                  <span class="px-1 rounded bg-[#1d1a13] border border-[#2a2215] text-[10px] font-mono text-[#d4a24c]">spike/tauri-shell</span>
+                  <span class="ml-auto font-mono text-[10px] text-[#6ca892]">+82 / -14</span>
+                </div>
+              </div>
+              <div data-card data-selected="false" class="card-row relative rounded-[6px] bg-[#141519] border border-[#1e2025] p-2.5 cursor-pointer transition-colors">
+                <div class="flex items-start gap-2">
+                  <span class="mt-[3px] font-mono text-[10px] text-zinc-500">TRK-035</span>
+                  <span class="text-[10px] font-mono text-zinc-500 bg-[#1a1b20] px-1 rounded border border-[#24262c]">refactor</span>
+                  <span class="ml-auto flex items-center gap-1 text-[10px] font-mono text-[#8b7ec8]"><span class="w-1.5 h-1.5 rounded-full bg-[#8b7ec8]"></span>agent</span>
+                </div>
+                <div class="mt-1 text-[12.5px] text-zinc-200 leading-snug">Split <span class="font-mono">storage.ts</span> into reader/writer modules</div>
+                <div class="mt-1 text-[11px] text-zinc-500 line-clamp-2">Proposed by claude-opus after reviewing cycle 16 diff. All tests green locally.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- COLUMN: Done -->
+          <div class="w-[260px] shrink-0 flex flex-col bg-[#0c0d10] border border-[#17181c] rounded-[8px] opacity-[0.92]">
+            <div class="px-3 pt-2.5 pb-2 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#6ca892]"></span>
+                <span class="text-[11.5px] font-mono uppercase tracking-[0.12em] text-zinc-300">Done</span>
+                <span class="text-[10.5px] font-mono text-zinc-500 bg-[#16171b] px-1.5 rounded">12</span>
+              </div>
+            </div>
+            <div class="h-px mx-2 bg-[#17181c]"></div>
+            <div class="flex-1 p-2 space-y-1.5 overflow-y-auto scroll-thin">
+              <div data-card data-selected="false" class="card-row relative rounded-[6px] bg-[#101114] border border-[#17181c] p-2.5 cursor-pointer transition-colors">
+                <div class="flex items-start gap-2">
+                  <span class="mt-[3px] font-mono text-[10px] text-zinc-600">TRK-028</span>
+                  <span class="text-[10px] font-mono text-zinc-600 bg-[#14151a] px-1 rounded border border-[#1e1f24]">feat</span>
+                </div>
+                <div class="mt-1 text-[12px] text-zinc-400 leading-snug line-through decoration-zinc-700">Local JSON store under <span class="font-mono">.trackboi/cards/</span></div>
+              </div>
+              <div data-card data-selected="false" class="card-row relative rounded-[6px] bg-[#101114] border border-[#17181c] p-2.5 cursor-pointer transition-colors">
+                <div class="flex items-start gap-2">
+                  <span class="mt-[3px] font-mono text-[10px] text-zinc-600">TRK-026</span>
+                  <span class="text-[10px] font-mono text-zinc-600 bg-[#14151a] px-1 rounded border border-[#1e1f24]">chore</span>
+                </div>
+                <div class="mt-1 text-[12px] text-zinc-400 leading-snug line-through decoration-zinc-700">Markdown renderer for card notes</div>
+              </div>
+              <div data-card data-selected="false" class="card-row relative rounded-[6px] bg-[#101114] border border-[#17181c] p-2.5 cursor-pointer transition-colors">
+                <div class="flex items-start gap-2">
+                  <span class="mt-[3px] font-mono text-[10px] text-zinc-600">TRK-022</span>
+                  <span class="text-[10px] font-mono text-zinc-600 bg-[#14151a] px-1 rounded border border-[#1e1f24]">feat</span>
+                </div>
+                <div class="mt-1 text-[12px] text-zinc-400 leading-snug line-through decoration-zinc-700">MCP headless CLI entry point</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== INSPECTOR / CARD EDITOR ===== -->
+    <aside class="w-[460px] shrink-0 bg-[#0b0c0f] border-l border-[#17181c] flex flex-col">
+      <!-- inspector header -->
+      <div class="px-3 pt-2.5 pb-2 border-b border-[#17181c]">
+        <div class="flex items-center gap-1.5 text-[11px] font-mono">
+          <span class="text-zinc-500">trackboi</span>
+          <span class="text-zinc-700">/</span>
+          <span class="text-[#d4a24c]">spike/tauri-shell</span>
+          <span class="text-zinc-700">/</span>
+          <span class="text-zinc-300">TRK-042</span>
+          <div class="ml-auto flex items-center gap-0.5">
+            <button title="Previous card" class="w-[22px] h-[22px] rounded flex items-center justify-center text-zinc-500 hover:text-zinc-200 hover:bg-[#15161b]"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+            <button title="Next card" class="w-[22px] h-[22px] rounded flex items-center justify-center text-zinc-500 hover:text-zinc-200 hover:bg-[#15161b]"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+            <span class="w-px h-3 bg-[#1e2025] mx-1"></span>
+            <button title="Open in window" class="w-[22px] h-[22px] rounded flex items-center justify-center text-zinc-500 hover:text-zinc-200 hover:bg-[#15161b]"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M15 3h6v6M14 10l7-7M10 21H5a2 2 0 0 1-2-2v-5"/></svg></button>
+            <button title="More" class="w-[22px] h-[22px] rounded flex items-center justify-center text-zinc-500 hover:text-zinc-200 hover:bg-[#15161b]"><svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></button>
+            <button title="Close" class="w-[22px] h-[22px] rounded flex items-center justify-center text-zinc-500 hover:text-zinc-200 hover:bg-[#15161b]"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+          </div>
+        </div>
+
+        <!-- Title -->
+        <div class="mt-2">
+          <input value="Rebuild card editor as a desktop inspector panel"
+            class="w-full bg-transparent text-[16.5px] font-medium text-zinc-100 leading-snug tracking-tight placeholder-zinc-600"
+            placeholder="Card title…" />
+        </div>
+
+        <!-- Status/meta row -->
+        <div class="mt-2 flex items-center gap-1.5 flex-wrap">
+          <button class="h-[22px] px-1.5 rounded-[5px] border border-[#2a2315] bg-[#1f1a12] text-[#eac07a] text-[11px] font-mono flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-[#d4a24c]"></span>In Progress
+            <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <button class="h-[22px] px-1.5 rounded-[5px] border border-[#24262c] bg-[#121317] text-zinc-300 text-[11px] font-mono flex items-center gap-1">
+            <svg class="w-2.5 h-2.5 text-[#c87a7a]" fill="currentColor" viewBox="0 0 8 8"><rect width="8" height="8" rx="2"/></svg>
+            priority · high
+          </button>
+          <button class="h-[22px] px-1.5 rounded-[5px] border border-[#24262c] bg-[#121317] text-zinc-300 text-[11px] font-mono flex items-center gap-1">
+            <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            due · 2026-04-24
+          </button>
+          <button class="h-[22px] px-1.5 rounded-[5px] border border-[#24262c] bg-[#121317] text-zinc-400 text-[11px] font-mono flex items-center gap-1">
+            <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            add
+          </button>
+          <div class="ml-auto flex items-center gap-1 text-[10.5px] font-mono text-zinc-500">
+            <span>saved</span>
+            <span class="w-1 h-1 rounded-full bg-[#6ca892]"></span>
+            <span>2s ago</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div data-tab-group class="flex items-end border-b border-[#17181c] px-3 gap-4 shrink-0" style="height:34px">
+        <button data-tab="notes" data-active="true" class="tab h-full text-[12px] font-mono tracking-tight transition-colors">
+          Notes
+        </button>
+        <button data-tab="subtasks" data-active="false" class="tab h-full text-[12px] font-mono tracking-tight transition-colors flex items-center gap-1">
+          Subtasks
+          <span class="px-1 text-[9.5px] rounded bg-[#1a1b20] border border-[#24262c] text-zinc-400">3/6</span>
+        </button>
+        <button data-tab="fields" data-active="false" class="tab h-full text-[12px] font-mono tracking-tight transition-colors">
+          Fields
+        </button>
+        <button data-tab="context" data-active="false" class="tab h-full text-[12px] font-mono tracking-tight transition-colors flex items-center gap-1">
+          Context
+          <span class="w-1.5 h-1.5 rounded-full bg-[#8b7ec8]"></span>
+        </button>
+        <button data-tab="activity" data-active="false" class="tab h-full text-[12px] font-mono tracking-tight transition-colors">
+          Activity
+        </button>
+      </div>
+
+      <!-- SCROLLABLE BODY -->
+      <div class="flex-1 min-h-0 overflow-y-auto scroll-thin">
+
+        <!-- ===== Tab: Notes ===== -->
+        <div data-tab-panel data-group="" data-tab="notes" class="px-3 py-3">
+          <!-- markdown toolbar -->
+          <div class="flex items-center gap-0.5 mb-2">
+            <button class="w-6 h-6 rounded flex items-center justify-center text-zinc-400 hover:bg-[#15161b] hover:text-zinc-100" title="Bold"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M7 5h6a4 4 0 0 1 0 8H7zM7 13h7a4 4 0 0 1 0 8H7z"/></svg></button>
+            <button class="w-6 h-6 rounded flex items-center justify-center text-zinc-400 hover:bg-[#15161b] hover:text-zinc-100" title="Italic"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M19 4h-9M14 20H5M15 4 9 20"/></svg></button>
+            <button class="w-6 h-6 rounded flex items-center justify-center text-zinc-400 hover:bg-[#15161b] hover:text-zinc-100" title="Code"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></svg></button>
+            <span class="w-px h-3 bg-[#1e2025] mx-1"></span>
+            <button class="w-6 h-6 rounded flex items-center justify-center text-zinc-400 hover:bg-[#15161b] hover:text-zinc-100" title="H1"><span class="text-[10px] font-mono">H1</span></button>
+            <button class="w-6 h-6 rounded flex items-center justify-center text-zinc-400 hover:bg-[#15161b] hover:text-zinc-100" title="List"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></button>
+            <button class="w-6 h-6 rounded flex items-center justify-center text-zinc-400 hover:bg-[#15161b] hover:text-zinc-100" title="Checklist"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></button>
+            <button class="w-6 h-6 rounded flex items-center justify-center text-zinc-400 hover:bg-[#15161b] hover:text-zinc-100" title="Code block"><span class="text-[10px] font-mono">{ }</span></button>
+            <button class="w-6 h-6 rounded flex items-center justify-center text-zinc-400 hover:bg-[#15161b] hover:text-zinc-100" title="Link"><svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+            <div class="ml-auto flex items-center gap-0.5">
+              <button data-segmented class="flex items-center bg-[#121317] border border-[#1e2025] rounded p-[1px] h-[22px]">
+                <span data-segment data-active="true" class="segment h-[18px] px-1.5 rounded text-[10px] font-mono">edit</span>
+                <span data-segment data-active="false" class="segment h-[18px] px-1.5 rounded text-[10px] font-mono">preview</span>
+                <span data-segment data-active="false" class="segment h-[18px] px-1.5 rounded text-[10px] font-mono">split</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Markdown "editor" area -->
+          <div class="rounded-[6px] border border-[#1e2025] bg-[#0d0e11] font-mono text-[12.5px] leading-[1.65] text-zinc-200 overflow-hidden">
+            <div class="flex">
+              <!-- gutter -->
+              <div class="shrink-0 w-8 select-none text-right pr-2 py-2.5 font-mono text-[10.5px] text-zinc-600 border-r border-[#17181c] bg-[#0b0c0f]">
+                <div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div><div>8</div><div>9</div><div>10</div><div>11</div><div>12</div><div>13</div><div>14</div><div>15</div>
+              </div>
+              <div class="flex-1 py-2.5 px-3">
+<div class="text-zinc-500"># Rebuild card editor</div>
+<div class="h-[1.65em]"></div>
+<div>The current editor reads like a web form — plain inputs stacked in a modal.</div>
+<div>It needs to feel like an actual <span class="text-[#d4a24c]">issue workspace</span> the user keeps open beside the editor.</div>
+<div class="h-[1.65em]"></div>
+<div class="text-zinc-500">## Structural goals</div>
+<div class="h-[1.65em]"></div>
+<div><span class="text-zinc-500">-</span> Inspector pane, not a modal overlay</div>
+<div><span class="text-zinc-500">-</span> Tabbed surface: <span class="text-[#6bb6c8]">Notes</span> / <span class="text-[#6bb6c8]">Subtasks</span> / <span class="text-[#6bb6c8]">Fields</span> / <span class="text-[#6bb6c8]">Context</span></div>
+<div><span class="text-zinc-500">-</span> Scope, placement, priority inline in the header</div>
+<div><span class="text-zinc-500">-</span> Markdown with live gutter, not a bare textarea</div>
+<div class="h-[1.65em]"></div>
+<div class="text-zinc-500">## Acceptance</div>
+<div><span class="text-zinc-500">-</span> Opens via <span class="text-zinc-400 bg-[#15161b] px-1 rounded border border-[#1e2025]">↵</span> on a selected card</div>
+<div><span class="text-zinc-500">-</span> <span class="text-zinc-400 bg-[#15161b] px-1 rounded border border-[#1e2025]">⌘⇧←</span> / <span class="text-zinc-400 bg-[#15161b] px-1 rounded border border-[#1e2025]">⌘⇧→</span> moves between cards</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI suggestion inline block -->
+          <div class="mt-3 rounded-[6px] border border-[#2a2234] bg-[#141024] overflow-hidden">
+            <div class="flex items-center gap-2 px-3 py-2 border-b border-[#2a2234]">
+              <svg class="w-3 h-3 text-[#a890d8]" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              <span class="text-[11px] font-mono text-[#c4b5e8]">claude-opus</span>
+              <span class="text-[10px] font-mono text-zinc-500">· context-suggestion</span>
+              <span class="ml-auto text-[10px] font-mono text-zinc-500">referenced 4 files</span>
+            </div>
+            <div class="px-3 py-2 text-[12px] text-zinc-300 leading-snug">
+              Consider extracting the markdown toolbar into <span class="font-mono text-[#a890d8]">src/ui/components/NotesEditor.vue</span> — it's duplicated in <span class="font-mono text-zinc-400">NewCardModal</span> and <span class="font-mono text-zinc-400">EditCardModal</span>.
+            </div>
+            <div class="px-3 py-2 border-t border-[#2a2234] flex items-center gap-1.5">
+              <button class="h-[22px] px-2 rounded-[4px] bg-[#241a38] border border-[#382a55] text-[#d1c3f0] text-[11px] font-mono hover:bg-[#2d2146]">Apply to notes</button>
+              <button class="h-[22px] px-2 rounded-[4px] border border-[#2a2234] text-zinc-400 text-[11px] font-mono hover:border-[#3a3147]">Open draft</button>
+              <span class="ml-auto text-[10px] font-mono text-zinc-500">15:42 · today</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== Tab: Subtasks ===== -->
+        <div data-tab-panel data-group="" data-tab="subtasks" hidden class="px-3 py-3">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-mono uppercase tracking-[0.14em] text-zinc-500">Subtasks</span>
+              <span class="text-[10px] font-mono text-zinc-500">3 / 6 · 50%</span>
+            </div>
+            <button class="h-[22px] px-1.5 text-[11px] font-mono text-zinc-300 rounded hover:bg-[#15161b] flex items-center gap-1">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+              add
+            </button>
+          </div>
+          <div class="space-y-[2px]">
+            <div data-subtask data-done="true" class="group flex items-start gap-2 px-2 py-1.5 rounded hover:bg-[#14151a] cursor-pointer">
+              <span class="st-box mt-[2px] w-[14px] h-[14px] rounded border border-[#3a3c44] bg-[#15161b] flex items-center justify-center">
+                <svg class="w-2.5 h-2.5 text-[#0a0a0c]" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+              </span>
+              <span class="st-title text-[12.5px] text-zinc-200 flex-1">Sketch paned inspector layout</span>
+              <span class="text-[10px] font-mono text-zinc-500">#42.1</span>
+            </div>
+            <div data-subtask data-done="true" class="group flex items-start gap-2 px-2 py-1.5 rounded hover:bg-[#14151a] cursor-pointer">
+              <span class="st-box mt-[2px] w-[14px] h-[14px] rounded border border-[#3a3c44] bg-[#15161b] flex items-center justify-center">
+                <svg class="w-2.5 h-2.5 text-[#0a0a0c]" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+              </span>
+              <span class="st-title text-[12.5px] text-zinc-200 flex-1">Extract <span class="font-mono text-zinc-400">useCardSelection</span> composable</span>
+              <span class="text-[10px] font-mono text-zinc-500">#42.2</span>
+            </div>
+            <div data-subtask data-done="true" class="group flex items-start gap-2 px-2 py-1.5 rounded hover:bg-[#14151a] cursor-pointer">
+              <span class="st-box mt-[2px] w-[14px] h-[14px] rounded border border-[#3a3c44] bg-[#15161b] flex items-center justify-center">
+                <svg class="w-2.5 h-2.5 text-[#0a0a0c]" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+              </span>
+              <span class="st-title text-[12.5px] text-zinc-200 flex-1">Tabbed header with segmented active state</span>
+              <span class="text-[10px] font-mono text-zinc-500">#42.3</span>
+            </div>
+            <div data-subtask data-done="false" class="group flex items-start gap-2 px-2 py-1.5 rounded hover:bg-[#14151a] cursor-pointer">
+              <span class="st-box mt-[2px] w-[14px] h-[14px] rounded border border-[#3a3c44] bg-[#15161b] flex items-center justify-center">
+                <svg class="w-2.5 h-2.5 text-[#0a0a0c]" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+              </span>
+              <span class="st-title text-[12.5px] text-zinc-200 flex-1">Inline markdown renderer with code block styling</span>
+              <span class="text-[10px] font-mono text-[#eac07a]">in progress</span>
+            </div>
+            <div data-subtask data-done="false" class="group flex items-start gap-2 px-2 py-1.5 rounded hover:bg-[#14151a] cursor-pointer">
+              <span class="st-box mt-[2px] w-[14px] h-[14px] rounded border border-[#3a3c44] bg-[#15161b] flex items-center justify-center">
+                <svg class="w-2.5 h-2.5 text-[#0a0a0c]" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+              </span>
+              <span class="st-title text-[12.5px] text-zinc-200 flex-1">Wire <span class="font-mono text-zinc-400">⌘⇧←</span> / <span class="font-mono text-zinc-400">⌘⇧→</span> navigation</span>
+              <span class="text-[10px] font-mono text-zinc-500">#42.5</span>
+            </div>
+            <div data-subtask data-done="false" class="group flex items-start gap-2 px-2 py-1.5 rounded hover:bg-[#14151a] cursor-pointer">
+              <span class="st-box mt-[2px] w-[14px] h-[14px] rounded border border-[#3a3c44] bg-[#15161b] flex items-center justify-center">
+                <svg class="w-2.5 h-2.5 text-[#0a0a0c]" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+              </span>
+              <span class="st-title text-[12.5px] text-zinc-200 flex-1">Remove legacy modal once inspector ships</span>
+              <span class="text-[10px] font-mono text-zinc-500">#42.6</span>
+            </div>
+            <button class="mt-1 w-full flex items-center gap-2 px-2 py-1.5 rounded border border-dashed border-[#24262c] text-zinc-500 hover:text-zinc-300 hover:border-[#2c2e37] text-[12px] font-mono">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+              add subtask
+            </button>
+          </div>
+        </div>
+
+        <!-- ===== Tab: Fields ===== -->
+        <div data-tab-panel data-group="" data-tab="fields" hidden class="px-3 py-3 space-y-[2px]">
+          <div class="grid grid-cols-[110px_1fr] items-center gap-2 px-1 py-1.5 rounded hover:bg-[#14151a]">
+            <span class="text-[11px] font-mono uppercase tracking-[0.1em] text-zinc-500">component</span>
+            <span class="px-1 rounded w-fit bg-[#161920] border border-[#22262e] text-[11.5px] font-mono text-[#6bb6c8]">ui</span>
+          </div>
+          <div class="grid grid-cols-[110px_1fr] items-center gap-2 px-1 py-1.5 rounded hover:bg-[#14151a]">
+            <span class="text-[11px] font-mono uppercase tracking-[0.1em] text-zinc-500">area</span>
+            <span class="px-1 rounded w-fit bg-[#1a1620] border border-[#261e2e] text-[11.5px] font-mono text-[#a890d8]">editor</span>
+          </div>
+          <div class="grid grid-cols-[110px_1fr] items-center gap-2 px-1 py-1.5 rounded hover:bg-[#14151a]">
+            <span class="text-[11px] font-mono uppercase tracking-[0.1em] text-zinc-500">scope</span>
+            <span class="text-[11.5px] font-mono text-[#d4a24c]">track · spike/tauri-shell</span>
+          </div>
+        </div>
+
+        <!-- ===== Tab: Context (hidden unless toggled) ===== -->
+        <div data-tab-panel data-group="" data-tab="context" hidden class="px-3 py-3"></div>
+
+        <!-- ===== Tab: Activity (hidden) ===== -->
+        <div data-tab-panel data-group="" data-tab="activity" hidden class="px-3 py-3"></div>
+
+        <!-- ============ PERSISTENT SECTIONS (show under notes tab) ============ -->
+        <div class="px-3 pt-2 pb-3 space-y-2">
+
+          <!-- Section: Placement & Scope -->
+          <section data-collapsible data-collapsed="false" class="rounded-[6px] border border-[#17181c] bg-[#0d0e11]">
+            <button data-collapse-toggle class="w-full px-3 h-[30px] flex items-center justify-between">
+              <div class="flex items-center gap-1.5">
+                <svg class="collapse-chev w-3 h-3 text-zinc-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+                <span class="text-[10.5px] font-mono uppercase tracking-[0.14em] text-zinc-400">Placement & Scope</span>
+              </div>
+              <span class="text-[10px] font-mono text-zinc-500">track · column 3</span>
+            </button>
+            <div class="collapse-body px-3 pb-3 pt-1">
+              <div class="grid grid-cols-2 gap-2">
+                <!-- Scope -->
+                <div class="col-span-2">
+                  <span class="block text-[10px] font-mono uppercase tracking-[0.12em] text-zinc-500 mb-1">scope</span>
+                  <div data-segmented class="flex items-center bg-[#121317] border border-[#1e2025] rounded-[5px] p-[2px] h-[26px] w-full">
+                    <button data-segment data-active="false" class="segment flex-1 h-[20px] px-2 rounded-[4px] text-[11px] font-mono flex items-center justify-center gap-1">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg>
+                      global
+                    </button>
+                    <button data-segment data-active="false" class="segment flex-1 h-[20px] px-2 rounded-[4px] text-[11px] font-mono flex items-center justify-center gap-1">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 7h18v14H3zM3 7V5a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v2"/></svg>
+                      project
+                    </button>
+                    <button data-segment data-active="true" class="segment flex-1 h-[20px] px-2 rounded-[4px] text-[11px] font-mono flex items-center justify-center gap-1">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><path d="M6 8v8a4 4 0 0 0 4 4h6"/></svg>
+                      track
+                    </button>
+                  </div>
+                </div>
+                <!-- track branch -->
+                <div>
+                  <span class="block text-[10px] font-mono uppercase tracking-[0.12em] text-zinc-500 mb-1">branch</span>
+                  <button class="w-full h-[26px] px-2 rounded-[5px] border border-[#2a2315] bg-[#1f1a12] flex items-center gap-1.5 text-[#eac07a]">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><path d="M6 8v8a4 4 0 0 0 4 4h6"/></svg>
+                    <span class="font-mono text-[11.5px] flex-1 text-left truncate">spike/tauri-shell</span>
+                    <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+                  </button>
+                </div>
+                <!-- worktree -->
+                <div>
+                  <span class="block text-[10px] font-mono uppercase tracking-[0.12em] text-zinc-500 mb-1">worktree</span>
+                  <button class="w-full h-[26px] px-2 rounded-[5px] border border-[#24262c] bg-[#121317] flex items-center gap-1.5 text-zinc-300">
+                    <span class="font-mono text-[11.5px] flex-1 text-left truncate">wt/tauri-shell</span>
+                    <svg class="w-2.5 h-2.5 text-zinc-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+                  </button>
+                </div>
+                <!-- placement -->
+                <div>
+                  <span class="block text-[10px] font-mono uppercase tracking-[0.12em] text-zinc-500 mb-1">column</span>
+                  <button class="w-full h-[26px] px-2 rounded-[5px] border border-[#24262c] bg-[#121317] flex items-center gap-1.5 text-zinc-300">
+                    <span class="w-1.5 h-1.5 rounded-full bg-[#d4a24c]"></span>
+                    <span class="font-mono text-[11.5px] flex-1 text-left">In Progress</span>
+                    <svg class="w-2.5 h-2.5 text-zinc-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+                  </button>
+                </div>
+                <!-- order -->
+                <div>
+                  <span class="block text-[10px] font-mono uppercase tracking-[0.12em] text-zinc-500 mb-1">rank</span>
+                  <div class="w-full h-[26px] px-2 rounded-[5px] border border-[#24262c] bg-[#121317] flex items-center gap-1.5 text-zinc-300 font-mono text-[11.5px]">
+                    <span class="text-zinc-500">↑</span>
+                    <span>0n:0fZl</span>
+                    <span class="ml-auto text-zinc-500">pos 1</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section: Custom fields -->
+          <section data-collapsible data-collapsed="false" class="rounded-[6px] border border-[#17181c] bg-[#0d0e11]">
+            <button data-collapse-toggle class="w-full px-3 h-[30px] flex items-center justify-between">
+              <div class="flex items-center gap-1.5">
+                <svg class="collapse-chev w-3 h-3 text-zinc-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+                <span class="text-[10.5px] font-mono uppercase tracking-[0.14em] text-zinc-400">Fields</span>
+                <span class="text-[10px] font-mono text-zinc-500">5</span>
+              </div>
+              <button class="text-zinc-500 hover:text-zinc-200 text-[10px] font-mono">schema</button>
+            </button>
+            <div class="collapse-body px-3 pb-3 pt-0.5 font-mono text-[11.5px]">
+              <div class="grid grid-cols-[90px_1fr] gap-y-1 items-center">
+                <span class="text-zinc-500">component</span>
+                <span><span class="px-1 rounded bg-[#161920] border border-[#22262e] text-[#6bb6c8]">ui</span></span>
+                <span class="text-zinc-500">area</span>
+                <span><span class="px-1 rounded bg-[#1a1620] border border-[#261e2e] text-[#a890d8]">editor</span></span>
+                <span class="text-zinc-500">effort</span>
+                <span class="text-zinc-300">3d <span class="text-zinc-600">· est</span></span>
+                <span class="text-zinc-500">ref</span>
+                <span><a class="text-[#6bb6c8] hover:underline">issue/editor-revamp</a></span>
+                <span class="text-zinc-500">pairing</span>
+                <span class="text-zinc-300">ad + claude-opus</span>
+              </div>
+              <button class="mt-2 w-full text-left px-2 py-1 rounded border border-dashed border-[#24262c] text-zinc-500 hover:text-zinc-300 hover:border-[#2c2e37] text-[11px] font-mono">
+                + add field
+              </button>
+            </div>
+          </section>
+
+          <!-- Section: Context (agent/project memory) -->
+          <section data-collapsible data-collapsed="false" class="rounded-[6px] border border-[#17181c] bg-[#0d0e11]">
+            <button data-collapse-toggle class="w-full px-3 h-[30px] flex items-center justify-between">
+              <div class="flex items-center gap-1.5">
+                <svg class="collapse-chev w-3 h-3 text-zinc-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+                <span class="text-[10.5px] font-mono uppercase tracking-[0.14em] text-zinc-400">Context</span>
+              </div>
+              <span class="text-[10px] font-mono text-zinc-500">4 refs · mcp</span>
+            </button>
+            <div class="collapse-body px-3 pb-3 pt-0.5 space-y-1">
+              <a class="flex items-center gap-2 px-2 py-1 rounded hover:bg-[#14151a] group">
+                <svg class="w-3 h-3 text-zinc-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M13 2v7h7"/></svg>
+                <span class="font-mono text-[11.5px] text-zinc-300 truncate">src/ui/components/EditCardModal.vue</span>
+                <span class="ml-auto text-[10px] font-mono text-zinc-500">M · 82</span>
+              </a>
+              <a class="flex items-center gap-2 px-2 py-1 rounded hover:bg-[#14151a] group">
+                <svg class="w-3 h-3 text-zinc-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M13 2v7h7"/></svg>
+                <span class="font-mono text-[11.5px] text-zinc-300 truncate">src/ui/components/NewCardModal.vue</span>
+                <span class="ml-auto text-[10px] font-mono text-zinc-500">M · 41</span>
+              </a>
+              <a class="flex items-center gap-2 px-2 py-1 rounded hover:bg-[#14151a] group">
+                <svg class="w-3 h-3 text-[#d4a24c]" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><path d="M6 8v8a4 4 0 0 0 4 4h6"/></svg>
+                <span class="font-mono text-[11.5px] text-zinc-300 truncate">spike/tauri-shell @ 2e7cb92</span>
+                <span class="ml-auto text-[10px] font-mono text-zinc-500">HEAD</span>
+              </a>
+              <a class="flex items-center gap-2 px-2 py-1 rounded hover:bg-[#14151a] group">
+                <svg class="w-3 h-3 text-[#a890d8]" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+                <span class="font-mono text-[11.5px] text-zinc-300 truncate">memory/project_trackboi_stack.md</span>
+                <span class="ml-auto text-[10px] font-mono text-zinc-500">pin</span>
+              </a>
+            </div>
+          </section>
+
+          <!-- Section: Metadata / history -->
+          <section data-collapsible data-collapsed="true" class="rounded-[6px] border border-[#17181c] bg-[#0d0e11]">
+            <button data-collapse-toggle class="w-full px-3 h-[30px] flex items-center justify-between">
+              <div class="flex items-center gap-1.5">
+                <svg class="collapse-chev w-3 h-3 text-zinc-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+                <span class="text-[10.5px] font-mono uppercase tracking-[0.14em] text-zinc-400">Metadata</span>
+              </div>
+              <span class="text-[10px] font-mono text-zinc-500">id · 01KPG0W…X350C</span>
+            </button>
+            <div class="collapse-body px-3 pb-3 pt-0.5 font-mono text-[11.5px]">
+              <div class="grid grid-cols-[90px_1fr] gap-y-1">
+                <span class="text-zinc-500">id</span>
+                <span class="text-zinc-300 truncate">card_01KPG0WB0S451VDTJFCCQX350C</span>
+                <span class="text-zinc-500">path</span>
+                <span class="text-zinc-300 truncate">.trackboi/cards/card_01KPG…C.json</span>
+                <span class="text-zinc-500">created</span>
+                <span class="text-zinc-300">2026-04-14 · 09:12</span>
+                <span class="text-zinc-500">updated</span>
+                <span class="text-zinc-300">2026-04-18 · 15:42 <span class="text-zinc-600">(just now)</span></span>
+                <span class="text-zinc-500">author</span>
+                <span class="text-zinc-300">abdulkadir.d</span>
+                <span class="text-zinc-500">ledger</span>
+                <span class="text-zinc-300">11 events · 3 agents</span>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </div>
+
+      <!-- Inspector footer -->
+      <div class="shrink-0 h-[30px] px-3 border-t border-[#17181c] flex items-center gap-2 text-[10.5px] font-mono text-zinc-500">
+        <span>TRK-042</span>
+        <span class="text-zinc-700">·</span>
+        <span>edits tracked in ledger</span>
+        <div class="ml-auto flex items-center gap-1">
+          <span class="kbd">↵</span><span>open</span>
+          <span class="mx-1 text-zinc-700">·</span>
+          <span class="kbd">⌘</span><span class="kbd">⇧</span><span class="kbd">↵</span><span>apply</span>
+          <span class="mx-1 text-zinc-700">·</span>
+          <span class="kbd">Esc</span><span>close</span>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ============== STATUS BAR ============== -->
+  <div class="h-[24px] bg-[#0a0b0d] border-t border-[#17181c] flex items-center px-3 gap-3 text-[10.5px] font-mono text-zinc-500 shrink-0">
+    <div class="flex items-center gap-1.5">
+      <svg class="w-3 h-3 text-[#d4a24c]" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><path d="M6 8v8a4 4 0 0 0 4 4h6"/></svg>
+      <span class="text-zinc-300">spike/tauri-shell</span>
+      <span class="text-zinc-600">↑3 ↓0</span>
+    </div>
+    <span class="text-zinc-700">|</span>
+    <span>wt <span class="text-zinc-300">~/projects/trackboi/wt/tauri-shell</span></span>
+    <span class="text-zinc-700">|</span>
+    <span>store <span class="text-zinc-300">.trackboi/cards</span> · 42 files · 156 kb</span>
+    <div class="ml-auto flex items-center gap-3">
+      <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-[#6ca892] pulse-dot"></span>local-first · synced</span>
+      <span class="text-zinc-700">|</span>
+      <span>mcp://localhost:8765</span>
+      <span class="text-zinc-700">|</span>
+      <span>cycle w16</span>
+      <span class="text-zinc-700">|</span>
+      <button data-open-cmd class="flex items-center gap-1 hover:text-zinc-300">
+        <span class="kbd">⌘</span><span class="kbd">K</span>
+        <span>palette</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============== COMMAND PALETTE MODAL ============== -->
+<div id="cmd-palette" hidden class="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] bg-black/50 backdrop-blur-[2px]">
+  <div class="w-[560px] rounded-[9px] border border-[#22242a] bg-[#0d0e11] shadow-[0_24px_60px_rgba(0,0,0,0.5)] overflow-hidden">
+    <div class="flex items-center gap-2 px-3 h-[42px] border-b border-[#1e2025]">
+      <svg class="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input autofocus placeholder="jump to card, branch, worktree, action…" class="flex-1 bg-transparent text-[13.5px] text-zinc-100 placeholder-zinc-600"/>
+      <button data-close-cmd class="kbd">Esc</button>
+    </div>
+    <div class="max-h-[360px] overflow-y-auto scroll-thin py-1.5">
+      <div class="px-3 py-1 text-[10px] font-mono uppercase tracking-[0.14em] text-zinc-500">cards</div>
+      <button class="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-[#15161b]">
+        <span class="font-mono text-[10.5px] text-zinc-500 w-[52px]">TRK-042</span>
+        <svg class="w-3 h-3 text-[#d4a24c]" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/></svg>
+        <span class="text-[12.5px] text-zinc-200 flex-1 text-left">Rebuild card editor as a desktop inspector panel</span>
+        <span class="text-[10px] font-mono text-[#d4a24c]">in progress</span>
+      </button>
+      <button class="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-[#15161b]">
+        <span class="font-mono text-[10.5px] text-zinc-500 w-[52px]">TRK-038</span>
+        <svg class="w-3 h-3 text-zinc-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/></svg>
+        <span class="text-[12.5px] text-zinc-300 flex-1 text-left">Rewire IPC bridge from Electrobun to Tauri invoke</span>
+        <span class="text-[10px] font-mono text-zinc-500">in progress</span>
+      </button>
+      <div class="px-3 py-1 mt-1 text-[10px] font-mono uppercase tracking-[0.14em] text-zinc-500">actions</div>
+      <button class="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-[#15161b]">
+        <span class="font-mono text-[10.5px] text-zinc-500 w-[52px]">cmd</span>
+        <svg class="w-3 h-3 text-zinc-400" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        <span class="text-[12.5px] text-zinc-200 flex-1 text-left">New card on current track</span>
+        <span class="flex gap-0.5"><span class="kbd">N</span></span>
+      </button>
+      <button class="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-[#15161b]">
+        <span class="font-mono text-[10.5px] text-zinc-500 w-[52px]">cmd</span>
+        <svg class="w-3 h-3 text-zinc-400" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><path d="M6 8v8a4 4 0 0 0 4 4h6"/></svg>
+        <span class="text-[12.5px] text-zinc-200 flex-1 text-left">Switch worktree…</span>
+        <span class="flex gap-0.5"><span class="kbd">⌘</span><span class="kbd">W</span></span>
+      </button>
+      <button class="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-[#15161b]">
+        <span class="font-mono text-[10.5px] text-zinc-500 w-[52px]">cmd</span>
+        <svg class="w-3 h-3 text-[#a890d8]" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M8 12h.01M16 12h.01"/></svg>
+        <span class="text-[12.5px] text-zinc-200 flex-1 text-left">Ask agent to draft subtasks for this card</span>
+        <span class="flex gap-0.5"><span class="kbd">⌘</span><span class="kbd">⇧</span><span class="kbd">A</span></span>
+      </button>
+    </div>
+    <div class="px-3 h-[28px] border-t border-[#1e2025] flex items-center text-[10px] font-mono text-zinc-500 gap-2">
+      <span class="kbd">↵</span><span>run</span>
+      <span class="mx-1 text-zinc-700">·</span>
+      <span class="kbd">↑</span><span class="kbd">↓</span><span>navigate</span>
+      <span class="mx-1 text-zinc-700">·</span>
+      <span class="kbd">⇥</span><span>filter by type</span>
+      <span class="ml-auto">local index · 4.2ms</span>
+    </div>
+  </div>
+</div>
+
+<!-- =============== INTERACTIVITY =============== -->
+<script>
+(() => {
+  // Tabs
+  document.querySelectorAll('[data-tab-group]').forEach(group => {
+    const tabs = group.querySelectorAll('[data-tab]');
+    tabs.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.dataset.tab;
+        tabs.forEach(b => b.dataset.active = 'false');
+        btn.dataset.active = 'true';
+        document.querySelectorAll('[data-tab-panel]').forEach(p => {
+          if (p.dataset.tab === target) p.hidden = false;
+          else p.hidden = true;
+        });
+      });
+    });
+  });
+
+  // Collapsibles
+  document.querySelectorAll('[data-collapsible]').forEach(el => {
+    const toggle = el.querySelector('[data-collapse-toggle]');
+    if (!toggle) return;
+    toggle.addEventListener('click', () => {
+      el.dataset.collapsed = el.dataset.collapsed === 'true' ? 'false' : 'true';
+    });
+  });
+
+  // Filter chips
+  document.querySelectorAll('[data-filter]').forEach(f => {
+    f.addEventListener('click', () => {
+      f.dataset.active = f.dataset.active === 'true' ? 'false' : 'true';
+    });
+  });
+
+  // Segmented controls
+  document.querySelectorAll('[data-segmented]').forEach(seg => {
+    const segments = seg.querySelectorAll('[data-segment]');
+    segments.forEach(s => {
+      s.addEventListener('click', (e) => {
+        e.stopPropagation();
+        segments.forEach(x => x.dataset.active = 'false');
+        s.dataset.active = 'true';
+      });
+    });
+  });
+
+  // Card selection (board)
+  document.querySelectorAll('[data-card]').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('[data-card]').forEach(c => c.dataset.selected = 'false');
+      card.dataset.selected = 'true';
+    });
+  });
+
+  // Sidebar items
+  document.querySelectorAll('[data-sidebar-item]').forEach(s => {
+    s.addEventListener('click', () => {
+      const group = s.dataset.group;
+      document.querySelectorAll(`[data-sidebar-item][data-group="${group}"]`).forEach(x => x.dataset.active = 'false');
+      s.dataset.active = 'true';
+    });
+  });
+
+  // Subtasks
+  document.querySelectorAll('[data-subtask]').forEach(st => {
+    st.addEventListener('click', () => {
+      st.dataset.done = st.dataset.done === 'true' ? 'false' : 'true';
+    });
+  });
+
+  // Command palette
+  const cmd = document.getElementById('cmd-palette');
+  const openCmd = () => { cmd.hidden = false; setTimeout(() => cmd.querySelector('input')?.focus(), 10); };
+  const closeCmd = () => { cmd.hidden = true; };
+  document.querySelectorAll('[data-open-cmd]').forEach(b => b.addEventListener('click', openCmd));
+  document.querySelectorAll('[data-close-cmd]').forEach(b => b.addEventListener('click', closeCmd));
+  cmd.addEventListener('click', e => { if (e.target === cmd) closeCmd(); });
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      cmd.hidden ? openCmd() : closeCmd();
+    }
+    if (e.key === 'Escape') closeCmd();
+  });
+})();
+</script>
+</body>
+</html>

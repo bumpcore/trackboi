@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { runCli } from "./main";
-import { createRuntime } from "../core/runtime";
+import { createNodeFsTrackboiActions } from "../core";
 
 /**
  * Headless Trackboi entrypoint.
@@ -10,7 +10,7 @@ import { createRuntime } from "../core/runtime";
  * to start Trackboi on stdio from a terminal, service, or editor without a
  * display server and without opening the desktop app.
  */
-void runCli(createRuntime(), process.argv.slice(2))
+void runCli(createNodeFsTrackboiActions(), process.argv.slice(2))
 	.then((code) => {
 		process.exitCode = code;
 	})

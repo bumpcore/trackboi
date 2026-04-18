@@ -1,0 +1,1839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trackboi — Demo Delivery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root {
+    --ink: #0d0d0b;
+    --ink-1: #141410;
+    --ink-2: #1c1c18;
+    --ink-3: #252520;
+    --ink-4: #2e2e28;
+    --ink-5: #3a3a33;
+    --wire: #2f2f28;
+    --wire-hi: #3e3e35;
+    --wire-hh: #52524a;
+    --muted: #6b6b60;
+    --dim: #4a4a42;
+    --text: #ccc9b8;
+    --text-hi: #e8e4d0;
+    --text-lo: #8a8775;
+    --amber: #d4913a;
+    --amber-lo: #a06a22;
+    --amber-dim: #2a1f0d;
+    --amber-glow: #e8ab5a;
+    --teal: #3d8a7a;
+    --teal-lo: #1e4a42;
+    --teal-dim: #0d2420;
+    --red: #c45040;
+    --red-dim: #2a1510;
+    --blue: #4a7fa8;
+    --blue-dim: #0f2030;
+    --green: #4a8a50;
+    --green-dim: #0f2215;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --serif: 'Instrument Serif', serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--ink);
+    font-family: var(--sans);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.5;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--wire-hi); border-radius: 2px; }
+
+  /* APP SHELL */
+  .app-shell {
+    display: grid;
+    grid-template-rows: 38px 1fr;
+    grid-template-columns: 42px 210px 1fr;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* TITLEBAR */
+  .titlebar {
+    grid-column: 1 / -1;
+    background: var(--ink-1);
+    border-bottom: 1px solid var(--wire);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    user-select: none;
+    -webkit-app-region: drag;
+  }
+
+  .titlebar-dots {
+    display: flex;
+    gap: 5px;
+    margin-right: 6px;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .dot-r { background: #c45040; }
+  .dot-y { background: #b88a30; }
+  .dot-g { background: #3a7a40; }
+
+  .titlebar-wordmark {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-lo);
+    letter-spacing: 0.08em;
+    text-transform: lowercase;
+  }
+
+  .titlebar-sep {
+    width: 1px;
+    height: 14px;
+    background: var(--wire-hi);
+    margin: 0 8px;
+  }
+
+  .titlebar-branch {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--amber);
+    letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .titlebar-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .titlebar-btn {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-lo);
+    padding: 3px 8px;
+    border: 1px solid var(--wire-hi);
+    border-radius: 3px;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+    background: transparent;
+    transition: all 0.12s;
+  }
+
+  .titlebar-btn:hover {
+    color: var(--text);
+    border-color: var(--wire-hh);
+    background: var(--ink-3);
+  }
+
+  .titlebar-btn.primary {
+    color: var(--amber);
+    border-color: var(--amber-lo);
+    background: var(--amber-dim);
+  }
+
+  .titlebar-btn.primary:hover {
+    background: #3a2810;
+  }
+
+  /* ICON RAIL */
+  .icon-rail {
+    grid-row: 2;
+    grid-column: 1;
+    background: var(--ink-1);
+    border-right: 1px solid var(--wire);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 0;
+    gap: 2px;
+  }
+
+  .rail-item {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--dim);
+    transition: all 0.1s;
+    font-size: 10px;
+    font-family: var(--mono);
+    font-weight: 500;
+  }
+
+  .rail-item:hover { color: var(--text); background: var(--ink-3); }
+  .rail-item.active { color: var(--amber); background: var(--amber-dim); }
+
+  .rail-sep {
+    width: 20px;
+    height: 1px;
+    background: var(--wire);
+    margin: 4px 0;
+  }
+
+  .rail-bottom {
+    margin-top: auto;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    grid-row: 2;
+    grid-column: 2;
+    background: var(--ink-2);
+    border-right: 1px solid var(--wire);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid var(--wire);
+  }
+
+  .sidebar-workspace-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sidebar-workspace-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-hi);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .ws-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--amber);
+    flex-shrink: 0;
+  }
+
+  .sidebar-section-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 10px 14px 6px;
+  }
+
+  .sidebar-scroll {
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .project-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 14px;
+    cursor: pointer;
+    border-radius: 0;
+    transition: background 0.08s;
+  }
+
+  .project-item:hover { background: var(--ink-3); }
+  .project-item.active { background: var(--ink-4); border-left: 2px solid var(--amber); padding-left: 12px; }
+
+  .project-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    background: var(--ink-5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .pi-tb { background: var(--amber-dim); color: var(--amber); }
+  .pi-on { background: var(--teal-dim); color: var(--teal); }
+  .pi-ck { background: var(--blue-dim); color: var(--blue); }
+  .pi-pl { background: #1a1020; color: #7a5aa8; }
+
+  .project-name {
+    font-size: 12px;
+    color: var(--text);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .project-count {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    background: var(--ink-5);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+
+  .worktree-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 14px 4px 20px;
+    cursor: pointer;
+    transition: background 0.08s;
+  }
+
+  .worktree-item:hover { background: var(--ink-3); }
+
+  .wt-branch {
+    width: 14px;
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  .wt-name {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-lo);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .wt-active .wt-name { color: var(--amber); }
+
+  .wt-badge {
+    font-family: var(--mono);
+    font-size: 8px;
+    padding: 1px 4px;
+    border-radius: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .badge-active { background: var(--amber-dim); color: var(--amber); border: 1px solid var(--amber-lo); }
+
+  .sidebar-footer {
+    border-top: 1px solid var(--wire);
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .agent-pulse {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--teal);
+    animation: pulse-ring 2s ease-out infinite;
+  }
+
+  @keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 rgba(61,138,122,0.5); }
+    70% { box-shadow: 0 0 0 5px rgba(61,138,122,0); }
+    100% { box-shadow: 0 0 0 0 rgba(61,138,122,0); }
+  }
+
+  .agent-status {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  /* MAIN */
+  .main {
+    grid-row: 2;
+    grid-column: 3;
+    background: var(--ink-2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* BOARD HEADER */
+  .board-header {
+    padding: 0 20px;
+    height: 50px;
+    border-bottom: 1px solid var(--wire);
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-shrink: 0;
+    background: var(--ink-1);
+  }
+
+  .board-title {
+    font-family: var(--serif);
+    font-size: 17px;
+    color: var(--text-hi);
+    letter-spacing: -0.01em;
+    flex-shrink: 0;
+  }
+
+  .board-title em {
+    font-style: italic;
+    color: var(--text-lo);
+  }
+
+  .header-sep {
+    width: 1px;
+    height: 16px;
+    background: var(--wire-hi);
+    margin: 0 14px;
+  }
+
+  .scope-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--ink-3);
+    border: 1px solid var(--wire-hi);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-right: 10px;
+  }
+
+  .scope-btn {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 4px 10px;
+    cursor: pointer;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    transition: all 0.1s;
+    border: none;
+    background: transparent;
+  }
+
+  .scope-btn:hover { color: var(--text); background: var(--ink-4); }
+  .scope-btn.active { color: var(--amber); background: var(--amber-dim); }
+
+  .worktree-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-lo);
+    background: var(--ink-3);
+    border: 1px solid var(--wire-hi);
+    border-radius: 4px;
+    padding: 3px 9px;
+    cursor: pointer;
+  }
+
+  .worktree-pill:hover { border-color: var(--wire-hh); color: var(--text); }
+
+  .worktree-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--amber);
+    flex-shrink: 0;
+  }
+
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .board-stat {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.03em;
+  }
+
+  .board-stat strong {
+    color: var(--text-lo);
+    font-weight: 500;
+  }
+
+  .hdr-icon-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    border: 1px solid var(--wire-hi);
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.1s;
+  }
+
+  .hdr-icon-btn:hover { background: var(--ink-3); color: var(--text); border-color: var(--wire-hh); }
+
+  /* BOARD AREA */
+  .board-area {
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 16px 20px;
+    display: flex;
+    gap: 12px;
+  }
+
+  /* COLUMN */
+  .col {
+    width: 270px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: var(--ink-3);
+    border: 1px solid var(--wire);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+
+  .col-header {
+    padding: 9px 12px 8px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    border-bottom: 1px solid var(--wire);
+    flex-shrink: 0;
+    background: var(--ink-4);
+  }
+
+  .col-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .dot-todo { background: var(--muted); }
+  .dot-doing { background: var(--amber); box-shadow: 0 0 4px var(--amber-lo); }
+  .dot-review { background: var(--blue); }
+  .dot-done { background: var(--teal); }
+
+  .col-name {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    color: var(--text-lo);
+    text-transform: uppercase;
+    flex: 1;
+  }
+
+  .col-count {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    background: var(--ink-5);
+    padding: 1px 6px;
+    border-radius: 2px;
+  }
+
+  .col-add-btn {
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.1s;
+  }
+
+  .col-add-btn:hover { background: var(--ink-5); color: var(--text); }
+
+  .col-cards {
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  /* CARD */
+  .card {
+    background: var(--ink-2);
+    border: 1px solid var(--wire);
+    border-radius: 4px;
+    padding: 9px 10px 8px;
+    cursor: pointer;
+    transition: all 0.1s;
+    position: relative;
+  }
+
+  .card:hover {
+    border-color: var(--wire-hh);
+    background: var(--ink-2);
+  }
+
+  .card.selected {
+    border-color: var(--amber-lo);
+    background: #1e1a10;
+    border-left: 2px solid var(--amber);
+    padding-left: 9px;
+  }
+
+  .card-track {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 5px;
+  }
+
+  .track-chip {
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 2px;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+
+  .tc-master { background: var(--ink-4); color: var(--muted); border: 1px solid var(--wire-hi); }
+  .tc-feature { background: var(--amber-dim); color: var(--amber); border: 1px solid #3a2510; }
+  .tc-spike { background: var(--blue-dim); color: var(--blue); border: 1px solid #0f2a40; }
+  .tc-onboard { background: var(--teal-dim); color: var(--teal); border: 1px solid #0f302a; }
+
+  .card-flag {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-family: var(--mono);
+    font-size: 8px;
+  }
+
+  .flag-conflict { color: var(--red); }
+  .flag-agent { color: var(--teal); }
+
+  .card-title {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-hi);
+    line-height: 1.35;
+    margin-bottom: 5px;
+  }
+
+  .card-note {
+    font-size: 11.5px;
+    color: var(--text-lo);
+    line-height: 1.4;
+    margin-bottom: 7px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+
+  .meta-chip {
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 2px;
+    border: 1px solid var(--wire);
+    color: var(--muted);
+  }
+
+  .mc-hi { color: var(--red); border-color: var(--red-dim); background: var(--red-dim); }
+  .mc-med { color: var(--amber); border-color: var(--amber-dim); background: var(--amber-dim); }
+  .mc-low { color: var(--muted); border-color: var(--wire); background: var(--ink-4); }
+  .mc-agent { color: var(--teal); border-color: var(--teal-dim); background: var(--teal-dim); }
+
+  .subtask-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .subtask-track {
+    flex: 1;
+    height: 2px;
+    background: var(--wire-hi);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+
+  .subtask-fill {
+    height: 100%;
+    border-radius: 1px;
+    background: var(--teal);
+    transition: width 0.3s;
+  }
+
+  .subtask-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* CARD GRIP */
+  .card-grip {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 3px;
+    border-radius: 4px 0 0 4px;
+    opacity: 0;
+    transition: opacity 0.1s;
+  }
+
+  .card:hover .card-grip { opacity: 1; background: var(--wire-hh); }
+  .card.selected .card-grip { opacity: 1; background: var(--amber); }
+
+  /* MODAL OVERLAY */
+  .modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(7,7,5,0.72);
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    z-index: 100;
+    padding: 12px;
+  }
+
+  /* CARD EDITOR */
+  .card-editor {
+    width: 520px;
+    height: calc(100% - 0px);
+    background: var(--ink-1);
+    border: 1px solid var(--wire-hi);
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: -8px 0 40px rgba(0,0,0,0.5);
+  }
+
+  .editor-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--wire);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    background: var(--ink-2);
+  }
+
+  .editor-breadcrumb {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex: 1;
+  }
+
+  .editor-breadcrumb span { color: var(--text-lo); }
+
+  .editor-close {
+    width: 24px;
+    height: 24px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.1s;
+  }
+
+  .editor-close:hover { background: var(--ink-4); color: var(--text); }
+
+  .editor-status-bar {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--wire);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    background: var(--ink-1);
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--wire-hi);
+    cursor: pointer;
+    color: var(--amber);
+    background: var(--amber-dim);
+    border-color: var(--amber-lo);
+    transition: all 0.1s;
+  }
+
+  .status-pill:hover { opacity: 0.8; }
+
+  .editor-field-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .edr-field-btn {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--wire-hi);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.1s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .edr-field-btn:hover { border-color: var(--wire-hh); color: var(--text); background: var(--ink-3); }
+
+  .edr-field-btn.active { color: var(--blue); border-color: var(--blue-dim); background: var(--blue-dim); }
+
+  .editor-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .editor-title-input {
+    font-family: var(--serif);
+    font-size: 21px;
+    color: var(--text-hi);
+    background: transparent;
+    border: none;
+    outline: none;
+    width: 100%;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    margin-bottom: 14px;
+    resize: none;
+    font-weight: 400;
+  }
+
+  .editor-title-input::placeholder { color: var(--dim); }
+
+  .editor-section {
+    margin-bottom: 0;
+  }
+
+  .editor-section-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .editor-section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--wire);
+  }
+
+  .fields-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 2px;
+  }
+
+  .field-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--ink-2);
+    border: 1px solid var(--wire);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .field-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    padding: 5px 8px;
+    border-right: 1px solid var(--wire);
+    white-space: nowrap;
+    min-width: 70px;
+    background: var(--ink-3);
+    letter-spacing: 0.04em;
+  }
+
+  .field-value {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-lo);
+    padding: 5px 8px;
+    flex: 1;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .field-value:hover { background: var(--ink-3); color: var(--text); }
+  .field-value.hi { color: var(--red); }
+  .field-value.teal { color: var(--teal); }
+  .field-value.amber { color: var(--amber); }
+  .field-value.branch { color: var(--blue); letter-spacing: 0; font-size: 9.5px; }
+
+  .notes-area {
+    background: var(--ink-2);
+    border: 1px solid var(--wire);
+    border-radius: 3px;
+    padding: 10px 12px;
+    font-size: 12.5px;
+    color: var(--text-lo);
+    line-height: 1.65;
+    min-height: 90px;
+    font-family: var(--sans);
+    cursor: text;
+  }
+
+  .notes-area .md-h {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--amber);
+    font-weight: 500;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .notes-area .md-code {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    background: var(--ink-3);
+    padding: 1px 4px;
+    border-radius: 2px;
+    color: var(--text);
+  }
+
+  .subtasks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .subtask-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.08s;
+  }
+
+  .subtask-item:hover { background: var(--ink-3); }
+
+  .st-check {
+    width: 13px;
+    height: 13px;
+    border-radius: 2px;
+    border: 1px solid var(--wire-hi);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .st-check.done { background: var(--teal); border-color: var(--teal); }
+
+  .st-text {
+    font-size: 12px;
+    color: var(--text-lo);
+    flex: 1;
+    line-height: 1.4;
+  }
+
+  .st-text.done { text-decoration: line-through; color: var(--muted); }
+
+  .st-branch {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+  }
+
+  .add-subtask-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 11.5px;
+    border-radius: 3px;
+    transition: all 0.1s;
+    border: 1px dashed var(--wire);
+    margin-top: 4px;
+  }
+
+  .add-subtask-btn:hover { color: var(--text-lo); border-color: var(--wire-hh); background: var(--ink-3); }
+
+  .activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .activity-item {
+    display: flex;
+    gap: 9px;
+    align-items: flex-start;
+  }
+
+  .activity-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--wire-hh);
+    flex-shrink: 0;
+    margin-top: 5px;
+  }
+
+  .activity-dot.agent { background: var(--teal); }
+
+  .activity-text {
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.45;
+    flex: 1;
+  }
+
+  .activity-text strong {
+    color: var(--text-lo);
+    font-weight: 500;
+  }
+
+  .activity-time {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--dim);
+    white-space: nowrap;
+    margin-top: 2px;
+  }
+
+  .editor-footer {
+    padding: 10px 16px;
+    border-top: 1px solid var(--wire);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    background: var(--ink-2);
+  }
+
+  .agent-context-box {
+    flex: 1;
+    background: var(--teal-dim);
+    border: 1px solid var(--teal-lo);
+    border-radius: 3px;
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .agent-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 2px;
+    background: var(--teal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .agent-text {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    color: var(--teal);
+    letter-spacing: 0.03em;
+    line-height: 1.4;
+  }
+
+  .save-btn {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 6px 14px;
+    border-radius: 3px;
+    border: 1px solid var(--amber-lo);
+    background: var(--amber-dim);
+    color: var(--amber);
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.1s;
+  }
+
+  .save-btn:hover { background: #3a2810; }
+
+  /* EMPTY COL */
+  .add-col {
+    width: 200px;
+    flex-shrink: 0;
+    border: 1px dashed var(--wire);
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    opacity: 0.4;
+    transition: opacity 0.1s;
+  }
+
+  .add-col:hover { opacity: 0.7; }
+
+  /* SVG ICONS */
+  svg { display: block; }
+
+  /* Animations */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card { animation: fadeIn 0.2s ease both; }
+  .card:nth-child(1) { animation-delay: 0.04s; }
+  .card:nth-child(2) { animation-delay: 0.08s; }
+  .card:nth-child(3) { animation-delay: 0.12s; }
+  .card:nth-child(4) { animation-delay: 0.16s; }
+  .card:nth-child(5) { animation-delay: 0.20s; }
+
+  .card-editor {
+    animation: slideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .modal-overlay {
+    transition: opacity 0.18s ease;
+  }
+
+  .modal-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .card-editor {
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.18s ease;
+  }
+
+  .modal-overlay.hidden .card-editor {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- TITLEBAR -->
+  <div class="titlebar">
+    <div class="titlebar-dots">
+      <div class="dot dot-r"></div>
+      <div class="dot dot-y"></div>
+      <div class="dot dot-g"></div>
+    </div>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="opacity:0.5">
+      <rect x="1" y="1" width="5" height="5" rx="1" fill="var(--amber)"/>
+      <rect x="8" y="1" width="5" height="5" rx="1" fill="var(--muted)" opacity="0.5"/>
+      <rect x="1" y="8" width="5" height="5" rx="1" fill="var(--muted)" opacity="0.5"/>
+      <rect x="8" y="8" width="5" height="5" rx="1" fill="var(--muted)" opacity="0.5"/>
+    </svg>
+    <div class="titlebar-wordmark">trackboi</div>
+    <div class="titlebar-sep"></div>
+    <div class="titlebar-branch">
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+        <circle cx="2" cy="2" r="1.5" stroke="var(--amber)" stroke-width="1"/>
+        <circle cx="8" cy="2" r="1.5" stroke="var(--amber)" stroke-width="1"/>
+        <circle cx="2" cy="8" r="1.5" stroke="var(--amber)" stroke-width="1"/>
+        <path d="M2 3.5V6.5" stroke="var(--amber)" stroke-width="1"/>
+        <path d="M3.5 2H6.5" stroke="var(--amber)" stroke-width="1"/>
+        <path d="M6.5 2 Q8 2 8 3.5" stroke="var(--amber)" stroke-width="1" fill="none"/>
+      </svg>
+      feature/mcp-tools
+    </div>
+    <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-left:6px;">↑ ahead 3 · ↓ behind 1</div>
+    <div class="titlebar-right">
+      <button class="titlebar-btn">Filter</button>
+      <button class="titlebar-btn">View</button>
+      <button class="titlebar-btn primary">+ New card</button>
+    </div>
+  </div>
+
+  <!-- ICON RAIL -->
+  <div class="icon-rail">
+    <div class="rail-item active" title="Board">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <rect x="1" y="1" width="5.5" height="12" rx="1" fill="currentColor"/>
+        <rect x="7.5" y="1" width="5.5" height="5.5" rx="1" fill="currentColor" opacity="0.5"/>
+        <rect x="7.5" y="7.5" width="5.5" height="5.5" rx="1" fill="currentColor" opacity="0.5"/>
+      </svg>
+    </div>
+    <div class="rail-item" title="Timeline">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <line x1="1" y1="4" x2="13" y2="4" stroke="currentColor" stroke-width="1"/>
+        <line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+        <line x1="1" y1="10" x2="9" y2="10" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+        <rect x="2" y="2.5" width="5" height="3" rx="0.5" fill="currentColor" opacity="0.3"/>
+        <rect x="4" y="5.5" width="7" height="3" rx="0.5" fill="currentColor" opacity="0.3"/>
+      </svg>
+    </div>
+    <div class="rail-item" title="List">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <line x1="4" y1="3" x2="13" y2="3" stroke="currentColor" stroke-width="1"/>
+        <line x1="4" y1="7" x2="13" y2="7" stroke="currentColor" stroke-width="1"/>
+        <line x1="4" y1="11" x2="13" y2="11" stroke="currentColor" stroke-width="1"/>
+        <circle cx="2" cy="3" r="1" fill="currentColor"/>
+        <circle cx="2" cy="7" r="1" fill="currentColor" opacity="0.5"/>
+        <circle cx="2" cy="11" r="1" fill="currentColor" opacity="0.5"/>
+      </svg>
+    </div>
+    <div class="rail-sep"></div>
+    <div class="rail-item" title="Worktrees">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M7 1V5M7 5L3.5 9M7 5L10.5 9" stroke="currentColor" stroke-width="1" fill="none"/>
+        <circle cx="7" cy="1" r="1.5" stroke="currentColor" stroke-width="1"/>
+        <circle cx="3.5" cy="10.5" r="1.5" stroke="currentColor" stroke-width="1"/>
+        <circle cx="10.5" cy="10.5" r="1.5" stroke="currentColor" stroke-width="1"/>
+      </svg>
+    </div>
+    <div class="rail-item rail-bottom" title="Settings">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1"/>
+        <path d="M7 1V2.5M7 11.5V13M1 7H2.5M11.5 7H13M2.9 2.9L3.96 3.96M10.04 10.04L11.1 11.1M11.1 2.9L10.04 3.96M3.96 10.04L2.9 11.1" stroke="currentColor" stroke-width="1"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-workspace-label">Workspace</div>
+      <div class="sidebar-workspace-name">
+        <div class="ws-dot"></div>
+        trackboi-demo
+      </div>
+    </div>
+
+    <div class="sidebar-scroll">
+      <div class="sidebar-section-label">Projects</div>
+
+      <div class="project-item active">
+        <div class="project-icon pi-tb">tb</div>
+        <div class="project-name">trackboi-demo</div>
+        <div class="project-count">19</div>
+      </div>
+
+      <div class="worktree-item wt-active">
+        <div class="wt-branch">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3 1V9M3 3L7 6" stroke="currentColor" stroke-width="1"/></svg>
+        </div>
+        <div class="wt-name">feature/mcp-tools</div>
+        <div class="wt-badge badge-active">active</div>
+      </div>
+
+      <div class="worktree-item">
+        <div class="wt-branch" style="color:var(--muted)">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3 1V9M3 3L7 6" stroke="currentColor" stroke-width="1"/></svg>
+        </div>
+        <div class="wt-name">main</div>
+      </div>
+
+      <div class="worktree-item">
+        <div class="wt-branch" style="color:var(--muted)">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3 1V9M3 3L7 6" stroke="currentColor" stroke-width="1"/></svg>
+        </div>
+        <div class="wt-name">spike/checkout-mcp</div>
+      </div>
+
+      <div style="height:6px"></div>
+
+      <div class="project-item">
+        <div class="project-icon pi-on">on</div>
+        <div class="project-name">onboarding-flows</div>
+        <div class="project-count">7</div>
+      </div>
+
+      <div class="project-item">
+        <div class="project-icon pi-ck">ck</div>
+        <div class="project-name">checkout-mcp</div>
+        <div class="project-count">12</div>
+      </div>
+
+      <div class="project-item">
+        <div class="project-icon pi-pl">pl</div>
+        <div class="project-name">platform-core</div>
+        <div class="project-count">5</div>
+      </div>
+
+      <div style="padding:10px 14px 6px; display:flex; align-items:center; gap:6px; cursor:pointer; opacity:0.5">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><line x1="5" y1="1" x2="5" y2="9" stroke="var(--muted)" stroke-width="1"/><line x1="1" y1="5" x2="9" y2="5" stroke="var(--muted)" stroke-width="1"/></svg>
+        <div style="font-size:11px;color:var(--muted);">Add project</div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="agent-pulse"></div>
+      <div class="agent-status">1 agent active · mcp:trackboi</div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="main">
+
+    <!-- BOARD HEADER -->
+    <div class="board-header">
+      <div class="board-title">Demo Delivery <em>/ feature</em></div>
+      <div class="header-sep"></div>
+
+      <div class="scope-toggle">
+        <div class="scope-btn active">Track</div>
+        <div class="scope-btn">Project</div>
+        <div class="scope-btn">All</div>
+      </div>
+
+      <div class="worktree-pill">
+        <div class="worktree-dot"></div>
+        feature/mcp-tools
+        <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M2 3L4 5L6 3" stroke="currentColor" stroke-width="1"/></svg>
+      </div>
+
+      <div class="header-right">
+        <div class="board-stat"><strong>19</strong> shown</div>
+        <button class="hdr-icon-btn" title="Group">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><line x1="1" y1="3" x2="11" y2="3" stroke="currentColor"/><line x1="1" y1="6" x2="11" y2="6" stroke="currentColor"/><line x1="1" y1="9" x2="8" y2="9" stroke="currentColor"/></svg>
+        </button>
+        <button class="hdr-icon-btn" title="Sort">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2L5 5L8 2" stroke="currentColor" stroke-width="1"/><line x1="5" y1="1" x2="5" y2="11" stroke="currentColor"/></svg>
+        </button>
+        <button class="hdr-icon-btn" title="Collapse">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><line x1="1" y1="6" x2="11" y2="6" stroke="currentColor"/><path d="M4 3L1 6L4 9" stroke="currentColor" stroke-width="1" fill="none"/><path d="M8 3L11 6L8 9" stroke="currentColor" stroke-width="1" fill="none"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- BOARD AREA -->
+    <div class="board-area">
+
+      <!-- TODO COLUMN -->
+      <div class="col">
+        <div class="col-header">
+          <div class="col-status-dot dot-todo"></div>
+          <div class="col-name">Backlog</div>
+          <div class="col-count">6</div>
+          <div class="col-add-btn">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><line x1="5" y1="1" x2="5" y2="9" stroke="currentColor" stroke-width="1.2"/><line x1="1" y1="5" x2="9" y2="5" stroke="currentColor" stroke-width="1.2"/></svg>
+          </div>
+        </div>
+        <div class="col-cards">
+
+          <div class="card">
+            <div class="card-grip"></div>
+            <div class="card-track">
+              <div class="track-chip tc-onboard">onboarding</div>
+              <div class="card-flag"><span style="color:var(--muted)">·</span></div>
+            </div>
+            <div class="card-title">Write rollback checklist for payment flow</div>
+            <div class="card-note">Capture recovery steps before touching real money code. Should cover DB state and queue drains.</div>
+            <div class="card-meta">
+              <div class="meta-chip mc-low">P3</div>
+              <div class="meta-chip">agent-ready</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-grip"></div>
+            <div class="card-track">
+              <div class="track-chip tc-feature">feature/mcp-tools</div>
+              <div class="card-flag flag-conflict">
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M4 1V5M4 7V7.5" stroke="currentColor" stroke-width="1.2"/><path d="M1 7H7L4 1L1 7Z" stroke="currentColor" stroke-width="0.8" fill="none"/></svg>
+                conflict
+              </div>
+            </div>
+            <div class="card-title">Ship welcome checklist v2</div>
+            <div class="card-note">Tight first-run experience for new users arriving without context.</div>
+            <div class="card-meta">
+              <div class="meta-chip mc-hi">P1</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-grip"></div>
+            <div class="card-track">
+              <div class="track-chip tc-master">main</div>
+            </div>
+            <div class="card-title">Tighten release checklist for QA</div>
+            <div class="card-note">Make the demo branch feel boring in the best possible way.</div>
+            <div class="card-meta">
+              <div class="meta-chip mc-med">P2</div>
+              <div class="meta-chip mc-agent">🤖 queued</div>
+            </div>
+            <div class="subtask-bar">
+              <div class="subtask-track"><div class="subtask-fill" style="width:30%"></div></div>
+              <div class="subtask-label">1 / 4</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-grip"></div>
+            <div class="card-track">
+              <div class="track-chip tc-feature">feature/mcp-tools</div>
+            </div>
+            <div class="card-title">Mock declined payment states</div>
+            <div class="card-note">Make error handling obvious before the agent starts clicking through it.</div>
+            <div class="card-meta">
+              <div class="meta-chip mc-med">P2</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-grip"></div>
+            <div class="card-track">
+              <div class="track-chip tc-onboard">onboarding</div>
+            </div>
+            <div class="card-title">Prepare onboarding brief</div>
+            <div class="card-note">Seed a branch-scoped task for the onboarding worktree.</div>
+            <div class="card-meta">
+              <div class="meta-chip mc-low">P3</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- IN PROGRESS COLUMN -->
+      <div class="col">
+        <div class="col-header">
+          <div class="col-status-dot dot-doing"></div>
+          <div class="col-name">In Progress</div>
+          <div class="col-count">5</div>
+          <div class="col-add-btn">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><line x1="5" y1="1" x2="5" y2="9" stroke="currentColor" stroke-width="1.2"/><line x1="1" y1="5" x2="9" y2="5" stroke="currentColor" stroke-width="1.2"/></svg>
+          </div>
+        </div>
+        <div class="col-cards">
+
+          <div class="card selected" onclick="">
+            <div class="card-grip"></div>
+            <div class="card-track">
+              <div class="track-chip tc-feature">feature/mcp-tools</div>
+              <div class="card-flag flag-agent">
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><circle cx="4" cy="4" r="3" stroke="currentColor" stroke-width="0.8"/><path d="M2.5 4.5L3.5 5.5L5.5 3" stroke="currentColor" stroke-width="0.8"/></svg>
+                agent
+              </div>
+            </div>
+            <div class="card-title">Verify MCP payment handshake</div>
+            <div class="card-note">Exercise the agent path with fake checkout data. Covers auth edge cases.</div>
+            <div class="card-meta">
+              <div class="meta-chip mc-hi">P1</div>
+              <div class="meta-chip mc-agent">active</div>
+            </div>
+            <div class="subtask-bar">
+              <div class="subtask-track"><div class="subtask-fill" style="width:66%"></div></div>
+              <div class="subtask-label">2 / 3</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-grip"></div>
+            <div class="card-track">
+              <div class="track-chip tc-onboard">onboarding</div>
+            </div>
+            <div class="card-title">Design onboarding empty state</div>
+            <div class="card-note">Keep it calm and obvious. No hero art, no copy overload.</div>
+            <div class="card-meta">
+              <div class="meta-chip mc-low">P3</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-grip"></div>
+            <div class="card-track">
+              <div class="track-chip tc-master">main</div>
+            </div>
+            <div class="card-title">Review workspace defaults</div>
+            <div class="card-note">Check that opening a workspace does not overwhelm the header with state.</div>
+            <div class="card-meta">
+              <div class="meta-chip mc-med">P2</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-grip"></div>
+            <div class="card-track">
+              <div class="track-chip tc-spike">spike/checkout-mcp</div>
+            </div>
+            <div class="card-title">Trace agent retry loop</div>
+            <div class="card-note">Watch what happens when the MCP call returns a partial failure response.</div>
+            <div class="card-meta">
+              <div class="meta-chip mc-med">P2</div>
+              <div class="meta-chip mc-agent">🤖 running</div>
+            </div>
+            <div class="subtask-bar">
+              <div class="subtask-track"><div class="subtask-fill" style="width:20%"></div></div>
+              <div class="subtask-label">1 / 5</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- REVIEW COLUMN -->
+      <div class="col">
+        <div class="col-header">
+          <div class="col-status-dot dot-review"></div>
+          <div class="col-name">Review</div>
+          <div class="col-count">3</div>
+          <div class="col-add-btn">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><line x1="5" y1="1" x2="5" y2="9" stroke="currentColor" stroke-width="1.2"/><line x1="1" y1="5" x2="9" y2="5" stroke="currentColor" stroke-width="1.2"/></svg>
+          </div>
+        </div>
+        <div class="col-cards">
+          <div class="card">
+            <div class="card-grip"></div>
+            <div class="card-track">
+              <div class="track-chip tc-feature">feature/mcp-tools</div>
+            </div>
+            <div class="card-title">Prototype empty project illustration</div>
+            <div class="card-note">Something that feels friendly without becoming mascot software.</div>
+            <div class="card-meta">
+              <div class="meta-chip mc-low">P3</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-grip"></div>
+            <div class="card-track">
+              <div class="track-chip tc-onboard">onboarding</div>
+            </div>
+            <div class="card-title">Ship welcome checklist copy review</div>
+            <div class="card-note">Language pass after the flow settles. Focus on verb tense consistency.</div>
+            <div class="card-meta">
+              <div class="meta-chip mc-low">P3</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-grip"></div>
+            <div class="card-track">
+              <div class="track-chip tc-master">main</div>
+            </div>
+            <div class="card-title">Stabilize demo baseline</div>
+            <div class="card-note">Keep master branch boring and releasable at all times.</div>
+            <div class="card-meta">
+              <div class="meta-chip mc-med">P2</div>
+              <div class="meta-chip mc-agent">agent-ready</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DONE COLUMN -->
+      <div class="col" style="opacity:0.75">
+        <div class="col-header">
+          <div class="col-status-dot dot-done"></div>
+          <div class="col-name">Done</div>
+          <div class="col-count">5</div>
+          <div class="col-add-btn">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><line x1="5" y1="1" x2="5" y2="9" stroke="currentColor" stroke-width="1.2"/><line x1="1" y1="5" x2="9" y2="5" stroke="currentColor" stroke-width="1.2"/></svg>
+          </div>
+        </div>
+        <div class="col-cards">
+          <div class="card">
+            <div class="card-grip"></div>
+            <div class="card-track">
+              <div class="track-chip tc-master">main</div>
+            </div>
+            <div class="card-title">Archive solved tray experiments</div>
+            <div class="card-meta">
+              <div class="meta-chip mc-low">P3</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-grip"></div>
+            <div class="card-track">
+              <div class="track-chip tc-spike">spike/checkout-mcp</div>
+            </div>
+            <div class="card-title">Capture fraud-note leftovers</div>
+            <div class="card-meta">
+              <div class="meta-chip mc-low">P3</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-grip"></div>
+            <div class="card-track">
+              <div class="track-chip tc-master">main</div>
+            </div>
+            <div class="card-title">Set up MCP server scaffolding</div>
+            <div class="card-meta">
+              <div class="meta-chip mc-agent">agent-built</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADD COLUMN -->
+      <div class="add-col">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><line x1="10" y1="3" x2="10" y2="17" stroke="var(--muted)" stroke-width="1.5"/><line x1="3" y1="10" x2="17" y2="10" stroke="var(--muted)" stroke-width="1.5"/></svg>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:0.05em">New column</div>
+      </div>
+
+    </div>
+
+    <!-- CARD EDITOR MODAL -->
+    <div class="modal-overlay">
+      <div class="card-editor">
+
+        <!-- Editor Header -->
+        <div class="editor-header">
+          <div class="editor-breadcrumb">
+            trackboi-demo
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M2 3L4 5L6 3" stroke="currentColor" stroke-width="1" transform="rotate(-90 4 4)"/></svg>
+            <span>Verify MCP payment handshake</span>
+          </div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-right:8px">TB-047</div>
+          <div class="editor-close">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 2L8 8M8 2L2 8" stroke="currentColor" stroke-width="1.2"/></svg>
+          </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="editor-status-bar">
+          <div class="status-pill">
+            <div style="width:6px;height:6px;border-radius:50%;background:var(--amber)"></div>
+            In Progress
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M2 3L4 5L6 3" stroke="currentColor" stroke-width="1"/></svg>
+          </div>
+
+          <div class="editor-field-row">
+            <div class="edr-field-btn active">
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><circle cx="4" cy="4" r="3" stroke="currentColor" stroke-width="0.8"/></svg>
+              feature/mcp-tools
+            </div>
+            <div class="edr-field-btn">
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><circle cx="4" cy="4" r="2.5" stroke="currentColor" stroke-width="0.8"/><circle cx="4" cy="4" r="1" fill="currentColor"/></svg>
+              Agent: active
+            </div>
+            <div class="edr-field-btn" style="margin-left:auto">
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><circle cx="1.5" cy="4" r="1" fill="currentColor"/><circle cx="4" cy="4" r="1" fill="currentColor"/><circle cx="6.5" cy="4" r="1" fill="currentColor"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scrollable content -->
+        <div class="editor-scroll">
+
+          <!-- Title -->
+          <textarea class="editor-title-input" rows="2" placeholder="Card title…">Verify MCP payment handshake</textarea>
+
+          <!-- Fields -->
+          <div class="editor-section-label">Fields</div>
+          <div class="fields-grid">
+            <div class="field-row">
+              <div class="field-label">Priority</div>
+              <div class="field-value hi">High · P1</div>
+            </div>
+            <div class="field-row">
+              <div class="field-label">Scope</div>
+              <div class="field-value teal">Track</div>
+            </div>
+            <div class="field-row">
+              <div class="field-label">Worktree</div>
+              <div class="field-value branch">feature/mcp-tools</div>
+            </div>
+            <div class="field-row">
+              <div class="field-label">Agent</div>
+              <div class="field-value teal">mcp:trackboi</div>
+            </div>
+            <div class="field-row">
+              <div class="field-label">Estimate</div>
+              <div class="field-value amber">~2h</div>
+            </div>
+            <div class="field-row">
+              <div class="field-label">Created</div>
+              <div class="field-value">2d ago</div>
+            </div>
+          </div>
+
+          <!-- Notes / Markdown -->
+          <div class="editor-section-label">Notes</div>
+          <div class="notes-area">
+            <span class="md-h">## Context</span>
+            The checkout MCP tool needs a real handshake test before we go to staging. Use the <span class="md-code">fake_checkout_v2</span> fixture — it covers the 3DS redirect path and partial auth scenarios.<br><br>
+            <span class="md-h">## What to verify</span>
+            Agent should confirm the auth token survives a session replay without re-prompting. Edge case: expired sessions must surface as <span class="md-code">ERR_SESSION_STALE</span> not a silent 200.
+          </div>
+
+          <!-- Subtasks -->
+          <div class="editor-section-label">Subtasks <span style="color:var(--muted);margin-left:4px;font-size:9px;letter-spacing:0">2 / 3</span></div>
+          <div class="subtasks-list">
+            <div class="subtask-item">
+              <div class="st-check done">
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3.5 6L6.5 2" stroke="white" stroke-width="1.2"/></svg>
+              </div>
+              <div class="st-text done">Confirm handshake returns signed token</div>
+              <div class="st-branch">main</div>
+            </div>
+            <div class="subtask-item">
+              <div class="st-check done">
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3.5 6L6.5 2" stroke="white" stroke-width="1.2"/></svg>
+              </div>
+              <div class="st-text done">Validate 3DS redirect path stays clean</div>
+              <div class="st-branch">feature/mcp-tools</div>
+            </div>
+            <div class="subtask-item">
+              <div class="st-check"></div>
+              <div class="st-text">Test ERR_SESSION_STALE error surface</div>
+              <div class="st-branch">feature/mcp-tools</div>
+            </div>
+            <div class="add-subtask-btn">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><line x1="5" y1="1" x2="5" y2="9" stroke="currentColor" stroke-width="1"/><line x1="1" y1="5" x2="9" y2="5" stroke="currentColor" stroke-width="1"/></svg>
+              Add subtask
+            </div>
+          </div>
+
+          <!-- Activity -->
+          <div class="editor-section-label">Activity</div>
+          <div class="activity-list">
+            <div class="activity-item">
+              <div class="activity-dot agent"></div>
+              <div style="flex:1">
+                <div class="activity-text"><strong>mcp:trackboi agent</strong> started working on subtask 3 — ERR_SESSION_STALE surface</div>
+                <div class="activity-time">4 min ago</div>
+              </div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-dot"></div>
+              <div style="flex:1">
+                <div class="activity-text"><strong>you</strong> moved to In Progress from Backlog</div>
+                <div class="activity-time">2h ago</div>
+              </div>
+            </div>
+            <div class="activity-item">
+              <div class="activity-dot"></div>
+              <div style="flex:1">
+                <div class="activity-text"><strong>you</strong> created this card · branch feature/mcp-tools · scope track</div>
+                <div class="activity-time">2d ago</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="height:8px"></div>
+
+        </div>
+
+        <!-- Editor Footer -->
+        <div class="editor-footer">
+          <div class="agent-context-box">
+            <div class="agent-icon">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="3.5" stroke="white" stroke-width="0.8"/><path d="M3 5.5L4.5 7L7.5 3.5" stroke="white" stroke-width="0.8"/></svg>
+            </div>
+            <div class="agent-text">mcp:trackboi is watching this card — 1 subtask in flight</div>
+          </div>
+          <button class="save-btn">Save</button>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  const overlay = document.querySelector('.modal-overlay');
+  const closeBtn = document.querySelector('.editor-close');
+  const cards = document.querySelectorAll('.card');
+
+  function closeDrawer() {
+    overlay.classList.add('hidden');
+    cards.forEach(c => c.classList.remove('selected'));
+  }
+
+  function openDrawer(card) {
+    overlay.classList.remove('hidden');
+    cards.forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+  }
+
+  closeBtn.addEventListener('click', closeDrawer);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeDrawer(); });
+  cards.forEach(card => card.addEventListener('click', () => openDrawer(card)));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+</script>
+</body>
+</html>

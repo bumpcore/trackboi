@@ -1,10 +1,10 @@
-import { existsSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, realpathSync, rmSync } from "node:fs";
 import path from "node:path";
 import { DEFAULT_BOARD_ID, STORAGE_SEARCH_PATHS } from "./constants";
 import { normalizeScope } from "./git";
 import { readJson, writeJsonAtomic } from "./json";
-import { boardPath, boardsPath, cardPath, cardsPath, projectMetadataPath, storageRoot } from "./paths";
-import type { Board, Card, Project, ProjectMetadata, ProjectRegistry } from "./types";
+import { boardPath, boardsPath, cardPath, cardsPath, projectMetadataPath, storageRoot, tracksPath } from "./paths";
+import type { Board, Card, CardComment, Project, ProjectMetadata, ProjectRegistry } from "./types";
 
 export type ProjectStore = {
 	project: Project & { storagePath: string };
@@ -73,6 +73,7 @@ export function openStore(project: Project, registry: ProjectRegistry, create: b
 export function ensureProjectFiles(project: Project, rootPath: string, storagePath: string): void {
 	mkdirSync(boardsPath(rootPath), { recursive: true });
 	mkdirSync(cardsPath(rootPath), { recursive: true });
+	mkdirSync(tracksPath(rootPath), { recursive: true });
 
 	const metadataPath = projectMetadataPath(rootPath);
 	if (!existsSync(metadataPath)) {
@@ -135,21 +136,33 @@ export function readCards(rootPath: string): Card[] {
 	const cards: Card[] = [];
 	const cardDir = cardsPath(rootPath);
 	if (existsSync(cardDir)) {
-		for (const filename of readdirSync(cardDir)) {
-			if (!filename.endsWith(".json")) continue;
-			const filePath = path.join(cardDir, filename);
-			if (!statSync(filePath).isFile()) continue;
+		for (const entry of readdirSync(cardDir, { withFileTypes: true })) {
+			if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+			const filePath = path.join(cardDir, entry.name);
 			const card = readJson<Card>(filePath);
-			const id = path.basename(filename, ".json");
+			const id = path.basename(entry.name, ".json");
 			if (card.id !== id) throw new Error(`Card id ${card.id} does not match filename ${id}`);
 			card.scope = normalizeScope(card.scope);
 			card.boardId ??= DEFAULT_BOARD_ID;
+			card.trackId ??= null;
 			card.fieldValues ??= {};
+			card.comments = normalizeCardComments(card.comments);
 			if (card.boardId === DEFAULT_BOARD_ID) cards.push(card);
 		}
 	}
 	cards.sort((left, right) => left.column.localeCompare(right.column) || left.rank.localeCompare(right.rank));
 	return cards;
+}
+
+export function countCards(rootPath: string): number {
+	const cardDir = cardsPath(rootPath);
+	if (!existsSync(cardDir)) return 0;
+
+	let count = 0;
+	for (const entry of readdirSync(cardDir, { withFileTypes: true })) {
+		if (entry.isFile() && entry.name.endsWith(".json")) count += 1;
+	}
+	return count;
 }
 
 export function deleteCardFile(rootPath: string, cardId: string): void {
@@ -169,4 +182,25 @@ function initialStoragePath(project: Project, registry: ProjectRegistry): string
 		return ".etc/.trackboi";
 	}
 	return candidates[0] ?? STORAGE_SEARCH_PATHS[0];
+}
+
+function normalizeCardComments(value: unknown): CardComment[] {
+	if (!Array.isArray(value)) return [];
+
+	return value.flatMap((entry): CardComment[] => {
+		if (!entry || typeof entry !== "object") return [];
+		const comment = entry as Partial<CardComment>;
+		if (typeof comment.id !== "string" || typeof comment.body !== "string") return [];
+
+		const timestamp = typeof comment.createdAt === "string" ? comment.createdAt : now();
+		return [{
+			id: comment.id,
+			author: typeof comment.author === "string" && comment.author.trim()
+				? comment.author.trim()
+				: "Unknown",
+			body: comment.body,
+			createdAt: timestamp,
+			updatedAt: typeof comment.updatedAt === "string" ? comment.updatedAt : timestamp,
+		}];
+	});
 }

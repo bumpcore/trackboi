@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Trackboi Composite Direction</title>
+	<script src="https://cdn.tailwindcss.com"></script>
+	<script>
+		tailwind.config = {
+			theme: {
+				extend: {
+					fontFamily: {
+						sans: [
+							"-apple-system",
+							"BlinkMacSystemFont",
+							"Segoe UI",
+							"Inter",
+							"system-ui",
+							"sans-serif",
+						],
+						mono: [
+							"ui-monospace",
+							"SFMono-Regular",
+							"SF Mono",
+							"Menlo",
+							"Monaco",
+							"Consolas",
+							"monospace",
+						],
+					},
+				},
+			},
+		};
+	</script>
+	<style>
+		:root {
+			color-scheme: dark;
+		}
+
+		html,
+		body {
+			height: 100%;
+			overflow: hidden;
+			background: #08090b;
+		}
+
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+			letter-spacing: -0.01em;
+		}
+
+		::-webkit-scrollbar {
+			width: 8px;
+			height: 8px;
+		}
+
+		::-webkit-scrollbar-track {
+			background: transparent;
+		}
+
+		::-webkit-scrollbar-thumb {
+			background: rgba(113, 118, 128, 0.34);
+			border-radius: 999px;
+		}
+
+		.scrollable {
+			scrollbar-width: thin;
+			scrollbar-color: rgba(113, 118, 128, 0.34) transparent;
+		}
+
+		[data-card] {
+			transition:
+				border-color 140ms ease,
+				background-color 140ms ease,
+				color 140ms ease;
+		}
+
+		[data-lane].lane-active {
+			border-color: rgba(208, 154, 67, 0.55);
+			background: rgba(19, 21, 26, 0.96);
+		}
+
+		[data-lane].lane-active .lane-header {
+			border-color: rgba(208, 154, 67, 0.38);
+		}
+
+		[data-collapsible-body][hidden] {
+			display: none;
+		}
+
+		.workspace-surface {
+			background:
+				linear-gradient(180deg, rgba(10, 11, 15, 0.98), rgba(8, 9, 12, 1));
+		}
+
+		.lane-surface {
+			background:
+				linear-gradient(180deg, rgba(17, 19, 24, 0.96), rgba(14, 16, 20, 0.98));
+		}
+
+		.list-row {
+			position: relative;
+			border-top: 1px solid rgba(39, 42, 50, 0.88);
+			background: transparent;
+		}
+
+		.list-row:first-child {
+			border-top: none;
+		}
+
+		.list-row:hover {
+			background: rgba(28, 31, 38, 0.78);
+		}
+
+		.list-row::before {
+			content: "";
+			position: absolute;
+			left: 0;
+			top: 0;
+			bottom: 0;
+			width: 2px;
+			background: transparent;
+			transition: background-color 140ms ease;
+		}
+
+		.list-row.selected {
+			background: linear-gradient(180deg, rgba(30, 33, 40, 0.98), rgba(26, 29, 35, 0.98));
+		}
+
+		.list-row.selected::before {
+			background: #d09a43;
+		}
+
+		.list-row.selected .row-title {
+			color: #f2f3f5;
+		}
+
+		.list-row.selected .row-note {
+			color: #a8adb8;
+		}
+
+		.inspector-section + .inspector-section {
+			border-top: 1px solid rgba(31, 34, 41, 0.96);
+		}
+
+		.field-grid > div {
+			border-left: 1px solid rgba(36, 40, 48, 0.9);
+		}
+
+		.field-grid > div:first-child {
+			border-left: none;
+		}
+
+		.soft-chip {
+			border: 1px solid rgba(51, 56, 66, 0.92);
+			background: rgba(20, 23, 29, 0.92);
+			border-radius: 999px;
+			padding: 2px 8px;
+		}
+	</style>
+</head>
+<body class="bg-[#08090b] text-zinc-200">
+	<div class="flex h-screen w-screen flex-col">
+		<header class="flex h-9 items-center gap-3 border-b border-[#1a1c21] bg-[#0d0f13] px-3 text-[12px] select-none">
+			<div class="flex items-center gap-1.5">
+				<span class="h-2.5 w-2.5 rounded-full bg-[#4a2326] border border-[#6c2f34]"></span>
+				<span class="h-2.5 w-2.5 rounded-full bg-[#4f3e1d] border border-[#715728]"></span>
+				<span class="h-2.5 w-2.5 rounded-full bg-[#203925] border border-[#30533a]"></span>
+			</div>
+			<div class="h-4 w-px bg-[#22252c]"></div>
+			<div class="flex items-center gap-2 font-mono text-[11px] text-zinc-400">
+				<span class="rounded bg-[#d09a43] px-1.5 py-0.5 text-[#141518]">TB</span>
+				<span class="text-zinc-200">trackboi</span>
+				<span class="text-zinc-600">·</span>
+				<span>~/projects/trackboi</span>
+				<span class="text-zinc-600">·</span>
+				<span class="text-[#d09a43]">feat/inspector-comments</span>
+			</div>
+			<div class="mx-auto flex h-7 w-[420px] items-center gap-2 rounded-[7px] border border-[#23262d] bg-[#121419] px-3 text-[11px] text-zinc-500">
+				<svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+					<circle cx="11" cy="11" r="7"></circle>
+					<path d="m20 20-3.5-3.5"></path>
+				</svg>
+				<span class="font-mono">Jump to card, branch, worktree, action…</span>
+				<span class="ml-auto font-mono text-zinc-600">⌘K</span>
+			</div>
+			<div class="ml-auto flex items-center gap-2">
+				<div class="flex items-center gap-1.5 rounded-[7px] border border-[#23262d] bg-[#121419] px-2.5 py-1 font-mono text-[10px] text-zinc-400">
+					<span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+					<span>MCP active · 2 agents</span>
+				</div>
+				<button class="flex h-7 items-center rounded-[7px] border border-[#2b2e36] bg-[#15171d] px-3 text-[11px] font-medium text-zinc-200">
+					New card
+				</button>
+			</div>
+		</header>
+
+		<div class="flex min-h-0 flex-1">
+			<nav class="flex w-12 shrink-0 flex-col items-center gap-2 border-r border-[#16181d] bg-[#0b0c10] py-3">
+				<button class="flex h-8 w-8 items-center justify-center rounded-[8px] bg-[#181a21] text-[#d09a43]">
+					<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+						<rect x="3" y="4" width="5" height="16" rx="1"></rect>
+						<rect x="10" y="4" width="5" height="10" rx="1"></rect>
+						<rect x="17" y="4" width="4" height="13" rx="1"></rect>
+					</svg>
+				</button>
+				<button class="flex h-8 w-8 items-center justify-center rounded-[8px] text-zinc-500 hover:bg-[#15171d] hover:text-zinc-200">
+					<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+						<path d="M4 4h12l4 4v12H4z"></path>
+						<path d="M16 4v4h4"></path>
+					</svg>
+				</button>
+				<button class="flex h-8 w-8 items-center justify-center rounded-[8px] text-zinc-500 hover:bg-[#15171d] hover:text-zinc-200">
+					<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+						<rect x="4" y="7" width="16" height="12" rx="3"></rect>
+						<path d="M12 3v4"></path>
+						<path d="M9 16h6"></path>
+					</svg>
+				</button>
+				<div class="my-1 h-px w-6 bg-[#1a1c21]"></div>
+				<button class="mt-auto flex h-8 w-8 items-center justify-center rounded-[8px] text-zinc-500 hover:bg-[#15171d] hover:text-zinc-200">
+					<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+						<circle cx="12" cy="12" r="3"></circle>
+						<path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path>
+					</svg>
+				</button>
+			</nav>
+
+			<aside class="flex w-[248px] shrink-0 flex-col border-r border-[#17191f] bg-[#0d0f13]">
+				<div class="border-b border-[#17191f] px-4 py-4">
+					<div class="mb-3 flex items-center justify-between">
+						<div>
+							<p class="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">Workspace</p>
+							<h1 class="mt-1 text-[15px] font-semibold text-zinc-100">trackboi</h1>
+						</div>
+						<button class="rounded-[7px] border border-[#262a31] bg-[#15171d] px-2 py-1 font-mono text-[10px] text-zinc-300">
+							main
+						</button>
+					</div>
+					<div class="rounded-[10px] border border-[#23262d] bg-[#13151a] p-3">
+						<div class="flex items-center justify-between">
+							<div>
+								<p class="font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">Active Project</p>
+								<p class="mt-1 text-[13px] font-medium text-zinc-100">Trackboi Desktop</p>
+							</div>
+							<span class="rounded border border-emerald-900/80 bg-emerald-950/60 px-1.5 py-0.5 font-mono text-[10px] text-emerald-300">ready</span>
+						</div>
+						<p class="mt-2 font-mono text-[10px] leading-5 text-zinc-500">.trackboi · repo-local · 4 worktrees discovered</p>
+					</div>
+				</div>
+
+				<div class="scrollable flex-1 overflow-auto px-3 py-4">
+					<section class="mb-5">
+						<div class="mb-2 flex items-center justify-between px-1">
+							<h2 class="font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">Projects</h2>
+							<span class="font-mono text-[10px] text-zinc-600">4</span>
+						</div>
+						<div class="space-y-1">
+							<button class="flex w-full items-center gap-2 rounded-[9px] border border-[#2f333c] bg-[#1a1d24] px-3 py-2 text-left text-[12px] text-zinc-100">
+								<span class="h-2 w-2 rounded-full bg-[#d09a43]"></span>
+								<span class="flex-1 truncate">trackboi</span>
+								<span class="font-mono text-[10px] text-zinc-500">19</span>
+							</button>
+							<button class="flex w-full items-center gap-2 rounded-[9px] border border-transparent px-3 py-2 text-left text-[12px] text-zinc-500 hover:bg-[#14171d] hover:text-zinc-200">
+								<span class="h-2 w-2 rounded-full bg-[#4d7ba6]"></span>
+								<span class="flex-1 truncate">atlas-core</span>
+								<span class="font-mono text-[10px] text-zinc-600">32</span>
+							</button>
+							<button class="flex w-full items-center gap-2 rounded-[9px] border border-transparent px-3 py-2 text-left text-[12px] text-zinc-500 hover:bg-[#14171d] hover:text-zinc-200">
+								<span class="h-2 w-2 rounded-full bg-[#5a8f63]"></span>
+								<span class="flex-1 truncate">payments-api</span>
+								<span class="font-mono text-[10px] text-zinc-600">11</span>
+							</button>
+						</div>
+					</section>
+
+					<section class="mb-5">
+						<div class="mb-2 flex items-center justify-between px-1">
+							<h2 class="font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">Worktrees</h2>
+							<span class="font-mono text-[10px] text-zinc-600">3 active</span>
+						</div>
+						<div class="space-y-1">
+							<button class="flex w-full items-start gap-2 rounded-[9px] border border-[#2b3138] bg-[#16191f] px-3 py-2 text-left">
+								<span class="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+								<span class="min-w-0 flex-1">
+									<span class="block font-mono text-[11px] text-zinc-100">feat/inspector-comments</span>
+									<span class="block truncate font-mono text-[10px] text-zinc-500">worktrees/inspector-comments/</span>
+								</span>
+							</button>
+							<button class="flex w-full items-start gap-2 rounded-[9px] border border-transparent px-3 py-2 text-left hover:bg-[#14171d]">
+								<span class="mt-1 h-1.5 w-1.5 rounded-full bg-sky-400"></span>
+								<span class="min-w-0 flex-1">
+									<span class="block font-mono text-[11px] text-zinc-300">feat/card-comments</span>
+									<span class="block truncate font-mono text-[10px] text-zinc-600">worktrees/card-comments/</span>
+								</span>
+							</button>
+							<button class="flex w-full items-start gap-2 rounded-[9px] border border-transparent px-3 py-2 text-left hover:bg-[#14171d]">
+								<span class="mt-1 h-1.5 w-1.5 rounded-full bg-zinc-500"></span>
+								<span class="min-w-0 flex-1">
+									<span class="block font-mono text-[11px] text-zinc-300">main</span>
+									<span class="block truncate font-mono text-[10px] text-zinc-600">project/global</span>
+								</span>
+							</button>
+						</div>
+					</section>
+
+					<section>
+						<div class="mb-2 flex items-center justify-between px-1">
+							<h2 class="font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">Filters</h2>
+							<button class="font-mono text-[10px] text-zinc-600">reset</button>
+						</div>
+						<div class="grid gap-2">
+							<div class="flex items-center gap-2 rounded-[9px] border border-[#262a31] bg-[#13151a] px-3 py-2 font-mono text-[10px] text-zinc-300">
+								<span class="inline-flex h-4 items-center rounded border border-[#444a54] bg-[#1b1e25] px-1.5 text-[#d09a43]">scope</span>
+								<span>track only</span>
+							</div>
+							<div class="flex items-center gap-2 rounded-[9px] border border-[#262a31] bg-[#13151a] px-3 py-2 font-mono text-[10px] text-zinc-400">
+								<span class="inline-flex h-4 items-center rounded border border-[#444a54] bg-[#1b1e25] px-1.5">show</span>
+								<span>agent-ready + in progress</span>
+							</div>
+							<div class="flex items-center gap-2 rounded-[9px] border border-[#262a31] bg-[#13151a] px-3 py-2 font-mono text-[10px] text-zinc-400">
+								<span class="inline-flex h-4 items-center rounded border border-[#444a54] bg-[#1b1e25] px-1.5">ctx</span>
+								<span>comments + activity visible</span>
+							</div>
+						</div>
+					</section>
+				</div>
+			</aside>
+
+			<main class="workspace-surface grain relative flex min-w-0 flex-1 flex-col">
+				<div class="border-b border-[#17191f] bg-[#101217]/96 px-5 py-4 backdrop-blur-md">
+					<div class="flex items-start justify-between gap-4">
+						<div class="min-w-0">
+							<p class="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">Board Context</p>
+							<div class="mt-1 flex items-center gap-2 text-[18px] font-semibold tracking-tight text-zinc-100">
+								<span>Trackboi</span>
+								<span class="text-zinc-600">/</span>
+								<span class="font-mono text-[14px] text-[#d09a43]">feat/inspector-comments</span>
+							</div>
+							<p class="mt-1 text-[12px] text-zinc-500">Local-first task board for repo work, worktrees, and agent handoff context.</p>
+						</div>
+
+						<div class="flex flex-wrap items-center justify-end gap-2">
+							<div class="inline-flex rounded-[8px] border border-[#262a31] bg-[#13151a] p-0.5">
+								<button class="rounded-[6px] bg-[#262a31] px-3 py-1.5 font-mono text-[11px] text-zinc-100">board</button>
+								<button class="rounded-[6px] px-3 py-1.5 font-mono text-[11px] text-zinc-500">table</button>
+								<button class="rounded-[6px] px-3 py-1.5 font-mono text-[11px] text-zinc-500">timeline</button>
+							</div>
+							<div class="inline-flex rounded-[8px] border border-[#262a31] bg-[#13151a] p-0.5">
+								<button class="rounded-[6px] bg-[#262a31] px-3 py-1.5 font-mono text-[11px] text-zinc-100">track scope</button>
+								<button class="rounded-[6px] px-3 py-1.5 font-mono text-[11px] text-zinc-500">global</button>
+							</div>
+							<button class="rounded-[8px] border border-[#2e323a] bg-[#15181e] px-3 py-1.5 font-mono text-[11px] text-zinc-200">selected wt</button>
+						</div>
+					</div>
+				</div>
+
+				<div class="flex min-h-0 flex-1">
+					<div class="scrollable flex min-w-0 flex-1 gap-3 overflow-auto px-4 py-4">
+						<section data-lane class="lane-surface w-[320px] shrink-0 rounded-[10px] border border-[#20232a]">
+							<div class="lane-header flex items-center justify-between border-b border-[#20232a] px-4 py-3">
+								<div>
+									<p class="font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">Backlog</p>
+									<p class="mt-1 text-[12px] text-zinc-400">6 cards</p>
+								</div>
+								<span class="font-mono text-[10px] text-zinc-600">todo</span>
+							</div>
+							<div class="px-0 py-1">
+								<button data-card class="list-row w-full px-4 py-3 text-left">
+									<div class="mb-2 flex items-center justify-between gap-2 pl-1">
+										<span class="font-mono text-[10px] text-zinc-600">TRK-078</span>
+										<span class="rounded border border-[#314436] bg-[#152218] px-1.5 py-0.5 font-mono text-[10px] text-emerald-300">agent-ready</span>
+									</div>
+									<div class="row-title pl-1 text-[13px] font-medium text-zinc-100">Expose comment thread through MCP read endpoint</div>
+									<p class="row-note mt-1.5 pl-1 text-[12px] leading-5 text-zinc-500">Agents should be able to read context breadcrumbs without scraping raw notes.</p>
+									<div class="mt-3 flex flex-wrap gap-3 pl-1 font-mono text-[10px] text-zinc-500">
+										<span class="soft-chip">wt: feat/card-comments</span>
+										<span class="soft-chip">P2</span>
+									</div>
+								</button>
+
+								<button data-card class="list-row w-full px-4 py-3 text-left">
+									<div class="mb-2 flex items-center justify-between gap-2 pl-1">
+										<span class="font-mono text-[10px] text-zinc-600">TRK-074</span>
+										<span class="rounded border border-[#463827] bg-[#20180f] px-1.5 py-0.5 font-mono text-[10px] text-[#d09a43]">conflict</span>
+									</div>
+									<div class="row-title pl-1 text-[13px] font-medium text-zinc-100">Merge worktree-specific card context without losing history</div>
+									<p class="row-note mt-1.5 pl-1 text-[12px] leading-5 text-zinc-500">Need a practical v1 rule for comments when the same card exists in multiple trees.</p>
+									<div class="mt-3 flex flex-wrap gap-3 pl-1 font-mono text-[10px] text-zinc-500">
+										<span class="soft-chip">3 variants</span>
+										<span class="soft-chip">research</span>
+									</div>
+								</button>
+							</div>
+						</section>
+
+						<section data-lane class="lane-surface w-[320px] shrink-0 rounded-[10px] border border-[#20232a]">
+							<div class="lane-header flex items-center justify-between border-b border-[#20232a] px-4 py-3">
+								<div>
+									<p class="font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">In Progress</p>
+									<p class="mt-1 text-[12px] text-zinc-400">4 cards</p>
+								</div>
+								<span class="font-mono text-[10px] text-zinc-600">doing</span>
+							</div>
+							<div class="px-0 py-1">
+								<button id="selected-card" data-card class="list-row selected w-full border-y border-[#3b404b] px-4 py-3 text-left">
+									<div class="mb-2 flex items-center justify-between gap-2 pl-1">
+										<span class="font-mono text-[10px] text-zinc-500">TRK-081</span>
+										<span class="rounded border border-[#2a4433] bg-[#132018] px-1.5 py-0.5 font-mono text-[10px] text-emerald-300">selected</span>
+									</div>
+									<div class="row-title pl-1 text-[13px] font-medium text-zinc-100">Add persistent comments as task memory for human and agent handoff</div>
+									<p class="row-note mt-1.5 pl-1 text-[12px] leading-5 text-zinc-400">Not realtime chat. A durable local thread that adds depth and context over time.</p>
+									<div class="mt-3 flex flex-wrap gap-3 pl-1 font-mono text-[10px] text-zinc-500">
+										<span class="soft-chip text-[#d09a43]">track</span>
+										<span class="soft-chip">wt: feat/inspector-comments</span>
+										<span class="soft-chip">2 / 4 subtasks</span>
+									</div>
+								</button>
+
+								<button data-card class="list-row w-full px-4 py-3 text-left">
+									<div class="mb-2 flex items-center justify-between gap-2 pl-1">
+										<span class="font-mono text-[10px] text-zinc-600">TRK-079</span>
+										<span class="rounded border border-[#334355] bg-[#15202a] px-1.5 py-0.5 font-mono text-[10px] text-sky-300">agent-active</span>
+									</div>
+									<div class="row-title pl-1 text-[13px] font-medium text-zinc-100">Reshape card editor into docked inspector on desktop</div>
+									<p class="row-note mt-1.5 pl-1 text-[12px] leading-5 text-zinc-500">Keep board visible while editing, move metadata and activity into structured sections.</p>
+									<div class="mt-3 flex flex-wrap gap-3 pl-1 font-mono text-[10px] text-zinc-500">
+										<span class="soft-chip">ui</span>
+										<span class="soft-chip">claude-worker</span>
+									</div>
+								</button>
+							</div>
+						</section>
+
+						<section data-lane class="lane-active lane-surface w-[320px] shrink-0 rounded-[10px] border border-[#3b3525]">
+							<div class="lane-header flex items-center justify-between border-b border-[#3b3525] px-4 py-3">
+								<div>
+									<p class="font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">Review</p>
+									<p class="mt-1 text-[12px] text-zinc-400">1 card · lane highlighted</p>
+								</div>
+								<span class="font-mono text-[10px] text-[#d09a43]">drop target</span>
+							</div>
+							<div class="px-4 py-3">
+								<div class="border border-dashed border-[#5a4727] bg-[#1a1711] px-3 py-3 font-mono text-[10px] uppercase tracking-[0.08em] text-[#d09a43]">
+									Drop selected card here to move into review
+								</div>
+							</div>
+						</section>
+
+						<section data-lane class="lane-surface w-[320px] shrink-0 rounded-[10px] border border-[#20232a]">
+							<div class="lane-header flex items-center justify-between border-b border-[#20232a] px-4 py-3">
+								<div>
+									<p class="font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">Done</p>
+									<p class="mt-1 text-[12px] text-zinc-400">3 cards</p>
+								</div>
+								<span class="font-mono text-[10px] text-zinc-600">done</span>
+							</div>
+							<div class="px-0 py-1">
+								<button data-card class="list-row w-full px-4 py-3 text-left opacity-75">
+									<div class="mb-2 flex items-center justify-between gap-2 pl-1">
+										<span class="font-mono text-[10px] text-zinc-600">TRK-068</span>
+										<span class="rounded border border-[#2b3136] bg-[#12161b] px-1.5 py-0.5 font-mono text-[10px] text-zinc-400">shipped</span>
+									</div>
+									<div class="row-title pl-1 text-[13px] font-medium text-zinc-300">Stabilize filewatch refresh path</div>
+									<div class="mt-3 flex flex-wrap gap-3 pl-1 font-mono text-[10px] text-zinc-600">
+										<span class="soft-chip">desktop</span>
+										<span class="soft-chip">merged</span>
+									</div>
+								</button>
+							</div>
+						</section>
+					</div>
+
+					<aside class="scrollable flex w-[470px] shrink-0 flex-col overflow-auto border-l border-[#17191f] bg-[#0f1116]">
+						<div class="sticky top-0 z-10 border-b border-[#17191f] bg-[#111319]/96 px-4 py-4 backdrop-blur-md">
+							<div class="flex items-start justify-between gap-3">
+								<div class="min-w-0">
+									<p class="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">Inspector</p>
+									<h2 class="mt-1 text-[18px] font-semibold leading-6 text-zinc-100">Add persistent comments as task memory for human and agent handoff</h2>
+								</div>
+								<div class="flex items-center gap-1">
+									<button class="rounded-[7px] border border-[#262a31] bg-[#15171d] px-2 py-1 font-mono text-[10px] text-zinc-300">prev</button>
+									<button class="rounded-[7px] border border-[#262a31] bg-[#15171d] px-2 py-1 font-mono text-[10px] text-zinc-300">next</button>
+								</div>
+							</div>
+							<div class="mt-3 inline-flex rounded-[8px] border border-[#262a31] bg-[#13151a] p-0.5">
+								<button class="rounded-[6px] bg-[#262a31] px-3 py-1.5 font-mono text-[11px] text-zinc-100">content</button>
+								<button class="rounded-[6px] px-3 py-1.5 font-mono text-[11px] text-zinc-500">activity</button>
+								<button class="rounded-[6px] px-3 py-1.5 font-mono text-[11px] text-zinc-500">agent ctx</button>
+							</div>
+						</div>
+
+						<div class="px-0 py-1">
+							<section class="inspector-section px-4 py-4">
+								<div class="mb-3 flex items-center justify-between">
+									<div>
+										<p class="font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">Summary</p>
+										<p class="mt-1 text-[12px] text-zinc-500">Selected card remains editable while board stays visible.</p>
+									</div>
+									<span class="font-mono text-[10px] text-[#d09a43]">TRK-081</span>
+								</div>
+								<input value="Add persistent comments as task memory for human and agent handoff" class="w-full border-b border-[#343944] bg-transparent px-0 py-2.5 text-[14px] font-medium text-zinc-100 outline-none" />
+								<div class="field-grid mt-4 grid grid-cols-2 gap-0">
+									<div class="px-0 py-0 pr-4">
+										<div class="font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">Column</div>
+										<div class="mt-1 text-[12px] text-zinc-200">In Progress</div>
+									</div>
+									<div class="px-4 py-0">
+										<div class="font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">Scope</div>
+										<div class="mt-1 font-mono text-[12px] text-zinc-200">track · feat/inspector-comments</div>
+									</div>
+								</div>
+							</section>
+
+							<section class="inspector-section px-4 py-4">
+								<div class="mb-3">
+									<p class="font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">Notes</p>
+									<p class="mt-1 text-[12px] text-zinc-500">Comments are not chat. They are durable breadcrumbs that deepen task context over time.</p>
+								</div>
+								<textarea class="h-36 w-full border border-x-0 border-y-[#242830] bg-transparent px-0 py-3 text-[13px] leading-6 text-zinc-300 outline-none">We should treat comments as local contextual memory on a card.
+
+This helps when:
+- an agent leaves behind investigation notes
+- a human explains why a task changed direction
+- a future worker needs more context than the card title and notes provide
+
+V1 does not need realtime. It just needs good structure and durable storage.</textarea>
+							</section>
+
+							<section class="inspector-section">
+								<button data-collapsible class="flex w-full items-center justify-between px-4 py-3 text-left">
+									<span>
+										<span class="block font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">Comments</span>
+										<span class="mt-1 block text-[12px] text-zinc-500">Persistent task memory for humans and agents</span>
+									</span>
+									<span class="font-mono text-[10px] text-zinc-500">expanded</span>
+								</button>
+								<div data-collapsible-body class="space-y-0 border-t border-[#242830]">
+									<div class="border-b border-[#242830] bg-[#12151c] px-4 py-3">
+										<div class="flex items-center justify-between gap-2">
+											<span class="font-mono text-[10px] text-sky-300">codex-agent</span>
+											<span class="font-mono text-[10px] text-zinc-600">45m ago</span>
+										</div>
+										<p class="mt-2 text-[12px] leading-5 text-zinc-300">Investigated whether comments should be their own entity or embedded on cards. Embedded comments on the card look easiest for v1 and align with existing JSON storage.</p>
+									</div>
+									<div class="border-b border-[#242830] bg-[#141814] px-4 py-3">
+										<div class="flex items-center justify-between gap-2">
+											<span class="font-mono text-[10px] text-emerald-300">abdulkadir</span>
+											<span class="font-mono text-[10px] text-zinc-600">18m ago</span>
+										</div>
+										<p class="mt-2 text-[12px] leading-5 text-zinc-300">This should not be a realtime discussion feature. The value is that another agent can pick up the card later and see extra depth without needing a fresh prompt every time.</p>
+									</div>
+									<div class="px-4 py-4">
+										<label class="block font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">Add Comment</label>
+										<textarea class="mt-2 h-24 w-full border border-x-0 border-y-[#313641] bg-transparent px-0 py-2 text-[12px] leading-5 text-zinc-300 outline-none" placeholder="Leave a note for the next human or agent..."></textarea>
+										<div class="mt-3 flex items-center justify-between">
+											<span class="font-mono text-[10px] text-zinc-600">author · local user</span>
+											<button class="rounded-[8px] border border-[#2e323a] bg-[#191c23] px-3 py-1.5 font-mono text-[11px] text-zinc-200">append comment</button>
+										</div>
+									</div>
+								</div>
+							</section>
+
+							<section class="inspector-section">
+								<button data-collapsible class="flex w-full items-center justify-between px-4 py-3 text-left">
+									<span>
+										<span class="block font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">Subtasks</span>
+										<span class="mt-1 block text-[12px] text-zinc-500">2 of 4 complete</span>
+									</span>
+									<span class="font-mono text-[10px] text-zinc-500">expanded</span>
+								</button>
+								<div data-collapsible-body class="space-y-0 border-t border-[#242830]">
+									<label class="flex items-center gap-3 border-b border-[#242830] px-4 py-3">
+										<input checked type="checkbox" class="accent-[#d09a43]" />
+										<span class="text-[12px] text-zinc-400 line-through">Define comment payload shape</span>
+									</label>
+									<label class="flex items-center gap-3 border-b border-[#242830] px-4 py-3">
+										<input checked type="checkbox" class="accent-[#d09a43]" />
+										<span class="text-[12px] text-zinc-400 line-through">Decide v1 non-realtime scope</span>
+									</label>
+									<label class="flex items-center gap-3 border-b border-[#242830] px-4 py-3">
+										<input type="checkbox" class="accent-[#d09a43]" />
+										<span class="text-[12px] text-zinc-200">Render comments in card inspector</span>
+									</label>
+									<label class="flex items-center gap-3 px-4 py-3">
+										<input type="checkbox" class="accent-[#d09a43]" />
+										<span class="text-[12px] text-zinc-200">Expose comments in MCP read flow</span>
+									</label>
+								</div>
+							</section>
+
+							<section class="inspector-section px-4 py-4">
+								<div class="mb-3">
+									<p class="font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">Technical Metadata</p>
+								</div>
+								<div class="space-y-2 font-mono text-[10px] text-zinc-500">
+									<div class="flex items-center justify-between gap-3">
+										<span>card id</span>
+										<span class="text-zinc-300">card_01KPG0WB0S451VDTJFCCQX350C</span>
+									</div>
+									<div class="flex items-center justify-between gap-3">
+										<span>storage</span>
+										<span class="text-zinc-300">.trackboi/cards/card_01KPG0W....json</span>
+									</div>
+									<div class="flex items-center justify-between gap-3">
+										<span>origin</span>
+										<span class="text-zinc-300">feat/inspector-comments</span>
+									</div>
+									<div class="flex items-center justify-between gap-3">
+										<span>events</span>
+										<span class="text-zinc-300">7 activity items</span>
+									</div>
+								</div>
+							</section>
+						</div>
+
+						<div class="sticky bottom-0 border-t border-[#17191f] bg-[#111319]/96 px-4 py-3 backdrop-blur-md">
+							<div class="flex items-center gap-2">
+								<button class="rounded-[8px] border border-[#2e323a] bg-[#d09a43] px-3 py-1.5 text-[12px] font-medium text-[#141518]">Save</button>
+								<button class="rounded-[8px] border border-[#2e323a] bg-[#181b22] px-3 py-1.5 text-[12px] font-medium text-zinc-200">Move to review</button>
+								<button class="rounded-[8px] border border-[#2e323a] bg-[#181b22] px-3 py-1.5 text-[12px] font-medium text-zinc-500">Close</button>
+							</div>
+						</div>
+					</aside>
+				</div>
+			</main>
+		</div>
+	</div>
+
+	<script>
+		const cards = Array.from(document.querySelectorAll("[data-card]"));
+		const lanes = Array.from(document.querySelectorAll("[data-lane]"));
+
+		function setSelectedCard(nextCard) {
+			cards.forEach((card) => {
+				card.classList.remove("card-selected", "border-[#3b404b]", "bg-[#1b1e25]");
+				card.classList.add("border-[#242830]", "bg-[#17191f]");
+			});
+			nextCard.classList.add("card-selected", "border-[#3b404b]", "bg-[#1b1e25]");
+		}
+
+		cards.forEach((card) => {
+			card.addEventListener("click", () => setSelectedCard(card));
+		});
+
+		lanes.forEach((lane) => {
+			lane.addEventListener("mouseenter", () => {
+				if (!lane.classList.contains("lane-active")) lane.classList.add("bg-[#15181f]");
+			});
+			lane.addEventListener("mouseleave", () => {
+				if (!lane.classList.contains("lane-active")) lane.classList.remove("bg-[#15181f]");
+			});
+		});
+
+		document.querySelectorAll("[data-collapsible]").forEach((button) => {
+			button.addEventListener("click", () => {
+				const body = button.parentElement.querySelector("[data-collapsible-body]");
+				const label = button.querySelector("span:last-child");
+				const nextHidden = !body.hasAttribute("hidden");
+				if (nextHidden) body.setAttribute("hidden", "");
+				else body.removeAttribute("hidden");
+				if (label) label.textContent = nextHidden ? "collapsed" : "expanded";
+			});
+		});
+	</script>
+</body>
+</html>

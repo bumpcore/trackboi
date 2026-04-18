@@ -3,7 +3,7 @@ import path from "node:path";
 import { readGitContext } from "./git";
 import { readJson } from "./json";
 import { boardPath } from "./paths";
-import { projectName, readCards, resolveProjectStorage } from "./storage";
+import { countCards, projectName, resolveProjectStorage } from "./storage";
 import type { Project, ProjectEntry, ProjectRegistry, ProjectSource } from "./types";
 
 type CodeWorkspaceFile = {
@@ -45,7 +45,7 @@ export function projectStatus(project: Project, registry: ProjectRegistry): Proj
 function projectCardCount(project: Project, registry: ProjectRegistry): number | null {
 	const resolved = resolveProjectStorage(project, registry, false);
 	if (!resolved || !existsSync(boardPath(resolved.rootPath))) return null;
-	return readCards(resolved.rootPath).length;
+	return countCards(resolved.rootPath);
 }
 
 export function projectEntry(project: Project, registry: ProjectRegistry): ProjectEntry {

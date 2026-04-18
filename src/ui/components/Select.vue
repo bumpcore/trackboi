@@ -35,7 +35,7 @@ withDefaults(defineProps<{
 </script>
 
 <template>
-	<SelectRoot v-model="modelValue" :disabled="disabled">
+	<SelectRoot v-model="modelValue" :disabled="disabled" :modal="false">
 		<SelectTrigger
 			:class="cn(
 				'flex h-8 w-full items-center justify-between gap-2 rounded-md border border-input/70 bg-background/35 px-2.5 py-1 text-sm text-foreground outline-none transition-colors hover:bg-accent/70 focus-visible:ring-1 focus-visible:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50',

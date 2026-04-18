@@ -1,83 +1,132 @@
 import type {
 	Board,
 	CardPatch,
+	CreateTrackInput,
 	CustomField,
 	DesktopState,
 	ProjectSnapshot,
+	TrackPatch,
+	TrackFileWriteInput,
 	WorkScope,
 } from "@/core/types";
-import type { TrackboiApi } from "./preload";
+import type { TrackboiBridgeApi, WindowBridgeApi } from "./bridge";
+import { trackboi } from "./trackboi";
+import { windowShell } from "./window";
 
 type BoardChangedListener = (snapshot: ProjectSnapshot | null) => void;
 
-const listeners = new Set<BoardChangedListener>();
-let projectChangeListenerStarted = false;
-let projectChangeRefreshQueued = false;
+/**
+ * Creates the renderer-side desktop facade by composing the IPC-backed Trackboi
+ * actions transport with the dedicated shell window transport.
+ */
+export function createDesktopFacade(
+	trackboiApi: TrackboiBridgeApi = trackboi,
+	windowApi: WindowBridgeApi = windowShell,
+) {
+	const listeners = new Set<BoardChangedListener>();
+	let projectChangeListenerStarted = false;
+	let projectChangeRefreshQueued = false;
 
-async function notifyBoardChanged() {
-	const snapshot = await window.trackboi.getActiveProject();
-	for (const listener of listeners) listener(snapshot);
-	return snapshot;
-}
+	function notifyListeners(snapshot: ProjectSnapshot | null): void {
+		for (const listener of listeners) listener(snapshot);
+	}
 
-function startProjectChangeListener() {
-	if (projectChangeListenerStarted) return;
-	projectChangeListenerStarted = true;
+	async function notifyBoardChanged() {
+		const snapshot = await trackboiApi.getActiveProject();
+		notifyListeners(snapshot);
+		return snapshot;
+	}
 
-	window.trackboi.onProjectChanged(() => {
-		if (projectChangeRefreshQueued) return;
-		projectChangeRefreshQueued = true;
-		window.setTimeout(() => {
-			projectChangeRefreshQueued = false;
-			void notifyBoardChanged();
-		}, 120);
-	});
-}
+	/**
+	 * Starts the main-to-renderer project-change subscription once and coalesces
+	 * bursty filesystem events into one snapshot refresh.
+	 */
+	function startProjectChangeListener() {
+		if (projectChangeListenerStarted) return;
+		projectChangeListenerStarted = true;
 
-export const desktop = {
+		trackboiApi.onProjectChanged(() => {
+			if (projectChangeRefreshQueued) return;
+			projectChangeRefreshQueued = true;
+			globalThis.setTimeout(() => {
+				projectChangeRefreshQueued = false;
+				void notifyBoardChanged();
+			}, 120);
+		});
+	}
+
+	async function refreshAfterMutation<T>(action: () => Promise<T>): Promise<T> {
+		const result = await action();
+		await notifyBoardChanged();
+		return result;
+	}
+
+	async function refreshAfterProjectSelection<T>(action: () => Promise<T>, snapshotSelector: (result: T) => ProjectSnapshot | null): Promise<T> {
+		const result = await action();
+		notifyListeners(snapshotSelector(result));
+		return result;
+	}
+
+	return {
 	async getActiveProject() {
-		return window.trackboi.getActiveProject();
+		return trackboiApi.getActiveProject();
 	},
 	async listProjects() {
-		return window.trackboi.listProjects();
+		return trackboiApi.listProjects();
 	},
 	async listView() {
-		return window.trackboi.listView();
+		return trackboiApi.listView();
 	},
 	async readDesktopState(): Promise<DesktopState> {
-		return window.trackboi.readDesktopState();
+		return trackboiApi.readDesktopState();
 	},
 	async setSelectedWorktree(worktreeId: string | null): Promise<DesktopState> {
-		return window.trackboi.setSelectedWorktree(worktreeId);
+		return trackboiApi.setSelectedWorktree(worktreeId);
 	},
 	async setStorageSearchPaths(paths: string[]) {
-		return window.trackboi.setStorageSearchPaths(paths);
+		return trackboiApi.setStorageSearchPaths(paths);
 	},
 	async setActiveWorkspaceFile(filePath: string | null) {
-		return window.trackboi.setActiveWorkspaceFile(filePath);
+		return trackboiApi.setActiveWorkspaceFile(filePath);
+	},
+	async listTracks() {
+		return trackboiApi.listTracks();
+	},
+	async getTrack(trackId: string) {
+		return trackboiApi.getTrack(trackId);
+	},
+	async createTrack(input: CreateTrackInput) {
+		return refreshAfterMutation(() => trackboiApi.createTrack(input));
+	},
+	async updateTrack(trackId: string, patch: TrackPatch) {
+		return refreshAfterMutation(() => trackboiApi.updateTrack(trackId, patch));
+	},
+	async deleteTrack(trackId: string) {
+		return refreshAfterMutation(() => trackboiApi.deleteTrack(trackId));
+	},
+	async readTrackFile(trackId: string, fileName: string) {
+		return trackboiApi.readTrackFile(trackId, fileName);
+	},
+	async writeTrackFile(input: TrackFileWriteInput) {
+		return refreshAfterMutation(() => trackboiApi.writeTrackFile(input));
+	},
+	async deleteTrackFile(trackId: string, fileName: string) {
+		return refreshAfterMutation(() => trackboiApi.deleteTrackFile(trackId, fileName));
 	},
 	async openWorkspaceFile() {
-		return window.trackboi.openWorkspaceFile();
+		return trackboiApi.openWorkspaceFile();
 	},
 	async chooseProject() {
-		const snapshot = await window.trackboi.chooseProject();
-		for (const listener of listeners) listener(snapshot);
-		return snapshot;
+		return refreshAfterProjectSelection(() => trackboiApi.chooseProject(), (snapshot) => snapshot);
 	},
 	async locateProject(projectId: string) {
-		const snapshot = await window.trackboi.locateProject(projectId);
-		for (const listener of listeners) listener(snapshot);
-		return snapshot;
+		return refreshAfterProjectSelection(() => trackboiApi.locateProject(projectId), (snapshot) => snapshot);
 	},
 	async removeProject(projectId: string) {
-		const snapshot = await window.trackboi.removeProject(projectId);
-		for (const listener of listeners) listener(snapshot);
-		return snapshot;
+		return refreshAfterProjectSelection(() => trackboiApi.removeProject(projectId), (snapshot) => snapshot);
 	},
 	async switchProject(projectId: string) {
-		const nextState = await window.trackboi.switchProject(projectId);
-		for (const listener of listeners) listener(nextState.snapshot);
-		return nextState;
+		return refreshAfterProjectSelection(() => trackboiApi.switchProject(projectId), (nextState) => nextState.snapshot);
 	},
 	async createCard(input: {
 		title: string;
@@ -85,63 +134,56 @@ export const desktop = {
 		parentId?: string | null;
 		column: string;
 		scope?: WorkScope;
+		trackId?: string | null;
 		targetWorktreeId?: string | null;
 	}) {
-		const card = await window.trackboi.createCard(input);
-		await notifyBoardChanged();
-		return card;
+		return refreshAfterMutation(() => trackboiApi.createCard(input));
 	},
 	async updateCard(cardId: string, patch: CardPatch) {
-		const card = await window.trackboi.updateCard(cardId, patch);
-		await notifyBoardChanged();
-		return card;
+		return refreshAfterMutation(() => trackboiApi.updateCard(cardId, patch));
 	},
 	async updateBoard(board: Board) {
-		const nextBoard = await window.trackboi.updateBoard(board);
-		await notifyBoardChanged();
-		return nextBoard;
+		return refreshAfterMutation(() => trackboiApi.updateBoard(board));
 	},
 	async updateCustomFields(customFields: CustomField[]) {
-		const metadata = await window.trackboi.updateCustomFields(customFields);
-		await notifyBoardChanged();
-		return metadata;
+		return refreshAfterMutation(() => trackboiApi.updateCustomFields(customFields));
 	},
 	async moveCard(cardId: string, toColumn: string, beforeCardId: string | null) {
-		const card = await window.trackboi.moveCard(cardId, toColumn, beforeCardId);
-		await notifyBoardChanged();
-		return card;
+		return refreshAfterMutation(() => trackboiApi.moveCard(cardId, toColumn, beforeCardId));
 	},
 	async deleteCard(cardId: string) {
-		const result = await window.trackboi.deleteCard(cardId);
-		await notifyBoardChanged();
-		return result;
+		return refreshAfterMutation(() => trackboiApi.deleteCard(cardId));
 	},
 	async minimizeWindow() {
-		await window.trackboi.window.minimize();
+		await windowApi.minimize();
 		return { ok: true as const };
 	},
 	async toggleMaximizeWindow() {
-		await window.trackboi.window.toggleMaximize();
+		await windowApi.toggleMaximize();
 		return { ok: true as const };
 	},
 	async closeWindow() {
-		await window.trackboi.window.close();
+		await windowApi.close();
 		return { ok: true as const };
 	},
 	async startWindowDrag() {
-		await window.trackboi.window.startDrag();
+		await windowApi.startDrag();
 	},
 	async startResize(edge: string) {
-		await window.trackboi.window.startResize(edge);
+		await windowApi.startResize(edge);
 	},
 	addBoardChangedListener(listener: BoardChangedListener) {
 		startProjectChangeListener();
 		listeners.add(listener);
 	},
-};
+	};
+}
+
+export const desktop = createDesktopFacade();
 
 declare global {
 	interface Window {
-		trackboi: TrackboiApi;
+		trackboi: TrackboiBridgeApi;
+		trackboiWindow: WindowBridgeApi;
 	}
 }

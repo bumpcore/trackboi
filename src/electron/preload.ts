@@ -1,50 +1,10 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
-	Board,
-	Card,
-	CardPatch,
-	CreateCardInput,
-	CustomField,
-	DesktopState,
 	MoveCardInput,
-	ProjectMetadata,
-	ProjectRegistry,
-	ProjectSnapshot,
-	ProjectView,
 } from "../core";
-
-export type ProjectChangedPayload = {
-	rootPath: string;
-};
-
-export type TrackboiApi = {
-	getActiveProject(): Promise<ProjectSnapshot | null>;
-	listProjects(): Promise<ProjectRegistry>;
-	listView(): Promise<ProjectView>;
-	readDesktopState(): Promise<DesktopState>;
-	setSelectedWorktree(worktreeId: string | null): Promise<DesktopState>;
-	setStorageSearchPaths(paths: string[]): Promise<ProjectView>;
-	setActiveWorkspaceFile(filePath: string | null): Promise<ProjectView>;
-	openWorkspaceFile(): Promise<ProjectView | null>;
-	chooseProject(): Promise<ProjectSnapshot | null>;
-	locateProject(projectId: string): Promise<ProjectSnapshot | null>;
-	removeProject(projectId: string): Promise<ProjectSnapshot | null>;
-	switchProject(projectId: string): Promise<DesktopState>;
-	createCard(input: CreateCardInput): Promise<Card>;
-	updateCard(cardId: string, patch: CardPatch): Promise<Card>;
-	updateBoard(board: Board): Promise<Board>;
-	updateCustomFields(customFields: CustomField[]): Promise<ProjectMetadata>;
-	moveCard(cardId: string, toColumn: string, beforeCardId: string | null): Promise<Card>;
-	deleteCard(cardId: string): Promise<{ ok: true }>;
-	onProjectChanged(listener: (payload: ProjectChangedPayload) => void): () => void;
-	window: {
-		minimize(): Promise<void>;
-		toggleMaximize(): Promise<void>;
-		close(): Promise<void>;
-		startDrag(): Promise<void>;
-		startResize(edge: string): Promise<void>;
-	};
-};
+import type { TrackboiBridgeApi, WindowBridgeApi } from "./bridge";
+import { ipcChannels } from "./ipc";
+import type { ProjectChangedPayload } from "./bridge";
 
 /**
  * The only API exposed from Electron preload into the renderer.
@@ -52,53 +12,72 @@ export type TrackboiApi = {
  * Keeping this object typed and narrow prevents UI code from reaching Node or
  * Electron directly.
  */
-const api: TrackboiApi = {
-	getActiveProject: () => ipcRenderer.invoke("trackboi:get-active-project") as Promise<ProjectSnapshot | null>,
-	listProjects: () => ipcRenderer.invoke("trackboi:list-projects") as Promise<ProjectRegistry>,
-	listView: () => ipcRenderer.invoke("trackboi:list-view") as Promise<ProjectView>,
-	readDesktopState: () => ipcRenderer.invoke("trackboi:read-desktop-state") as Promise<DesktopState>,
+const trackboiApi: TrackboiBridgeApi = {
+	getActiveProject: () => ipcRenderer.invoke(ipcChannels.trackboi.getActiveProject),
+	listProjects: () => ipcRenderer.invoke(ipcChannels.trackboi.listProjects),
+	listView: () => ipcRenderer.invoke(ipcChannels.trackboi.listView),
+	readDesktopState: () => ipcRenderer.invoke(ipcChannels.trackboi.readDesktopState),
 	setSelectedWorktree: (worktreeId) => (
-		ipcRenderer.invoke("trackboi:set-selected-worktree", worktreeId) as Promise<DesktopState>
+		ipcRenderer.invoke(ipcChannels.trackboi.setSelectedWorktree, worktreeId)
 	),
 	setStorageSearchPaths: (paths) => (
-		ipcRenderer.invoke("trackboi:set-storage-search-paths", paths) as Promise<ProjectView>
+		ipcRenderer.invoke(ipcChannels.trackboi.setStorageSearchPaths, paths)
 	),
 	setActiveWorkspaceFile: (filePath) => (
-		ipcRenderer.invoke("trackboi:set-active-workspace-file", filePath) as Promise<ProjectView>
+		ipcRenderer.invoke(ipcChannels.trackboi.setActiveWorkspaceFile, filePath)
 	),
-	openWorkspaceFile: () => ipcRenderer.invoke("trackboi:open-workspace-file") as Promise<ProjectView | null>,
-	chooseProject: () => ipcRenderer.invoke("trackboi:choose-project") as Promise<ProjectSnapshot | null>,
+	listTracks: () => ipcRenderer.invoke(ipcChannels.trackboi.listTracks),
+	getTrack: (trackId) => ipcRenderer.invoke(ipcChannels.trackboi.getTrack, trackId),
+	createTrack: (input) => ipcRenderer.invoke(ipcChannels.trackboi.createTrack, input),
+	updateTrack: (trackId, patch) => (
+		ipcRenderer.invoke(ipcChannels.trackboi.updateTrack, trackId, patch)
+	),
+	deleteTrack: (trackId) => ipcRenderer.invoke(ipcChannels.trackboi.deleteTrack, trackId),
+	readTrackFile: (trackId, fileName) => (
+		ipcRenderer.invoke(ipcChannels.trackboi.readTrackFile, trackId, fileName)
+	),
+	writeTrackFile: (input) => ipcRenderer.invoke(ipcChannels.trackboi.writeTrackFile, input),
+	deleteTrackFile: (trackId, fileName) => (
+		ipcRenderer.invoke(ipcChannels.trackboi.deleteTrackFile, trackId, fileName)
+	),
+	openWorkspaceFile: () => ipcRenderer.invoke(ipcChannels.trackboi.openWorkspaceFile),
+	chooseProject: () => ipcRenderer.invoke(ipcChannels.trackboi.chooseProject),
 	locateProject: (projectId) => (
-		ipcRenderer.invoke("trackboi:locate-project", projectId) as Promise<ProjectSnapshot | null>
+		ipcRenderer.invoke(ipcChannels.trackboi.locateProject, projectId)
 	),
 	removeProject: (projectId) => (
-		ipcRenderer.invoke("trackboi:remove-project", projectId) as Promise<ProjectSnapshot | null>
+		ipcRenderer.invoke(ipcChannels.trackboi.removeProject, projectId)
 	),
-	switchProject: (projectId) => ipcRenderer.invoke("trackboi:switch-project", projectId) as Promise<DesktopState>,
-	createCard: (input) => ipcRenderer.invoke("trackboi:create-card", input) as Promise<Card>,
+	switchProject: (projectId) => ipcRenderer.invoke(ipcChannels.trackboi.switchProject, projectId),
+	createCard: (input) => ipcRenderer.invoke(ipcChannels.trackboi.createCard, input),
 	updateCard: (cardId, patch) => (
-		ipcRenderer.invoke("trackboi:update-card", cardId, patch) as Promise<Card>
+		ipcRenderer.invoke(ipcChannels.trackboi.updateCard, cardId, patch)
 	),
-	updateBoard: (board) => ipcRenderer.invoke("trackboi:update-board", board) as Promise<Board>,
+	updateBoard: (board) => ipcRenderer.invoke(ipcChannels.trackboi.updateBoard, board),
 	updateCustomFields: (customFields) => (
-		ipcRenderer.invoke("trackboi:update-custom-fields", customFields) as Promise<ProjectMetadata>
+		ipcRenderer.invoke(ipcChannels.trackboi.updateCustomFields, customFields)
 	),
 	moveCard: (cardId, toColumn, beforeCardId) => (
-		ipcRenderer.invoke("trackboi:move-card", { cardId, toColumn, beforeCardId } satisfies MoveCardInput) as Promise<Card>
+		ipcRenderer.invoke(
+			ipcChannels.trackboi.moveCard,
+			{ cardId, toColumn, beforeCardId } satisfies MoveCardInput,
+		)
 	),
-	deleteCard: (cardId) => ipcRenderer.invoke("trackboi:delete-card", cardId) as Promise<{ ok: true }>,
+	deleteCard: (cardId) => ipcRenderer.invoke(ipcChannels.trackboi.deleteCard, cardId),
 	onProjectChanged: (listener) => {
 		const wrapped = (_event: Electron.IpcRendererEvent, payload: ProjectChangedPayload) => listener(payload);
-		ipcRenderer.on("trackboi://project-changed", wrapped);
-		return () => ipcRenderer.off("trackboi://project-changed", wrapped);
-	},
-	window: {
-		minimize: () => ipcRenderer.invoke("trackboi:window-minimize") as Promise<void>,
-		toggleMaximize: () => ipcRenderer.invoke("trackboi:window-toggle-maximize") as Promise<void>,
-		close: () => ipcRenderer.invoke("trackboi:window-close") as Promise<void>,
-		startDrag: () => ipcRenderer.invoke("trackboi:window-start-drag") as Promise<void>,
-		startResize: (edge) => ipcRenderer.invoke("trackboi:window-start-resize", edge) as Promise<void>,
+		ipcRenderer.on(ipcChannels.events.projectChanged, wrapped);
+		return () => ipcRenderer.off(ipcChannels.events.projectChanged, wrapped);
 	},
 };
 
-contextBridge.exposeInMainWorld("trackboi", api);
+const windowApi: WindowBridgeApi = {
+	minimize: () => ipcRenderer.invoke(ipcChannels.window.minimize) as Promise<void>,
+	toggleMaximize: () => ipcRenderer.invoke(ipcChannels.window.toggleMaximize) as Promise<void>,
+	close: () => ipcRenderer.invoke(ipcChannels.window.close) as Promise<void>,
+	startDrag: () => ipcRenderer.invoke(ipcChannels.window.startDrag) as Promise<void>,
+	startResize: (edge) => ipcRenderer.invoke(ipcChannels.window.startResize, edge) as Promise<void>,
+};
+
+contextBridge.exposeInMainWorld("trackboi", trackboiApi);
+contextBridge.exposeInMainWorld("trackboiWindow", windowApi);

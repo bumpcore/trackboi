@@ -23,3 +23,7 @@ export function writeJsonAtomic<T>(filePath: string, value: T): void {
 	writeFileSync(tempPath, `${JSON.stringify(value, null, "\t")}\n`);
 	renameSync(tempPath, filePath);
 }
+
+export function jsonEquals(left: unknown, right: unknown): boolean {
+	return JSON.stringify(left) === JSON.stringify(right);
+}

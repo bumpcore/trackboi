@@ -51,14 +51,54 @@ const blockMarkdown = new MarkdownIt("commonmark", {
 	},
 }).disable(["hr", "image", "html_block", "html_inline"]);
 
+const cacheLimit = 500;
+const inlineCache = new Map<string, string>();
+const blockCache = new Map<string, string>();
+const previewCache = new Map<string, string>();
+
 export function renderInlineMarkdown(source: string): string {
 	const normalized = source.replace(/\r?\n+/g, " ").trim();
 	if (!normalized) return "";
-	return inlineMarkdown.renderInline(normalized);
+	return renderWithCache(inlineCache, normalized, () => inlineMarkdown.renderInline(normalized));
+}
+
+export function renderMarkdownPreview(source: string): string {
+	const normalized = normalizePreviewSource(source);
+	if (!normalized) return "";
+	return renderWithCache(previewCache, normalized, () => inlineMarkdown.renderInline(normalized));
 }
 
 export function renderMarkdown(source: string): string {
 	const normalized = source.trim();
 	if (!normalized) return "";
-	return blockMarkdown.render(normalized);
+	return renderWithCache(blockCache, normalized, () => blockMarkdown.render(normalized));
+}
+
+function normalizePreviewSource(source: string): string {
+	return source
+		.trim()
+		.replace(/```[\s\S]*?```/g, " [code] ")
+		.replace(/`([^`]+)`/g, "$1")
+		.replace(/^\s{0,3}(#{1,6}|\>|\-|\*|\+|\d+\.)\s+/gm, "")
+		.replace(/\r?\n+/g, " ")
+		.replace(/\s+/g, " ")
+		.trim()
+		.slice(0, 320);
+}
+
+function renderWithCache(cache: Map<string, string>, key: string, render: () => string): string {
+	const cached = cache.get(key);
+	if (cached != null) {
+		cache.delete(key);
+		cache.set(key, cached);
+		return cached;
+	}
+
+	const html = render();
+	cache.set(key, html);
+	if (cache.size > cacheLimit) {
+		const oldestKey = cache.keys().next().value;
+		if (typeof oldestKey === "string") cache.delete(oldestKey);
+	}
+	return html;
 }

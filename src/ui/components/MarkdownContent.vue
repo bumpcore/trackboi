@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { renderMarkdown } from "@/ui/lib/markdown";
+import { renderMarkdown, renderMarkdownPreview } from "@/ui/lib/markdown";
 
 const props = defineProps<{
 	value: string;
@@ -8,7 +8,9 @@ const props = defineProps<{
 	class?: string;
 }>();
 
-const html = computed(() => renderMarkdown(props.value));
+const html = computed(() => (
+	props.preview ? renderMarkdownPreview(props.value) : renderMarkdown(props.value)
+));
 </script>
 
 <template>

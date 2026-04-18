@@ -1,6 +1,5 @@
 import { existsSync } from "node:fs";
 import { createCardInStore, deleteCardInStore, moveCardInStore, updateCardInStore } from "./cards";
-import { findGitRoot, listGitWorktrees, readGitContext } from "./git";
 import { newId } from "./id";
 import { readJson, writeJsonAtomic } from "./json";
 import { boardPath, projectMetadataPath, runtimePaths } from "./paths";
@@ -10,30 +9,41 @@ import {
 	canonicalStorageKey,
 	listWorkspaceSource,
 	projectEntry,
-	projectStatus,
 } from "./sources";
 import {
 	canonicalProjectPath,
-	ensureProjectFiles,
 	openStore,
-	normalizeBoard,
-	normalizeProjectMetadata,
-	projectFromMetadata,
 	projectName,
-	readCards,
 	resolveProjectStorage,
 	storageCandidates,
 	type ProjectStore,
 } from "./storage";
+import {
+	createTrackInStore,
+	deleteTrackFileInStore,
+	deleteTrackInStore,
+	readTrackFileInStore,
+	updateTrackInStore,
+	writeTrackFileInStore,
+} from "./tracks";
+import { aggregateSnapshot as aggregateRuntimeSnapshot, stripInternalSnapshotFields, withSelectedWorktree } from "./services/runtimeAggregation";
+import { readSnapshotForProjectPath } from "./services/runtimeSnapshots";
+import type { CachedDesktopState, WorktreeStore } from "./services/runtimeTypes";
+import {
+	createSelectedWorktreeStore as promoteWorktreeStore,
+	discoverWorktrees as discoverProjectWorktrees,
+	pickSelectedWorktree,
+	projectCacheKey,
+	stripProjectFromWorktree,
+} from "./services/runtimeWorktrees";
 import type {
 	Board,
 	Card,
 	CardPatch,
-	CardVariant,
+	CreateTrackInput,
 	CreateCardInput,
 	CustomField,
 	DesktopState,
-	GitContext,
 	MoveCardInput,
 	Project,
 	ProjectMetadata,
@@ -41,29 +51,16 @@ import type {
 	ProjectSnapshotWithInternals,
 	ProjectSource,
 	ProjectView,
+	Track,
+	TrackFile,
+	TrackFileReadResult,
+	TrackFileWriteInput,
+	TrackPatch,
 	TrackboiRuntime,
-	WorktreeContext,
 } from "./types";
+import { normalizeProjectMetadata } from "./storage";
 
 export type RuntimeOptions = RegistryOptions;
-
-type WorktreeStore = WorktreeContext & {
-	project: Project;
-	git: GitContext;
-};
-
-type CachedDesktopState = {
-	projectKey: string;
-	snapshotBase: ProjectSnapshotWithInternals | null;
-	view: ProjectView;
-	worktrees: WorktreeStore[];
-};
-
-type CardOrigin = {
-	card: Card;
-	worktree: WorktreeStore;
-	storagePath: string;
-};
 
 /**
  * Creates the public Trackboi core API.
@@ -74,62 +71,28 @@ type CardOrigin = {
 export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 	const registry = createRegistryStore(options);
 	let desktopCache: CachedDesktopState | null = null;
+	const snapshotCache = new Map<string, ProjectSnapshotWithInternals>();
+	const worktreeCache = new Map<string, WorktreeStore[]>();
 
 	function invalidateCache(): void {
 		desktopCache = null;
-	}
-
-	function projectCacheKey(project: Project): string {
-		return `${project.id}:${project.path}`;
-	}
-
-	function rememberProjectStorage(projectId: string, storagePath: string): void {
-		const current = registry.readRegistry();
-		const project = current.projects.find((entry) => entry.id === projectId);
-		if (project && project.storagePath !== storagePath) {
-			project.storagePath = storagePath;
-			registry.writeRegistry(current);
-		}
+		snapshotCache.clear();
+		worktreeCache.clear();
 	}
 
 	function readSnapshotForPath(project: Project, projectPath: string, create: boolean): ProjectSnapshotWithInternals | null {
-		if (!existsSync(projectPath)) return null;
-
-		const projectForPath: Project = {
-			...project,
-			path: canonicalProjectPath(projectPath),
-			storagePath: undefined,
-		};
-		const current = registry.readRegistry();
-		const store = openStore(projectForPath, current, create);
-		ensureProjectFiles(store.project, store.rootPath, store.storagePath);
-		rememberProjectStorage(project.id, store.storagePath);
-
-		let metadata = normalizeProjectMetadata(
-			readJson<ProjectMetadata>(projectMetadataPath(store.rootPath)),
-			project,
-			store.storagePath,
-		);
-		const board = normalizeBoard(readJson<Board>(boardPath(store.rootPath)), {
-			...project,
-			path: projectForPath.path,
+		return readSnapshotForProjectPath({
+			project: {
+				...project,
+				path: projectPath,
+				storagePath: undefined,
+			},
+			projectPath,
+			create,
+			readRegistry: registry.readRegistry,
+			writeRegistry: registry.writeRegistry,
+			snapshotCache,
 		});
-		writeJsonAtomic(projectMetadataPath(store.rootPath), metadata);
-		writeJsonAtomic(boardPath(store.rootPath), board);
-		if (metadata.customFields.length === 0 && board.customFields.length > 0) {
-			metadata = { ...metadata, customFields: board.customFields };
-			writeJsonAtomic(projectMetadataPath(store.rootPath), metadata);
-		}
-
-		const nextProject = projectFromMetadata(store);
-		return {
-			project: nextProject,
-			metadata,
-			git: readGitContext(projectForPath.path),
-			board,
-			cards: readCards(store.rootPath),
-			storageRoot: store.rootPath,
-		};
 	}
 
 	function listView(): ProjectView {
@@ -165,168 +128,40 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 	}
 
 	function discoverWorktrees(project: Project): WorktreeStore[] {
-		if (!existsSync(project.path)) return [];
-		const repoRoot = findGitRoot(project.path);
-		const discovered = repoRoot
-			? listGitWorktrees(repoRoot)
-			: [{ path: project.path, branch: null, isPrimary: true }];
-		const worktrees = discovered.length > 0 ? discovered : [{ path: project.path, branch: null, isPrimary: true }];
-
-		return worktrees.map((entry) => {
-			const worktreePath = canonicalProjectPath(entry.path);
-			const worktreeProject: Project = {
-				id: project.id,
-				name: project.name,
-				path: worktreePath,
-				storagePath: undefined,
-			};
-			const resolved = resolveProjectStorage(worktreeProject, registry.readRegistry(), false);
-			const status = projectStatus(worktreeProject, registry.readRegistry());
-			const cardCount = resolved && existsSync(boardPath(resolved.rootPath))
-				? readCards(resolved.rootPath).length
-				: 0;
-			const git = readGitContext(worktreePath);
-			return {
-				id: worktreePath,
-				name: projectName(worktreePath),
-				path: worktreePath,
-				branch: entry.branch,
-				isPrimary: entry.isPrimary,
-				storagePath: resolved?.storagePath ?? null,
-				storageRoot: resolved?.rootPath ?? null,
-				status,
-				cardCount,
-				colorKey: worktreePath,
-				project: worktreeProject,
-				git,
-			};
+		return discoverProjectWorktrees({
+			project,
+			readRegistry: registry.readRegistry,
+			worktreeCache,
 		});
 	}
 
-	function pickSelectedWorktree(worktrees: WorktreeStore[]): WorktreeStore | null {
-		if (worktrees.length === 0) return null;
-		const current = registry.readRegistry();
-		const selected = current.selectedWorktreeId
-			? worktrees.find((worktree) => worktree.id === current.selectedWorktreeId) ?? null
-			: null;
-		return selected ?? worktrees.find((worktree) => worktree.isPrimary) ?? worktrees[0] ?? null;
+	function pickCurrentWorktree(worktrees: WorktreeStore[]): WorktreeStore | null {
+		return pickSelectedWorktree(worktrees, registry.readRegistry().selectedWorktreeId);
 	}
 
-	function createSelectedWorktreeStore(project: Project, worktree: WorktreeStore): WorktreeStore {
-		const snapshot = readSnapshotForPath(project, worktree.path, true);
-		if (!snapshot) return worktree;
-		return {
-			...worktree,
-			storagePath: snapshot.project.storagePath ?? null,
-			storageRoot: snapshot.storageRoot,
-			status: "ready",
-			cardCount: snapshot.cards.length,
-		};
-	}
-
-	function mergeCardVariants(origins: CardOrigin[]): Card {
-		const sortedOrigins = [...origins].sort((left, right) => {
-			const updated = right.card.updatedAt.localeCompare(left.card.updatedAt);
-			if (updated !== 0) return updated;
-			return left.worktree.name.localeCompare(right.worktree.name);
-		});
-		const winner = sortedOrigins[0]!;
-		const variants: CardVariant[] = sortedOrigins.map(({ card, worktree, storagePath }) => ({
-			worktreeId: worktree.id,
-			worktreeName: worktree.name,
-			storagePath,
-			updatedAt: card.updatedAt,
-			title: card.title,
-			description: card.description,
-			column: card.column,
-			scope: card.scope,
-		}));
-		const signatures = new Set(sortedOrigins.map(({ card }) => JSON.stringify({
-			title: card.title,
-			description: card.description,
-			parentId: card.parentId,
-			scope: card.scope,
-			column: card.column,
-			rank: card.rank,
-			labels: card.labels,
-			assignee: card.assignee,
-			fieldValues: card.fieldValues,
-		})));
-
-		return {
-			...winner.card,
-			originWorktreeId: winner.worktree.id,
-			originStoragePath: winner.storagePath,
-			worktreeIds: sortedOrigins.map(({ worktree }) => worktree.id),
-			conflicted: signatures.size > 1,
-			variants,
-		};
+	function toStoredCardPatch(
+		patch: CardPatch,
+		trackId: string | null,
+	): CardPatch {
+		const nextPatch: CardPatch = { ...patch, trackId, scope: { kind: "project", ref: "global" } };
+		return nextPatch;
 	}
 
 	function aggregateSnapshot(project: Project, create: boolean): { snapshotBase: ProjectSnapshotWithInternals | null; worktrees: WorktreeStore[] } {
-		if (!existsSync(project.path)) return { snapshotBase: null, worktrees: [] };
-
-		let worktrees = discoverWorktrees(project);
-		let selected = pickSelectedWorktree(worktrees);
-		if (!selected) return { snapshotBase: null, worktrees: [] };
-
-		if (create && selected.status !== "ready") {
-			selected = createSelectedWorktreeStore(project, selected);
-			worktrees = worktrees.map((candidate) => candidate.id === selected?.id ? selected : candidate);
-		}
-
-		const primary = worktrees.find((worktree) => worktree.isPrimary) ?? selected;
-		const storeSnapshots = worktrees
-			.filter((worktree) => worktree.storageRoot && existsSync(boardPath(worktree.storageRoot)))
-			.map((worktree) => {
-				const storeSnapshot = readSnapshotForPath(project, worktree.path, false);
-				return storeSnapshot ? { worktree, snapshot: storeSnapshot } : null;
-			})
-			.filter((entry): entry is { worktree: WorktreeStore; snapshot: ProjectSnapshotWithInternals } => entry != null);
-		const primarySnapshot = storeSnapshots.find((entry) => entry.worktree.id === primary?.id)?.snapshot
-			?? storeSnapshots[0]?.snapshot
-			?? readSnapshotForPath(project, selected.path, create);
-		if (!primarySnapshot) return { snapshotBase: null, worktrees };
-
-		const columns = [...primarySnapshot.board.columns];
-		const seenColumnIds = new Set(columns.map((column) => column.id));
-		for (const entry of storeSnapshots) {
-			for (const column of entry.snapshot.board.columns) {
-				if (seenColumnIds.has(column.id)) continue;
-				seenColumnIds.add(column.id);
-				columns.push(column);
-			}
-		}
-
-		const cardsById = new Map<string, CardOrigin[]>();
-		for (const entry of storeSnapshots) {
-			for (const card of entry.snapshot.cards) {
-				const storagePath = entry.worktree.storagePath ?? ".trackboi";
-				const origins = cardsById.get(card.id) ?? [];
-				origins.push({ card, worktree: entry.worktree, storagePath });
-				cardsById.set(card.id, origins);
-			}
-		}
-
-		const aggregatedCards = [...cardsById.values()]
-			.map((origins) => mergeCardVariants(origins))
-			.sort((left, right) => left.column.localeCompare(right.column) || left.rank.localeCompare(right.rank));
-
-		return {
-			snapshotBase: {
-			project: primarySnapshot.project,
-			metadata: primarySnapshot.metadata,
-			git: primary.git,
-			board: {
-				...primarySnapshot.board,
-				name: primarySnapshot.board.name,
-				columns,
-			},
-			cards: aggregatedCards,
-			storageRoot: primary.storageRoot ?? primarySnapshot.storageRoot,
-			},
-			worktrees,
-		};
+		return aggregateRuntimeSnapshot({
+			project,
+			create,
+			discoverWorktrees,
+			pickSelectedWorktree: pickCurrentWorktree,
+			createSelectedWorktreeStore: (activeProject, worktree) => (
+				promoteWorktreeStore({
+					project: activeProject,
+					worktree,
+					readSnapshotForPath,
+				})
+			),
+			readSnapshotForPath,
+		});
 	}
 
 	function getCachedDesktopState(create: boolean): CachedDesktopState {
@@ -381,7 +216,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 
 	function activeSnapshotWithInternals(): ProjectSnapshotWithInternals | null {
 		const cached = getCachedDesktopState(true);
-		return withSelectedWorktree(cached.snapshotBase, pickSelectedWorktree(cached.worktrees));
+		return withSelectedWorktree(cached.snapshotBase, pickCurrentWorktree(cached.worktrees));
 	}
 
 	function activeSnapshot(): ProjectSnapshot | null {
@@ -411,10 +246,14 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		const explicit = targetWorktreeId
 			? worktrees.find((worktree) => worktree.id === targetWorktreeId) ?? null
 			: null;
-		let selected = explicit ?? pickSelectedWorktree(worktrees);
+		let selected = explicit ?? pickCurrentWorktree(worktrees);
 		if (!selected) throw new Error("No worktree available for this project");
 		if (selected.status !== "ready") {
-			selected = createSelectedWorktreeStore(project, selected);
+			selected = promoteWorktreeStore({
+				project,
+				worktree: selected,
+				readSnapshotForPath,
+			});
 			worktrees = worktrees.map((candidate) => candidate.id === selected?.id ? selected : candidate);
 		}
 		const current = registry.readRegistry();
@@ -448,6 +287,184 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		return { worktreeId: worktree.id, worktreePath: worktree.path };
 	}
 
+	function listTracks(): Track[] {
+		return activeSnapshot()?.tracks ?? [];
+	}
+
+	function getTrack(trackId: string): Track {
+		const track = listTracks().find((candidate) => candidate.id === trackId);
+		if (!track) throw new Error(`Unknown track: ${trackId}`);
+		return track;
+	}
+
+	function findTrackOrigin(trackId: string): { worktreeId: string; worktreePath: string } {
+		const project = requireActiveProject();
+		const track = getTrack(trackId);
+		if (!track.originWorktreeId) throw new Error(`Unknown track origin for ${trackId}`);
+		const worktree = discoverWorktrees(project).find((candidate) => candidate.id === track.originWorktreeId);
+		if (!worktree) throw new Error(`Unknown track origin for ${trackId}`);
+		return { worktreeId: worktree.id, worktreePath: worktree.path };
+	}
+
+	function findExistingBranchTrack(ref: string): Track | null {
+		return listTracks().find((track) => track.source.kind === "branch" && track.source.ref === ref && !track.synthetic) ?? null;
+	}
+
+	function materializeBranchTrack(ref: string, title = ref): Track {
+		const existing = findExistingBranchTrack(ref);
+		if (existing) return existing;
+
+			const created = createTrackInStore(openTargetStore(null, true), {
+				title,
+				source: { kind: "branch", ref },
+			});
+		invalidateCache();
+		return created;
+	}
+
+	function ensureTrackIdForCardInput(input: { trackId?: string | null; scope?: CardPatch["scope"] }, fallbackTitle?: string): string | null {
+		if (input.trackId) {
+			if (input.trackId.startsWith("synthetic-track:")) {
+				const synthetic = getTrack(input.trackId);
+				if (synthetic.source.kind === "branch") {
+					return materializeBranchTrack(synthetic.source.ref, synthetic.title).id;
+				}
+			}
+			return input.trackId;
+		}
+		if (input.scope?.kind === "track") {
+			return materializeBranchTrack(input.scope.ref, fallbackTitle ?? input.scope.ref).id;
+		}
+		return null;
+	}
+
+	function createTrack(input: CreateTrackInput): Track {
+		if (input.source?.kind === "branch") {
+			return materializeBranchTrack(input.source.ref, input.title);
+		}
+		const track = createTrackInStore(openTargetStore(null, true), input);
+		invalidateCache();
+		return track;
+	}
+
+	function updateTrack(trackId: string, patch: TrackPatch): Track {
+		const track = getTrack(trackId);
+		if (track.synthetic && track.source.kind === "branch") {
+			const realTrack = materializeBranchTrack(track.source.ref, patch.title ?? track.title);
+			return patch.title === undefined &&
+				patch.summary === undefined &&
+				patch.plan === undefined &&
+				patch.decisions === undefined &&
+				patch.references === undefined &&
+				patch.activity === undefined &&
+				patch.source === undefined
+				? realTrack
+				: updateTrack(realTrack.id, patch);
+		}
+
+		const project = requireActiveProject();
+		const origin = findTrackOrigin(trackId);
+		const store = openStore({
+			...project,
+			path: origin.worktreePath,
+			storagePath: undefined,
+		}, registry.readRegistry(), false);
+		const next = updateTrackInStore(store, trackId, patch);
+		invalidateCache();
+		return next;
+	}
+
+	function deleteTrack(trackId: string): { ok: true } {
+		const project = requireActiveProject();
+		const track = getTrack(trackId);
+		const worktrees = discoverWorktrees(project);
+
+		for (const worktree of worktrees) {
+			if (!worktree.storageRoot) continue;
+			const snapshot = readSnapshotForPath(project, worktree.path, false);
+			if (!snapshot) continue;
+			const store = openStore({
+				...project,
+				path: worktree.path,
+				storagePath: undefined,
+			}, registry.readRegistry(), false);
+			for (const card of snapshot.cards) {
+				const matchesRealTrack = card.trackId === trackId;
+				const matchesLegacyBranch = !card.trackId &&
+					track.source.kind === "branch" &&
+					card.scope.kind === "track" &&
+					card.scope.ref === track.source.ref;
+				if (!matchesRealTrack && !matchesLegacyBranch) continue;
+				updateCardInStore(store, card.id, {
+					trackId: null,
+					scope: { kind: "project", ref: "global" },
+				});
+			}
+		}
+
+		if (!track.synthetic) {
+			const origin = findTrackOrigin(trackId);
+			const store = openStore({
+				...project,
+				path: origin.worktreePath,
+				storagePath: undefined,
+			}, registry.readRegistry(), false);
+			deleteTrackInStore(store, trackId);
+		}
+
+		invalidateCache();
+		return { ok: true };
+	}
+
+	function readTrackFile(trackId: string, fileName: string): TrackFileReadResult {
+		const project = requireActiveProject();
+		const track = getTrack(trackId);
+		const realTrack = track.synthetic && track.source.kind === "branch"
+			? materializeBranchTrack(track.source.ref, track.title)
+			: track;
+		const origin = findTrackOrigin(realTrack.id);
+		const store = openStore({
+			...project,
+			path: origin.worktreePath,
+			storagePath: undefined,
+		}, registry.readRegistry(), false);
+		return readTrackFileInStore(store, realTrack.id, fileName);
+	}
+
+	function writeTrackFile(input: TrackFileWriteInput): TrackFile {
+		const project = requireActiveProject();
+		const track = getTrack(input.trackId);
+		const realTrackId = track.synthetic && track.source.kind === "branch"
+			? materializeBranchTrack(track.source.ref, track.title).id
+			: track.id;
+		const origin = findTrackOrigin(realTrackId);
+		const store = openStore({
+			...project,
+			path: origin.worktreePath,
+			storagePath: undefined,
+		}, registry.readRegistry(), false);
+		const file = writeTrackFileInStore(store, { ...input, trackId: realTrackId });
+		invalidateCache();
+		return file;
+	}
+
+	function deleteTrackFile(trackId: string, fileName: string): { ok: true } {
+		const project = requireActiveProject();
+		const track = getTrack(trackId);
+		const realTrackId = track.synthetic && track.source.kind === "branch"
+			? materializeBranchTrack(track.source.ref, track.title).id
+			: track.id;
+		const origin = findTrackOrigin(realTrackId);
+		const store = openStore({
+			...project,
+			path: origin.worktreePath,
+			storagePath: undefined,
+		}, registry.readRegistry(), false);
+		const result = deleteTrackFileInStore(store, realTrackId, fileName);
+		invalidateCache();
+		return result;
+	}
+
 	function chooseProjectPath(projectPath: string): ProjectSnapshot {
 		const canonicalPath = canonicalProjectPath(projectPath);
 		const current = registry.readRegistry();
@@ -457,7 +474,9 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			current.selectedWorktreeId = canonicalPath;
 			registry.writeRegistry(current);
 			invalidateCache();
-			return toPublicSnapshot(readSnapshotForPath(existing, canonicalPath, true) ?? aggregateSnapshot(existing, true).snapshotBase!);
+			return stripInternalSnapshotFields(
+				readSnapshotForPath(existing, canonicalPath, true) ?? aggregateSnapshot(existing, true).snapshotBase!,
+			)!;
 		}
 
 		const project: Project = {
@@ -472,7 +491,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		current.selectedWorktreeId = canonicalPath;
 		registry.writeRegistry(current);
 		invalidateCache();
-		return toPublicSnapshot(aggregateSnapshot(project, true).snapshotBase!);
+		return stripInternalSnapshotFields(aggregateSnapshot(project, true).snapshotBase)!;
 	}
 
 	function locateProjectPath(projectId: string, projectPath: string): ProjectSnapshot {
@@ -487,7 +506,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		current.selectedWorktreeId = canonicalPath;
 		registry.writeRegistry(current);
 		invalidateCache();
-		return toPublicSnapshot(aggregateSnapshot(project, true).snapshotBase!);
+		return stripInternalSnapshotFields(aggregateSnapshot(project, true).snapshotBase)!;
 	}
 
 	function removeProject(projectId: string): ProjectSnapshot | null {
@@ -538,7 +557,12 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		const worktree = requireSelectedWorktree(input.targetWorktreeId);
 		const snapshot = readSnapshotForPath(project, worktree.path, true);
 		if (!snapshot) throw new Error("Choose a project first");
-		const card = createCardInStore(openTargetStore(worktree.id, true), snapshot, input);
+		const trackId = ensureTrackIdForCardInput(input, input.title);
+		const card = createCardInStore(openTargetStore(worktree.id, true), snapshot, {
+			...input,
+			trackId,
+			scope: { kind: "project", ref: "global" },
+		});
 		invalidateCache();
 		return {
 			...card,
@@ -555,6 +579,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 				description: card.description,
 				column: card.column,
 				scope: card.scope,
+				trackId: card.trackId,
 			}],
 		};
 	}
@@ -562,12 +587,17 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 	function updateCard(cardId: string, patch: CardPatch): Card {
 		const project = requireActiveProject();
 		const origin = findCardOrigin(cardId);
+		const currentCard = activeSnapshot()?.cards.find((candidate) => candidate.id === cardId);
+		const trackId = ensureTrackIdForCardInput({
+			trackId: patch.trackId ?? currentCard?.trackId ?? null,
+			scope: patch.scope ?? currentCard?.scope,
+		}, currentCard?.title);
 		const store = openStore({
 			...project,
 			path: origin.worktreePath,
 			storagePath: undefined,
 		}, registry.readRegistry(), false);
-		const card = updateCardInStore(store, cardId, patch);
+		const card = updateCardInStore(store, cardId, toStoredCardPatch(patch, trackId));
 		invalidateCache();
 		return card;
 	}
@@ -633,6 +663,14 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		switchProject,
 		setStorageSearchPaths,
 		setActiveWorkspaceFile,
+		listTracks,
+		getTrack,
+		createTrack,
+		updateTrack,
+		deleteTrack,
+		readTrackFile,
+		writeTrackFile,
+		deleteTrackFile,
 		createCard,
 		updateCard,
 		updateBoard,
@@ -642,29 +680,4 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 	};
 }
 
-export function stripInternalSnapshotFields(snapshot: ProjectSnapshotWithInternals | null): ProjectSnapshot | null {
-	if (!snapshot) return snapshot;
-	return toPublicSnapshot(snapshot);
-}
-
-function toPublicSnapshot(snapshot: ProjectSnapshotWithInternals): ProjectSnapshot {
-	const { storageRoot: _storageRoot, ...publicSnapshot } = snapshot;
-	return publicSnapshot;
-}
-
-function withSelectedWorktree(
-	snapshot: ProjectSnapshotWithInternals | null,
-	selectedWorktree: WorktreeStore | null,
-): ProjectSnapshotWithInternals | null {
-	if (!snapshot || !selectedWorktree) return snapshot;
-	return {
-		...snapshot,
-		git: selectedWorktree.git,
-		storageRoot: selectedWorktree.storageRoot ?? snapshot.storageRoot,
-	};
-}
-
-function stripProjectFromWorktree(worktree: WorktreeStore): WorktreeContext {
-	const { project: _project, git: _git, ...publicWorktree } = worktree;
-	return publicWorktree;
-}
+export { stripInternalSnapshotFields } from "./services/runtimeAggregation";

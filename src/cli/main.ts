@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import type { ProjectSource, ProjectView, TrackboiRuntime } from "../core";
+import type { NodeFsTrackboiActions, ProjectSource, ProjectView } from "../core";
 import { runMcpServer } from "./mcp";
 
 const CLI_COMMANDS = new Set(["cards", "projects", "mcp", "help", "--help", "-h"]);
@@ -19,7 +19,7 @@ type CardsOptions = {
  * The MCP server will enter here too, which keeps agent and human CLI commands
  * on the same shared core as the desktop app.
  */
-export async function runCli(runtime: TrackboiRuntime, argv: string[]): Promise<number> {
+export async function runCli(trackboi: NodeFsTrackboiActions, argv: string[]): Promise<number> {
 	let exitCode = 0;
 	const program = new Command();
 
@@ -34,23 +34,23 @@ export async function runCli(runtime: TrackboiRuntime, argv: string[]): Promise<
 	program
 		.command("projects")
 		.description("List projects Trackboi can see.")
-		.action(() => {
-			printProjects(runtime);
+		.action(async () => {
+			await printProjects(trackboi);
 		});
 
 	program
 		.command("cards")
 		.description("List cards for the active project.")
 		.option("--json", "Print cards as JSON.")
-		.action((options: CardsOptions) => {
-			printCards(runtime, options);
+		.action(async (options: CardsOptions) => {
+			await printCards(trackboi, options);
 		});
 
 	program
 		.command("mcp")
 		.description("Run the stdio MCP server.")
 		.action(async () => {
-			await runMcpServer(runtime);
+			await runMcpServer(trackboi);
 		});
 
 	if (argv.length === 0) {
@@ -76,21 +76,21 @@ export function isCliCommand(command: string | undefined): boolean {
 	return command !== undefined && CLI_COMMANDS.has(command);
 }
 
-export async function runCliCommand(runtime: TrackboiRuntime, command: string, args: string[]): Promise<number> {
+export async function runCliCommand(trackboi: NodeFsTrackboiActions, command: string, args: string[]): Promise<number> {
 	if (command === "mcp") {
-		await runMcpServer(runtime);
+		await runMcpServer(trackboi);
 		return 0;
 	}
 
-	return runCli(runtime, [command, ...args]);
+	return runCli(trackboi, [command, ...args]);
 }
 
 function isCommanderExit(error: unknown): error is { exitCode: number } {
 	return typeof error === "object" && error !== null && "exitCode" in error;
 }
 
-function printProjects(runtime: TrackboiRuntime): void {
-	const view = runtime.listView();
+async function printProjects(trackboi: NodeFsTrackboiActions): Promise<void> {
+	const view = await trackboi.listView();
 	if (view.sources.every((source) => source.entries.length === 0)) {
 		console.log("No projects registered.");
 		return;
@@ -110,9 +110,9 @@ function printProjectSource(source: ProjectSource, view: ProjectView): void {
 	}
 }
 
-function printCards(runtime: TrackboiRuntime, options: CardsOptions): void {
+async function printCards(trackboi: NodeFsTrackboiActions, options: CardsOptions): Promise<void> {
 	const json = options.json === true;
-	const snapshot = runtime.activeSnapshot();
+	const snapshot = await trackboi.getActiveProject();
 	if (!snapshot) {
 		if (json) console.log("[]");
 		else console.log("No active project.");

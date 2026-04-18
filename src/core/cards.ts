@@ -31,14 +31,14 @@ export function createCardInStore(
 		title,
 		description: input.description?.trim() ?? "",
 		parentId: input.parentId ?? null,
-		scope: input.scope ? normalizeScope(input.scope) : snapshot.git.branch
-			? { kind: "track", ref: snapshot.git.branch }
-			: { kind: "project", ref: "global" },
+		scope: { kind: "project", ref: "global" },
+		trackId: input.trackId ?? null,
 		column: input.column,
 		rank: rankBetween(columnCards.at(-1)?.rank ?? null, null),
 		labels: [],
 		assignee: null,
 		fieldValues: {},
+		comments: [],
 		createdAt: timestamp,
 		updatedAt: timestamp,
 	};
@@ -89,17 +89,27 @@ export function deleteCardInStore(store: ProjectStore, cardId: string): { ok: tr
  * Applies a user/API patch while preserving fields not mentioned by the patch.
  */
 function applyCardPatch(card: Card, patch: CardPatch): Card {
-	const next: Card = { ...card };
+		const next: Card = {
+			...card,
+			trackId: card.trackId ?? null,
+			fieldValues: card.fieldValues ?? {},
+			comments: card.comments ?? [],
+		};
 	if (typeof patch.title === "string") next.title = patch.title.trim();
 	if (typeof patch.description === "string") next.description = patch.description.trim();
 	if ("parentId" in patch) next.parentId = patch.parentId ?? null;
 	if (patch.scope) next.scope = normalizeScope(patch.scope);
+	if ("trackId" in patch) {
+		next.trackId = patch.trackId ?? null;
+		next.scope = { kind: "project", ref: "global" };
+	}
 	if (typeof patch.column === "string") next.column = patch.column;
 	if (typeof patch.rank === "string") next.rank = patch.rank;
 	if (typeof patch.boardId === "string") next.boardId = patch.boardId;
 	if (Array.isArray(patch.labels)) next.labels = patch.labels.filter((label) => typeof label === "string");
 	if ("assignee" in patch) next.assignee = typeof patch.assignee === "string" ? patch.assignee : null;
 	if (patch.fieldValues) next.fieldValues = patch.fieldValues;
+	if (Array.isArray(patch.comments)) next.comments = patch.comments;
 	if (!next.title.trim()) throw new Error("Card title is required");
 	next.updatedAt = now();
 	return next;

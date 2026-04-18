@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createRuntime } from "../../src/core/runtime";
@@ -172,6 +172,49 @@ describe("runtime worktree integration", () => {
 		const expectedPath = path.join(fixture.checkoutWorktree, ".etc/trackboi/cards", `${card.id}.json`);
 		expect(existsSync(expectedPath)).toBe(true);
 		expect(card.originWorktreeId).toBe(checkoutId);
+		expect(card.comments).toEqual([]);
+	});
+
+	test("updateCard persists comments and normalizes missing comment arrays from disk", () => {
+		const fixture = createRuntimeFixture();
+		fixture.seedStore(fixture.mainRepo, ".trackboi", {
+			board: {
+				name: "Main board",
+				columns: [{ id: "todo", name: "To Do" }],
+			},
+			cards: [{
+				id: "card_main_1",
+				title: "Legacy card",
+				description: "",
+				column: "todo",
+				rank: "a0",
+				scope: { kind: "project", ref: "global" },
+				updatedAt: "2026-04-18T10:00:00.000Z",
+			}],
+		});
+
+		const legacyCardPath = path.join(fixture.mainRepo, ".trackboi/cards/card_main_1.json");
+		const legacyCard = JSON.parse(readFileSync(legacyCardPath, "utf8")) as Record<string, unknown>;
+		delete legacyCard.comments;
+		writeJsonAtomic(legacyCardPath, legacyCard);
+
+		const runtime = fixture.runtime();
+		runtime.chooseProjectPath(fixture.mainRepo);
+
+		expect(runtime.readDesktopState().snapshot?.cards[0]?.comments).toEqual([]);
+
+		const updated = runtime.updateCard("card_main_1", {
+			comments: [{
+				id: "comment_1",
+				author: "Agent",
+				body: "Left context for the next pass.",
+				createdAt: "2026-04-18T10:04:00.000Z",
+				updatedAt: "2026-04-18T10:04:00.000Z",
+			}],
+		});
+
+		expect(updated.comments).toHaveLength(1);
+		expect(runtime.readDesktopState().snapshot?.cards[0]?.comments[0]?.body).toBe("Left context for the next pass.");
 	});
 
 	test("cached desktop state stays stable until invalidated, then refreshes from disk", () => {
@@ -210,6 +253,152 @@ describe("runtime worktree integration", () => {
 
 		runtime.invalidateCache();
 		expect(runtime.readDesktopState().snapshot?.cards).toHaveLength(2);
+	});
+
+	test("readDesktopState does not rewrite normalized board or project files", () => {
+		const fixture = createRuntimeFixture();
+		fixture.seedStore(fixture.mainRepo, ".trackboi", {
+			board: {
+				name: "Main board",
+				columns: [{ id: "todo", name: "To Do" }],
+			},
+			cards: [{
+				id: "card_main_1",
+				title: "Steady read",
+				description: "",
+				column: "todo",
+				rank: "a0",
+				scope: { kind: "project", ref: "global" },
+				updatedAt: "2026-04-18T10:00:00.000Z",
+			}],
+		});
+
+		const boardFile = path.join(fixture.mainRepo, ".trackboi/boards/default.json");
+		const projectFile = path.join(fixture.mainRepo, ".trackboi/project.json");
+		const boardMtimeBefore = statSync(boardFile).mtimeMs;
+		const projectMtimeBefore = statSync(projectFile).mtimeMs;
+
+		const runtime = fixture.runtime();
+		runtime.chooseProjectPath(fixture.mainRepo);
+		runtime.readDesktopState();
+		runtime.readDesktopState();
+
+		expect(statSync(boardFile).mtimeMs).toBe(boardMtimeBefore);
+		expect(statSync(projectFile).mtimeMs).toBe(projectMtimeBefore);
+	});
+
+	test("surfaces legacy branch-scoped cards as synthetic tracks and materializes them on edit", () => {
+		const fixture = createRuntimeFixture();
+		fixture.seedStore(fixture.mainRepo, ".trackboi", {
+			board: {
+				name: "Main board",
+				columns: [{ id: "todo", name: "To Do" }],
+			},
+			cards: [{
+				id: "card_legacy_track",
+				title: "Legacy branch card",
+				description: "",
+				column: "todo",
+				rank: "a0",
+				scope: { kind: "track", ref: "feature/onboarding" },
+				updatedAt: "2026-04-18T11:00:00.000Z",
+			}],
+		});
+
+		const runtime = fixture.runtime();
+		runtime.chooseProjectPath(fixture.mainRepo);
+
+		const before = runtime.readDesktopState().snapshot;
+		const syntheticTrack = before?.tracks.find((track) => track.source.kind === "branch" && track.source.ref === "feature/onboarding");
+		const legacyCard = before?.cards.find((card) => card.id === "card_legacy_track");
+
+		expect(syntheticTrack?.synthetic).toBe(true);
+		expect(legacyCard?.trackId).toBe(syntheticTrack?.id);
+
+		const updated = runtime.updateCard("card_legacy_track", {
+			title: "Materialized branch card",
+		});
+
+		const after = runtime.readDesktopState().snapshot;
+		const materializedTrack = after?.tracks.find((track) => (
+			track.source.kind === "branch" &&
+			track.source.ref === "feature/onboarding" &&
+			!track.synthetic
+		));
+		const cardFile = JSON.parse(readFileSync(
+			path.join(fixture.mainRepo, ".trackboi/cards/card_legacy_track.json"),
+			"utf8",
+		)) as Card;
+
+		expect(materializedTrack).toBeDefined();
+		expect(updated.trackId).toBe(materializedTrack?.id);
+		expect(cardFile.trackId).toBe(materializedTrack?.id);
+		expect(cardFile.scope).toEqual({ kind: "project", ref: "global" });
+	});
+
+	test("creates, updates, reads, and deletes tracks plus track files", () => {
+		const fixture = createRuntimeFixture();
+		fixture.seedStore(fixture.mainRepo, ".trackboi", {
+			board: {
+				name: "Main board",
+				columns: [{ id: "todo", name: "To Do" }],
+			},
+			cards: [],
+		});
+
+		const runtime = fixture.runtime();
+		runtime.chooseProjectPath(fixture.mainRepo);
+
+		const created = runtime.createTrack({
+			title: "Inspector rewrite",
+			source: { kind: "branch", ref: "feat/inspector-rewrite" },
+			summary: "Lift track planning above cards.",
+		});
+
+		expect(runtime.listTracks().map((track) => track.id)).toContain(created.id);
+
+		const updated = runtime.updateTrack(created.id, {
+			plan: "1. Add track filter\n2. Dock inspector\n3. Materialize legacy refs",
+			decisions: [{
+				id: "decision_1",
+				title: "Use real track records",
+				body: "Avoid branch-only implicit scope for new writes.",
+				status: "accepted",
+				createdAt: "2026-04-18T11:10:00.000Z",
+				updatedAt: "2026-04-18T11:10:00.000Z",
+			}],
+		});
+
+		expect(updated.plan).toContain("Dock inspector");
+		expect(updated.decisions).toHaveLength(1);
+
+		const file = runtime.writeTrackFile({
+			trackId: created.id,
+			name: "notes.md",
+			content: "# Notes\n\nTrack-local context.",
+		});
+		expect(file.name).toBe("notes.md");
+
+		const readBack = runtime.readTrackFile(created.id, "notes.md");
+		expect(readBack.content).toContain("Track-local context");
+
+		const snapshotWithTrack = runtime.readDesktopState().snapshot;
+		expect(snapshotWithTrack?.tracks.find((track) => track.id === created.id)?.files.map((entry) => entry.name)).toContain("notes.md");
+
+		const card = runtime.createCard({
+			title: "Linked card",
+			column: "todo",
+			trackId: created.id,
+		});
+		expect(card.trackId).toBe(created.id);
+
+		runtime.deleteTrackFile(created.id, "notes.md");
+		expect(runtime.readDesktopState().snapshot?.tracks.find((track) => track.id === created.id)?.files).toEqual([]);
+
+		runtime.deleteTrack(created.id);
+		const afterDelete = runtime.readDesktopState().snapshot;
+		expect(afterDelete?.tracks.find((track) => track.id === created.id)).toBeUndefined();
+		expect(afterDelete?.cards.find((entry) => entry.id === card.id)?.trackId).toBeNull();
 	});
 });
 
@@ -292,11 +481,13 @@ function writeCardFile(storageRoot: string, seed: SeedCard): void {
 		description: seed.description,
 		parentId: null,
 		scope: seed.scope,
+		trackId: null,
 		column: seed.column,
 		rank: seed.rank,
 		labels: [],
 		assignee: null,
 		fieldValues: {},
+		comments: [],
 		createdAt: timestamp,
 		updatedAt: timestamp,
 	};

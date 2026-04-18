@@ -1,6 +1,7 @@
 import { ref, watch, type Ref } from "vue";
 import { desktop } from "@/electron/renderer";
 import type { CardDraft, Confirmation } from "@/ui/viewTypes";
+import { NO_TRACK_SELECT_VALUE } from "@/ui/composables/useTrackWorkflow";
 import type {
 	Card as TrackboiCard,
 	CardComment,
@@ -10,35 +11,31 @@ import type {
 
 type ConfirmationRequester = (confirmation: Confirmation) => void;
 
+type CardPanelMode = "closed" | "create" | "edit";
+
 type CardWorkflow = {
-	draftTitle: Ref<string>;
-	draftDescription: Ref<string>;
-	draftColumn: Ref<string>;
-	draftTargetWorktreeId: Ref<string>;
-	draftTrackId: Ref<string>;
-	newCardOpen: Ref<boolean>;
-	editingCard: Ref<TrackboiCard | null>;
-	editCommentAuthor: Ref<string>;
-	editCommentBody: Ref<string>;
-	editFieldValues: Ref<Record<string, FieldValue>>;
-	editDraft: Ref<CardDraft>;
+	panelMode: Ref<CardPanelMode>;
+	selectedCard: Ref<TrackboiCard | null>;
+	draft: Ref<CardDraft>;
+	trackId: Ref<string>;
+	targetWorktreeId: Ref<string>;
+	fieldValues: Ref<Record<string, FieldValue>>;
+	commentAuthor: Ref<string>;
+	commentBody: Ref<string>;
 	subtaskTitle: Ref<string>;
-	editTargetWorktreeId: Ref<string>;
-	editTrackId: Ref<string>;
-	openNewCard(columnId?: string): void;
-	closeNewCard(): void;
-	closeEditingCard(): void;
-	createNewCard(): Promise<void>;
-	startEditing(card: TrackboiCard): void;
-	saveEditingCard(): Promise<void>;
-	addCommentToEditingCard(): Promise<void>;
-	deleteExistingCard(card: TrackboiCard): Promise<void>;
+	openCreateCard(columnId?: string): void;
+	openCard(card: TrackboiCard): void;
+	closeCardPanel(): void;
+	submitCard(): Promise<void>;
+	addComment(): Promise<void>;
+	deleteCard(card: TrackboiCard): Promise<void>;
 	createSubtask(): Promise<void>;
 };
 
 /**
- * Coordinates new-card and edit-card workflows without letting the app shell
- * accumulate every modal field and mutation pathway.
+ * Coordinates the inspector-native card workflow. The shell can treat card
+ * creation and editing as one subject while this composable keeps the mutation
+ * rules and draft state together.
  */
 export function useCardWorkflow(options: {
 	snapshot: Ref<ProjectSnapshot | null>;
@@ -47,131 +44,142 @@ export function useCardWorkflow(options: {
 	run(action: () => Promise<void>): Promise<void>;
 	requestConfirmation: ConfirmationRequester;
 }): CardWorkflow {
-	const draftTitle = ref("");
-	const draftDescription = ref("");
-	const draftColumn = ref("todo");
-	const draftTargetWorktreeId = ref("");
-	const draftTrackId = ref("");
-	const newCardOpen = ref(false);
-
-	const editingCard = ref<TrackboiCard | null>(null);
-	const editCommentAuthor = ref("You");
-	const editCommentBody = ref("");
-	const editFieldValues = ref<Record<string, FieldValue>>({});
-	const editDraft = ref<CardDraft>({
+	const panelMode = ref<CardPanelMode>("closed");
+	const selectedCard = ref<TrackboiCard | null>(null);
+	const draft = ref<CardDraft>({
 		title: "",
 		description: "",
 		column: "todo",
 	});
+	const trackId = ref(NO_TRACK_SELECT_VALUE);
+	const targetWorktreeId = ref("");
+	const fieldValues = ref<Record<string, FieldValue>>({});
+	const commentAuthor = ref("You");
+	const commentBody = ref("");
 	const subtaskTitle = ref("");
-	const editTargetWorktreeId = ref("");
-	const editTrackId = ref("");
+
+	function resetDraft(columnId?: string) {
+		draft.value = {
+			title: "",
+			description: "",
+			column: columnId ?? options.snapshot.value?.board.columns[0]?.id ?? "todo",
+		};
+		trackId.value = options.selectedTrackId.value ?? NO_TRACK_SELECT_VALUE;
+		targetWorktreeId.value = options.selectedWorktreeId.value ?? "";
+		fieldValues.value = {};
+		commentBody.value = "";
+		subtaskTitle.value = "";
+	}
 
 	watch(
 		() => options.snapshot.value,
 		(nextSnapshot) => {
-			draftColumn.value = nextSnapshot?.board.columns[0]?.id ?? "todo";
-			if (!editingCard.value) return;
-			editingCard.value = nextSnapshot?.cards.find((card) => card.id === editingCard.value?.id) ?? null;
-			editTrackId.value = editingCard.value?.trackId ?? "";
+			if (panelMode.value === "create" && nextSnapshot) {
+				draft.value.column = draft.value.column || nextSnapshot.board.columns[0]?.id || "todo";
+			}
+			if (!selectedCard.value) return;
+			selectedCard.value = nextSnapshot?.cards.find((card) => card.id === selectedCard.value?.id) ?? null;
+			if (!selectedCard.value) {
+				panelMode.value = "closed";
+				return;
+			}
+			draft.value = {
+				title: selectedCard.value.title,
+				description: selectedCard.value.description,
+				column: selectedCard.value.column,
+			};
+			trackId.value = selectedCard.value.trackId ?? NO_TRACK_SELECT_VALUE;
+			targetWorktreeId.value = selectedCard.value.originWorktreeId ?? options.selectedWorktreeId.value ?? "";
+			fieldValues.value = { ...selectedCard.value.fieldValues };
 		},
 		{ immediate: true },
 	);
 
-	function openNewCard(columnId?: string) {
-		editingCard.value = null;
-		draftColumn.value = columnId ?? options.snapshot.value?.board.columns[0]?.id ?? draftColumn.value;
-		draftTargetWorktreeId.value = options.selectedWorktreeId.value ?? "";
-		draftTrackId.value = options.selectedTrackId.value ?? "";
-		newCardOpen.value = true;
+	function openCreateCard(columnId?: string) {
+		panelMode.value = "create";
+		selectedCard.value = null;
+		resetDraft(columnId);
 	}
 
-	function closeNewCard() {
-		newCardOpen.value = false;
-	}
-
-	function closeEditingCard() {
-		editingCard.value = null;
-		editCommentBody.value = "";
-	}
-
-	async function createNewCard() {
-		const title = draftTitle.value.trim();
-		if (!title) return;
-
-		await options.run(async () => {
-			await desktop.createCard({
-				title,
-				description: draftDescription.value,
-				column: draftColumn.value,
-				trackId: draftTrackId.value || null,
-				targetWorktreeId: draftTargetWorktreeId.value || null,
-			});
-			draftTitle.value = "";
-			draftDescription.value = "";
-			draftTrackId.value = options.selectedTrackId.value ?? "";
-			newCardOpen.value = false;
-		});
-	}
-
-	function startEditing(card: TrackboiCard) {
-		newCardOpen.value = false;
-		editingCard.value = card;
-		editDraft.value = {
+	function openCard(card: TrackboiCard) {
+		panelMode.value = "edit";
+		selectedCard.value = card;
+		draft.value = {
 			title: card.title,
 			description: card.description,
 			column: card.column,
 		};
-		editFieldValues.value = { ...card.fieldValues };
-		editTrackId.value = card.trackId ?? "";
-		editTargetWorktreeId.value = card.originWorktreeId ?? options.selectedWorktreeId.value ?? "";
+		trackId.value = card.trackId ?? NO_TRACK_SELECT_VALUE;
+		targetWorktreeId.value = card.originWorktreeId ?? options.selectedWorktreeId.value ?? "";
+		fieldValues.value = { ...card.fieldValues };
+		commentBody.value = "";
 		subtaskTitle.value = "";
-		editCommentBody.value = "";
 	}
 
-	async function saveEditingCard() {
-		if (!editingCard.value) return;
-		const cardId = editingCard.value.id;
-		const nextColumn = editDraft.value.column;
-		const shouldMove = nextColumn !== editingCard.value.column;
+	function closeCardPanel() {
+		panelMode.value = "closed";
+		selectedCard.value = null;
+		commentBody.value = "";
+		subtaskTitle.value = "";
+	}
 
+	async function submitCard() {
+		const title = draft.value.title.trim();
+		if (!title) return;
+
+		if (panelMode.value === "create") {
+			await options.run(async () => {
+				await desktop.createCard({
+					title,
+					description: draft.value.description,
+					column: draft.value.column,
+					trackId: trackId.value === NO_TRACK_SELECT_VALUE ? null : trackId.value,
+					targetWorktreeId: targetWorktreeId.value || null,
+				});
+				resetDraft(draft.value.column);
+				panelMode.value = "closed";
+			});
+			return;
+		}
+
+		if (!selectedCard.value) return;
+		const cardId = selectedCard.value.id;
+		const shouldMove = draft.value.column !== selectedCard.value.column;
 		await options.run(async () => {
 			await desktop.updateCard(cardId, {
-				title: editDraft.value.title,
-				description: editDraft.value.description,
-				trackId: editTrackId.value || null,
-				fieldValues: editFieldValues.value,
+				title,
+				description: draft.value.description,
+				trackId: trackId.value === NO_TRACK_SELECT_VALUE ? null : trackId.value,
+				fieldValues: fieldValues.value,
 			});
 			if (shouldMove) {
-				await desktop.moveCard(cardId, nextColumn, null);
+				await desktop.moveCard(cardId, draft.value.column, null);
 			}
-			editingCard.value = null;
 		});
 	}
 
-	async function addCommentToEditingCard() {
-		if (!editingCard.value) return;
-		const body = editCommentBody.value.trim();
+	async function addComment() {
+		if (!selectedCard.value) return;
+		const body = commentBody.value.trim();
 		if (!body) return;
-
 		const timestamp = new Date().toISOString();
 		const comment: CardComment = {
 			id: crypto.randomUUID(),
-			author: editCommentAuthor.value.trim() || "Unknown",
+			author: commentAuthor.value.trim() || "Unknown",
 			body,
 			createdAt: timestamp,
 			updatedAt: timestamp,
 		};
 
 		await options.run(async () => {
-			await desktop.updateCard(editingCard.value!.id, {
-				comments: [...(editingCard.value?.comments ?? []), comment],
+			await desktop.updateCard(selectedCard.value!.id, {
+				comments: [...(selectedCard.value?.comments ?? []), comment],
 			});
-			editCommentBody.value = "";
+			commentBody.value = "";
 		});
 	}
 
-	async function deleteExistingCard(card: TrackboiCard) {
+	async function deleteCard(card: TrackboiCard) {
 		options.requestConfirmation({
 			title: `Delete ${card.title}?`,
 			description: "This card file will be removed from the Trackboi store.",
@@ -180,20 +188,17 @@ export function useCardWorkflow(options: {
 			onConfirm: async () => {
 				await options.run(async () => {
 					await desktop.deleteCard(card.id);
-					if (editingCard.value?.id === card.id) {
-						editingCard.value = null;
-					}
+					if (selectedCard.value?.id === card.id) closeCardPanel();
 				});
 			},
 		});
 	}
 
 	async function createSubtask() {
-		if (!editingCard.value) return;
+		if (!selectedCard.value) return;
 		const title = subtaskTitle.value.trim();
 		if (!title) return;
-
-		const parent = editingCard.value;
+		const parent = selectedCard.value;
 		await options.run(async () => {
 			await desktop.createCard({
 				title,
@@ -208,28 +213,21 @@ export function useCardWorkflow(options: {
 	}
 
 	return {
-		draftTitle,
-		draftDescription,
-		draftColumn,
-		draftTargetWorktreeId,
-		draftTrackId,
-		newCardOpen,
-		editingCard,
-		editCommentAuthor,
-		editCommentBody,
-		editFieldValues,
-		editDraft,
+		panelMode,
+		selectedCard,
+		draft,
+		trackId,
+		targetWorktreeId,
+		fieldValues,
+		commentAuthor,
+		commentBody,
 		subtaskTitle,
-		editTargetWorktreeId,
-		editTrackId,
-		openNewCard,
-		closeNewCard,
-		closeEditingCard,
-		createNewCard,
-		startEditing,
-		saveEditingCard,
-		addCommentToEditingCard,
-		deleteExistingCard,
+		openCreateCard,
+		openCard,
+		closeCardPanel,
+		submitCard,
+		addComment,
+		deleteCard,
 		createSubtask,
 	};
 }

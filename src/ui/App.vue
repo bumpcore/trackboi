@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import BoardView from "@/ui/components/BoardView.vue";
-import EditCardModal from "@/ui/components/EditCardModal.vue";
-import NewCardModal from "@/ui/components/NewCardModal.vue";
-import ProjectSidebar from "@/ui/components/ProjectSidebar.vue";
-import ProjectSettingsModal from "@/ui/components/ProjectSettingsModal.vue";
+import BoardWorkspace from "@/ui/components/BoardWorkspace.vue";
+import ConfirmDialog from "@/ui/components/ConfirmDialog.vue";
+import LeftRail from "@/ui/components/LeftRail.vue";
+import LeftWorkspacePanel from "@/ui/components/LeftWorkspacePanel.vue";
+import PanelResizer from "@/ui/components/PanelResizer.vue";
+import RightWorkspacePanel from "@/ui/components/RightWorkspacePanel.vue";
 import SettingsModal from "@/ui/components/SettingsModal.vue";
-import TrackInspector from "@/ui/components/TrackInspector.vue";
-import TitleBar from "@/ui/components/TitleBar.vue";
+import WorkspaceTitleBar from "@/ui/components/WorkspaceTitleBar.vue";
+import { desktop } from "@/electron/renderer";
 import { useBoardPresentationState } from "@/ui/composables/useBoardPresentationState";
 import { useCardWorkflow } from "@/ui/composables/useCardWorkflow";
 import { useConfirmation } from "@/ui/composables/useConfirmation";
@@ -15,10 +16,9 @@ import { useDesktopProjectState } from "@/ui/composables/useDesktopProjectState"
 import { useProjectBoardSettings } from "@/ui/composables/useProjectBoardSettings";
 import { useTrackWorkflow } from "@/ui/composables/useTrackWorkflow";
 import { useWindowChrome } from "@/ui/composables/useWindowChrome";
-import { desktop } from "@/electron/renderer";
-import ConfirmDialog from "@/ui/components/ConfirmDialog.vue";
+import { useWorkspaceShellState } from "@/ui/composables/useWorkspaceShellState";
 import type { SelectOption } from "@/ui/components/Select.vue";
-import type { BoardScopeMode } from "@/ui/viewTypes";
+import type { BoardScopeMode, RightPanelView } from "@/ui/viewTypes";
 
 const {
 	closeWindow,
@@ -27,16 +27,19 @@ const {
 	resizeCursor,
 	resizeEdges,
 	resizeHandleClass,
-	startResize,
+	startResize: startWindowResize,
 	startTitlebarDrag,
 } = useWindowChrome();
+
 const {
 	confirmation,
 	confirmAction,
 	confirmDialogOpen,
 	requestConfirmation,
 } = useConfirmation();
+
 const boardScopeMode = ref<BoardScopeMode>("all");
+
 const {
 	snapshot,
 	view,
@@ -47,45 +50,38 @@ const {
 	busy,
 	error,
 	settingsOpen,
-	projectSettingsOpen,
 	storagePathDraft,
 	run,
 	setError,
 	loadProject,
 	refreshDesktopState,
 	chooseProject,
-	locateProject,
-	removeProject,
 	addStorageSearchPath,
 	removeStorageSearchPath,
 	resetStorageSearchPaths,
-	openWorkspaceFile,
-	closeWorkspaceFile,
 	switchProject,
 	selectWorktree,
 	closeSettings,
-	closeProjectSettings,
-	activeWorkspaceFile,
 	activeProject,
-	canRemoveActiveProject,
+	allEntries,
 	hasProjects,
 	selectedWorktree,
 	gitBranchLabel,
 	currentBranch,
 } = useDesktopProjectState(requestConfirmation);
+
 const {
 	selectedTrackId,
-	trackInspectorOpen,
-	trackInspectorMode,
+	panelMode: trackPanelMode,
 	selectedTrackFileName,
 	selectedTrackFileContent,
+	tracks,
 	selectedTrack,
 	linkedTrackCards,
 	trackLabels,
 	cardTrackOptions,
-	trackFilterOptions,
-	closeTrackInspector,
-	selectTrackFilter,
+	clearTrackSelection,
+	selectTrack,
 	openCreateTrack,
 	saveTrack,
 	deleteSelectedTrack,
@@ -98,29 +94,22 @@ const {
 	run,
 	requestConfirmation,
 });
+
 const {
-	draftTitle,
-	draftDescription,
-	draftColumn,
-	draftTargetWorktreeId,
-	draftTrackId,
-	newCardOpen,
-	editingCard,
-	editCommentAuthor,
-	editCommentBody,
-	editFieldValues,
-	editDraft,
+	panelMode: cardPanelMode,
+	selectedCard,
+	draft,
+	trackId,
+	targetWorktreeId,
+	fieldValues,
+	commentAuthor,
+	commentBody,
 	subtaskTitle,
-	editTargetWorktreeId,
-	editTrackId,
-	openNewCard,
-	closeNewCard,
-	closeEditingCard,
-	createNewCard,
-	startEditing,
-	saveEditingCard,
-	addCommentToEditingCard,
-	deleteExistingCard,
+	openCreateCard,
+	openCard,
+	submitCard,
+	addComment,
+	deleteCard,
 	createSubtask,
 } = useCardWorkflow({
 	snapshot,
@@ -129,8 +118,8 @@ const {
 	run,
 	requestConfirmation,
 });
+
 const {
-	boardScopeOptions,
 	allColumnCardCounts,
 	cardsByColumn,
 	childProgress,
@@ -145,8 +134,9 @@ const {
 	selectedTrackId,
 	selectedWorktree,
 	worktreeFilterId,
-	editingCardId: computed(() => editingCard.value?.id ?? null),
+	editingCardId: computed(() => selectedCard.value?.id ?? null),
 });
+
 const {
 	fieldNameDraft,
 	fieldTypeDraft,
@@ -170,21 +160,99 @@ const {
 	requestConfirmation,
 });
 
+const shell = useWorkspaceShellState();
+const rightViewPinned = ref(false);
+
 const columnOptions = computed<SelectOption[]>(() => (
 	snapshot.value?.board.columns.map((column) => ({
 		value: column.id,
 		label: column.name,
 	})) ?? []
 ));
-const worktreeOptions = computed<SelectOption[]>(() => (
-	[
-		{ value: "__all__", label: "All worktrees" },
-		...worktrees.value.map((worktree) => ({
-			value: worktree.id,
-			label: worktree.branch ? `${worktree.name} (${worktree.branch})` : worktree.name,
-		})),
-	]
+
+const cardTargetWorktreeOptions = computed<SelectOption[]>(() => (
+	worktrees.value.map((worktree) => ({
+		value: worktree.id,
+		label: worktree.branch ? `${worktree.name} (${worktree.branch})` : worktree.name,
+	}))
 ));
+
+const trackCounts = computed<Record<string, number>>(() => {
+	const counts: Record<string, number> = {};
+	for (const track of tracks.value) counts[track.id] = 0;
+	for (const card of snapshot.value?.cards ?? []) {
+		if (!card.parentId && card.trackId) counts[card.trackId] = (counts[card.trackId] ?? 0) + 1;
+	}
+	return counts;
+});
+
+const selectedCardTrack = computed(() => {
+	if (!selectedCard.value?.trackId) return null;
+	return snapshot.value?.tracks.find((track) => track.id === selectedCard.value?.trackId) ?? null;
+});
+
+const shellGridStyle = computed(() => ({
+	gridTemplateColumns: `56px ${shell.leftPanelWidth.value}px 4px minmax(0,1fr) 4px ${shell.rightPanelWidth.value}px`,
+}));
+
+function setRightView(view: RightPanelView) {
+	if (shell.rightCollapsed.value) shell.rightCollapsed.value = false;
+	shell.setRightView(view);
+	rightViewPinned.value = view === "activity" || view === "context" || view === "project-settings";
+}
+
+function ensureRightPanelOpen() {
+	if (shell.rightCollapsed.value) shell.rightCollapsed.value = false;
+}
+
+function openCardPanel(columnId?: string) {
+	openCreateCard(columnId);
+	ensureRightPanelOpen();
+	rightViewPinned.value = false;
+	shell.setRightView("card");
+}
+
+function editCard(card: Parameters<typeof openCard>[0]) {
+	openCard(card);
+	ensureRightPanelOpen();
+	if (!rightViewPinned.value || shell.rightView.value === "project-settings") {
+		shell.setRightView("card");
+	}
+}
+
+function openTrackPanel(trackId: string) {
+	selectTrack(trackId);
+	ensureRightPanelOpen();
+	if (!rightViewPinned.value || shell.rightView.value === "project-settings") {
+		shell.setRightView("track");
+	}
+}
+
+function handleTrackSelection(trackId: string) {
+	if (trackId === "__all__") {
+		clearTrackSelection();
+		return;
+	}
+	openTrackPanel(trackId);
+}
+
+function createTrackFromShell() {
+	openCreateTrack();
+	ensureRightPanelOpen();
+	rightViewPinned.value = false;
+	shell.setRightView("track");
+}
+
+async function switchProjectFromRail(projectId: string) {
+	shell.setLeftView("explorer");
+	await switchProject(projectId);
+}
+
+async function createColumnFromBoard() {
+	const existingCount = snapshot.value?.board.columns.length ?? 0;
+	await addColumn(`New Column ${existingCount + 1}`);
+}
+
 async function moveCard(cardId: string, toColumn: string, beforeCardId: string | null) {
 	await run(async () => {
 		await desktop.moveCard(cardId, toColumn, beforeCardId);
@@ -199,133 +267,149 @@ onMounted(loadProject);
 </script>
 
 <template>
-	<div class="grid h-screen grid-rows-[36px_minmax(0,1fr)] overflow-hidden rounded-[10px] bg-background text-foreground">
+	<div class="grid h-screen grid-rows-[44px_minmax(0,1fr)] overflow-hidden bg-background text-foreground">
 		<div
 			v-for="edge in resizeEdges"
 			:key="edge"
 			:class="resizeHandleClass(edge)"
 			class="pointer-events-none"
 			:style="{ cursor: resizeCursor(edge) }"
-			@pointerdown="startResize(edge, $event)"
+			@pointerdown="startWindowResize(edge, $event)"
 		/>
 
-		<TitleBar
-			:title="snapshot?.project.name ?? 'Trackboi'"
+		<WorkspaceTitleBar
+			:project-name="activeProject?.name ?? snapshot?.project.name ?? 'Trackboi'"
 			:branch-label="gitBranchLabel"
+			:location-label="snapshot?.project.path ?? activeProject?.path ?? null"
 			@drag="startTitlebarDrag"
 			@toggle-maximize="handleTitlebarDoubleClick"
 			@minimize="minimizeWindow"
 			@close="closeWindow"
 		/>
 
-		<main class="grid h-full min-h-0 grid-cols-[58px_minmax(0,1fr)] items-stretch overflow-hidden">
-			<ProjectSidebar
-				:view="view"
-				:busy="busy"
+		<main class="grid min-h-0 overflow-hidden" :style="shellGridStyle">
+			<LeftRail
+				:active-view="shell.leftView.value"
+				:active-project-id="view.activeProjectId"
+				:projects="allEntries"
+				@select="shell.setLeftView"
+				@switch-project="switchProjectFromRail"
+				@add-project="chooseProject"
 				@settings="settingsOpen = true"
-				@choose-project="chooseProject"
-				@switch-project="switchProject"
 			/>
 
-			<div class="grid min-h-0 min-w-0" :class="trackInspectorOpen ? 'grid-cols-[minmax(0,1fr)_360px]' : 'grid-cols-[minmax(0,1fr)]'">
-				<BoardView
-					v-model:board-scope-mode="boardScopeMode"
-					:active-project="activeProject"
-					:active-workspace-file="activeWorkspaceFile"
-					:board-scope-options="boardScopeOptions"
-					:branch-label="gitBranchLabel"
+			<div class="min-h-0 overflow-hidden border-r border-border/70">
+				<LeftWorkspacePanel
+					v-if="!shell.leftCollapsed.value"
+					:active-view="shell.leftView.value"
 					:busy="busy"
-					:can-remove-active-project="canRemoveActiveProject"
-					:cards-by-column="cardsByColumn"
-					:child-progress="childProgress"
-					:custom-fields="customFields"
-					:error="error"
-					:has-projects="hasProjects"
-					:loading="loading"
-					:scope-empty-message="scopeEmptyMessage"
-					:selected-worktree-id="selectedWorktreeId"
+					:selected-track-id="selectedTrackId"
+					:selected-track="selectedTrack"
 					:snapshot="snapshot"
-					:track-filter-options="trackFilterOptions"
-					:track-filter-value="selectedTrackId ?? '__all__'"
-					:track-labels="trackLabels"
-					:visible-card-count="visibleCardCount"
+					:track-counts="trackCounts"
+					:tracks="tracks"
 					:worktree-filter-id="worktreeFilterId"
 					:worktrees="worktrees"
-					:worktree-options="worktreeOptions"
-					@choose-project="chooseProject"
-					@close-workspace="closeWorkspaceFile"
-					@create-card="openNewCard"
-					@create-track="openCreateTrack"
-					@delete-card="deleteExistingCard"
-					@edit-card="startEditing"
-					@locate-project="locateProject"
-					@move-card="moveCard"
-					@open-workspace="openWorkspaceFile"
-					@open-new-card="openNewCard()"
-					@project-settings="projectSettingsOpen = true"
-					@remove-project="removeProject"
-					@select-track="selectTrackFilter"
 					@select-worktree="selectWorktree"
-				/>
-
-				<TrackInspector
-					:open="trackInspectorOpen"
-					:busy="busy"
-					:mode="trackInspectorMode"
-					:track="trackInspectorMode === 'edit' ? selectedTrack : null"
-					:current-branch="currentBranch"
-					:linked-cards="linkedTrackCards"
-					:selected-file-name="selectedTrackFileName"
-					:selected-file-content="selectedTrackFileContent"
-					@close="closeTrackInspector"
-					@save="saveTrack"
-					@delete="deleteSelectedTrack"
-					@load-file="loadSelectedTrackFile"
-					@write-file="writeSelectedTrackFile"
-					@delete-file="deleteSelectedTrackFile"
-					@edit-card="startEditing"
+					@select-track="handleTrackSelection"
+					@create-track="createTrackFromShell"
+					@toggle-collapsed="shell.toggleLeftCollapsed"
 				/>
 			</div>
 
-			<NewCardModal
-				v-model:title="draftTitle"
-				v-model:description="draftDescription"
-				v-model:column="draftColumn"
-				v-model:track-id="draftTrackId"
-				v-model:target-worktree-id="draftTargetWorktreeId"
-				:open="newCardOpen"
-				:busy="busy"
-				:column-options="columnOptions"
-				:track-options="cardTrackOptions"
-				:target-worktree-options="worktreeOptions"
-				@close="closeNewCard"
-				@create="createNewCard"
+			<PanelResizer
+				side="left"
+				:active-class="shell.leftResizeClass.value"
+				@resize="shell.startResize"
+				@reset="shell.resetLeftWidth"
 			/>
 
-			<EditCardModal
-				v-model:draft="editDraft"
-				v-model:track-id="editTrackId"
-				v-model:field-values="editFieldValues"
-				v-model:subtask-title="subtaskTitle"
-				v-model:comment-author="editCommentAuthor"
-				v-model:comment-body="editCommentBody"
-				v-model:target-worktree-id="editTargetWorktreeId"
-				:card="editingCard"
+			<BoardWorkspace
+				:active-project="activeProject"
 				:busy="busy"
-				:column-options="columnOptions"
-				:track-options="cardTrackOptions"
+				:cards-by-column="cardsByColumn"
+				:child-progress="childProgress"
 				:custom-fields="customFields"
-				:comments="editingCard?.comments ?? []"
-				:subtasks="editingSubtasks"
+				:error="error"
+				:has-projects="hasProjects"
+				:loading="loading"
+				:scope-empty-message="scopeEmptyMessage"
+				:selected-card-id="selectedCard?.id ?? null"
+				:selected-track="selectedTrack"
+				:selected-worktree="selectedWorktree"
+				:snapshot="snapshot"
+				:track-labels="trackLabels"
+				:visible-card-count="visibleCardCount"
+				@choose-project="chooseProject"
+				@create-column="createColumnFromBoard"
+				@create-card="openCardPanel"
+				@edit-card="editCard"
+				@delete-card="deleteCard"
+				@move-card="moveCard"
+			/>
+
+			<PanelResizer
+				side="right"
+				:active-class="shell.rightResizeClass.value"
+				@resize="shell.startResize"
+				@reset="shell.resetRightWidth"
+			/>
+
+			<RightWorkspacePanel
+				v-model:draft="draft"
+				v-model:track-id="trackId"
+				v-model:target-worktree-id="targetWorktreeId"
+				v-model:field-values="fieldValues"
+				v-model:comment-author="commentAuthor"
+				v-model:comment-body="commentBody"
+				v-model:subtask-title="subtaskTitle"
+				v-model:board-name-draft="boardNameDraft"
+				v-model:column-name-drafts="columnNameDrafts"
+				v-model:new-column-name="newColumnName"
+				v-model:field-name-draft="fieldNameDraft"
+				v-model:field-type-draft="fieldTypeDraft"
+				v-model:field-options-draft="fieldOptionsDraft"
+				:active-view="shell.rightView.value"
+				:busy="busy"
+				:collapsed="shell.rightCollapsed.value"
+				:card="selectedCard"
+				:card-mode="cardPanelMode"
+				:card-track="selectedCardTrack"
+				:column-options="columnOptions"
+				:column-card-counts="allColumnCardCounts"
+				:comment-list="selectedCard?.comments ?? []"
+				:current-branch="currentBranch"
+				:custom-fields="customFields"
+				:field-type-options="fieldTypeOptions"
+				:project-snapshot="snapshot"
 				:subtask-progress="editingSubtaskProgress"
-				:target-worktree-locked="true"
-				:target-worktree-options="worktreeOptions"
-				@close="closeEditingCard"
-				@save="saveEditingCard"
-				@delete="deleteExistingCard"
-				@edit-subtask="startEditing"
-				@add-comment="addCommentToEditingCard"
+				:subtasks="editingSubtasks"
+				:target-worktree-options="cardTargetWorktreeOptions"
+				:track="selectedTrack"
+				:track-mode="trackPanelMode"
+				:track-options="cardTrackOptions"
+				:track-file-name="selectedTrackFileName"
+				:track-file-content="selectedTrackFileContent"
+				:linked-track-cards="linkedTrackCards"
+				@select-view="setRightView"
+				@toggle-collapsed="shell.toggleRightCollapsed"
+				@submit-card="submitCard"
+				@delete-card="deleteCard"
+				@add-card-comment="addComment"
 				@create-subtask="createSubtask"
+				@edit-subtask="editCard"
+				@save-track="saveTrack"
+				@delete-track="deleteSelectedTrack"
+				@load-track-file="loadSelectedTrackFile"
+				@write-track-file="writeSelectedTrackFile"
+				@delete-track-file="deleteSelectedTrackFile"
+				@edit-track-card="editCard"
+				@save-board-name="saveBoardName"
+				@rename-column="renameColumn"
+				@remove-column="removeColumn"
+				@add-column="addColumn"
+				@add-custom-field="addCustomField"
+				@remove-custom-field="removeCustomField"
 			/>
 
 			<SettingsModal
@@ -337,28 +421,6 @@ onMounted(loadProject);
 				@add="addStorageSearchPath"
 				@remove="removeStorageSearchPath"
 				@reset="resetStorageSearchPaths"
-			/>
-
-			<ProjectSettingsModal
-				v-model:board-name-draft="boardNameDraft"
-				v-model:column-name-drafts="columnNameDrafts"
-				v-model:new-column-name="newColumnName"
-				v-model:field-name-draft="fieldNameDraft"
-				v-model:field-type-draft="fieldTypeDraft"
-				v-model:field-options-draft="fieldOptionsDraft"
-				:open="projectSettingsOpen"
-				:snapshot="snapshot"
-				:custom-fields="customFields"
-				:column-card-counts="allColumnCardCounts"
-				:field-type-options="fieldTypeOptions"
-				:busy="busy"
-				@close="closeProjectSettings"
-				@save-board-name="saveBoardName"
-				@rename-column="renameColumn"
-				@remove-column="removeColumn"
-				@add-column="addColumn"
-				@add-custom-field="addCustomField"
-				@remove-custom-field="removeCustomField"
 			/>
 		</main>
 
@@ -373,9 +435,3 @@ onMounted(loadProject);
 		/>
 	</div>
 </template>
-
-<!--
-	Most visual language lives in Tailwind utility classes and the local shadcn-style
-	primitives under src/ui/components. Keep bespoke CSS out of this file unless the
-	app needs behavior Tailwind cannot express cleanly.
--->

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useSortable } from "@vueuse/integrations/useSortable";
 import { ref, watch } from "vue";
-import { CircleDashed, GripVertical, Plus, Trash2 } from "lucide-vue-next";
+import { CircleDashed, Plus, Trash2 } from "lucide-vue-next";
 import Badge from "@/ui/components/Badge.vue";
 import Button from "@/ui/components/Button.vue";
 import MarkdownContent from "@/ui/components/MarkdownContent.vue";
@@ -15,6 +15,7 @@ const props = defineProps<{
 	cards: TrackboiCard[];
 	childProgress: Record<string, { total: number; done: number }>;
 	customFields: CustomField[];
+	selectedCardId?: string | null;
 	trackLabels: Record<string, string>;
 }>();
 
@@ -27,6 +28,8 @@ const emit = defineEmits<{
 
 const listElement = ref<HTMLElement | null>(null);
 const sortableCards = ref<TrackboiCard[]>([]);
+let suppressActivation = false;
+let activationResetTimer: number | null = null;
 
 watch(
 	() => props.cards,
@@ -43,8 +46,19 @@ useSortable(listElement, sortableCards, {
 	ghostClass: "card-ghost",
 	dragClass: "card-dragging",
 	filter: "[data-sortable-ignore]",
+	onStart() {
+		suppressActivation = true;
+		if (activationResetTimer !== null) {
+			window.clearTimeout(activationResetTimer);
+			activationResetTimer = null;
+		}
+	},
 	onEnd(event) {
 		const cardId = (event.item as HTMLElement | null)?.dataset.cardId;
+		activationResetTimer = window.setTimeout(() => {
+			suppressActivation = false;
+			activationResetTimer = null;
+		}, 120);
 		if (!cardId || event.to !== listElement.value) return;
 
 		const nextSibling = event.item.nextElementSibling as HTMLElement | null;
@@ -64,17 +78,22 @@ function visibleFieldEntries(card: TrackboiCard) {
 		return value ? [{ field, value }] : [];
 	});
 }
+
+function activateCard(card: TrackboiCard) {
+	if (suppressActivation) return;
+	emit("edit", card);
+}
 </script>
 
 <template>
 	<section
-		class="column-shell w-[356px] min-w-[356px] max-w-[356px] rounded-[14px] border border-border/60 bg-[linear-gradient(180deg,hsl(var(--card)/0.82)_0%,hsl(var(--background)/0.92)_100%)] shadow-[0_1px_0_hsl(0_0%_100%/0.02),0_18px_34px_hsl(0_0%_0%/0.18)]"
+		class="column-shell grid h-full min-h-0 w-[356px] min-w-[356px] max-w-[356px] grid-rows-[auto_minmax(0,1fr)] overflow-hidden border border-border/70 bg-secondary/45 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.02)]"
 		:data-column-id="column.id"
 	>
-		<header class="flex items-start justify-between gap-3 border-b border-border/45 px-4 py-3.5">
+		<header class="flex items-start justify-between gap-3 border-b border-border/55 px-4 py-3">
 			<div class="min-w-0">
 				<div class="flex items-center gap-2">
-					<span class="h-2 w-2 rounded-full bg-primary/90 shadow-[0_0_0_3px_hsl(var(--primary)/0.12)]" aria-hidden="true" />
+					<span class="h-2 w-2 rounded-full bg-primary/90" aria-hidden="true" />
 					<h2 class="truncate text-[13px] font-semibold uppercase tracking-[0.08em] text-foreground/94">{{ column.name }}</h2>
 				</div>
 				<p class="mt-2 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{{ props.cards.length }} cards</p>
@@ -95,10 +114,10 @@ function visibleFieldEntries(card: TrackboiCard) {
 			</div>
 		</header>
 
-		<div ref="listElement" class="grid min-h-56 content-start gap-2.5 p-3">
+		<div ref="listElement" class="app-scroll flex min-h-0 flex-col gap-2.5 overflow-y-auto p-3">
 			<div
 				v-if="sortableCards.length === 0"
-				class="grid min-h-28 place-items-center rounded-[12px] border border-dashed border-border/45 bg-background/18 px-6 text-center transition hover:border-primary/35 hover:bg-secondary/25"
+				class="grid min-h-28 shrink-0 place-items-center rounded-[8px] border border-dashed border-border/55 bg-background/16 px-6 text-center transition hover:border-primary/35 hover:bg-secondary/25"
 				data-sortable-ignore
 			>
 				<div>
@@ -114,24 +133,17 @@ function visibleFieldEntries(card: TrackboiCard) {
 			<UiCard
 				v-for="card in sortableCards"
 				:key="card.id"
-				class="board-card group relative grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 overflow-hidden p-3 transition"
+				class="board-card group relative grid w-full min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3 overflow-hidden p-3 transition"
 				:data-card-id="card.id"
+				:data-selected="props.selectedCardId === card.id"
+				role="button"
+				tabindex="0"
+				@click="activateCard(card)"
+				@keydown.enter.prevent="activateCard(card)"
+				@keydown.space.prevent="activateCard(card)"
 			>
-				<div class="board-card__rail absolute inset-y-0 left-0 w-[3px] bg-linear-to-b from-primary/70 via-primary/18 to-transparent opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
 				<div
-					class="mt-0.5 grid h-8 w-5 place-items-center rounded-[8px] border border-transparent text-muted-foreground transition group-hover:border-border/55 group-hover:bg-background/72 group-hover:text-foreground"
-					aria-hidden="true"
-				>
-					<GripVertical class="h-4 w-4" />
-				</div>
-				<div
-					class="min-w-0 max-w-full cursor-pointer bg-transparent text-left"
-					role="button"
-					tabindex="0"
-					data-sortable-ignore
-					@click="emit('edit', card)"
-					@keydown.enter.prevent="emit('edit', card)"
-					@keydown.space.prevent="emit('edit', card)"
+					class="min-w-0 max-w-full bg-transparent text-left"
 				>
 					<MarkdownInline
 						:value="card.title"
@@ -186,12 +198,12 @@ function visibleFieldEntries(card: TrackboiCard) {
 					</div>
 				</div>
 				<Button
-					class="mt-0.5 rounded-[8px] border border-transparent opacity-0 transition group-hover:border-border/55 group-hover:bg-background/72 group-hover:opacity-100"
+					class="mt-0.5 rounded-[6px] border border-transparent opacity-0 transition group-hover:border-border/55 group-hover:bg-background/72 group-hover:opacity-100"
 					variant="ghost"
 					size="icon"
 					type="button"
 					data-sortable-ignore
-					@click="emit('delete', card)"
+					@click.stop="emit('delete', card)"
 				>
 					<Trash2 class="h-4 w-4" />
 				</Button>

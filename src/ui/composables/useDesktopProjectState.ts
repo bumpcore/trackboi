@@ -10,6 +10,9 @@ import type {
 import type { Confirmation } from "@/ui/viewTypes";
 
 type ConfirmationRequester = (confirmation: Confirmation) => void;
+type WorktreeMemory = Record<string, string | null>;
+
+const WORKTREE_MEMORY_KEY = "trackboi:worktree-memory:v1";
 
 type DesktopProjectState = {
 	snapshot: Ref<ProjectSnapshot | null>;
@@ -33,13 +36,10 @@ type DesktopProjectState = {
 	addStorageSearchPath(): Promise<void>;
 	removeStorageSearchPath(path: string): Promise<void>;
 	resetStorageSearchPaths(): Promise<void>;
-	openWorkspaceFile(): Promise<void>;
-	closeWorkspaceFile(): Promise<void>;
 	switchProject(projectId: string): Promise<void>;
 	selectWorktree(worktreeId: string): Promise<void>;
 	closeSettings(): void;
 	closeProjectSettings(): void;
-	activeWorkspaceFile: ComputedRef<string | null>;
 	allEntries: ComputedRef<ProjectEntry[]>;
 	activeProject: ComputedRef<ProjectEntry | null>;
 	canRemoveActiveProject: ComputedRef<boolean>;
@@ -53,7 +53,7 @@ type DesktopProjectState = {
  * Owns desktop-level project state and the shell-facing actions that reshape it.
  *
  * This composable is intentionally the only UI workflow layer that knows about
- * desktop project selection, workspace files, and storage search paths.
+ * desktop project selection and storage search paths.
  */
 export function useDesktopProjectState(requestConfirmation: ConfirmationRequester): DesktopProjectState {
 	const snapshot = ref<ProjectSnapshot | null>(null);
@@ -92,15 +92,67 @@ export function useDesktopProjectState(requestConfirmation: ConfirmationRequeste
 		return snapshot.value.git.branch ?? (snapshot.value.git.detached ? "detached" : "git");
 	});
 	const currentBranch = computed(() => snapshot.value?.git.branch ?? null);
-	const activeWorkspaceFile = computed<string | null>(() => {
-		const source = view.value.sources.find((source) => source.kind === "codeWorkspace");
-		if (!source) return null;
-		const filePath = "filePath" in source ? source.filePath : "";
-		return filePath && filePath.length > 0 ? filePath : null;
-	});
 
 	function setError(errorValue: unknown) {
 		error.value = errorValue instanceof Error ? errorValue.message : String(errorValue);
+	}
+
+	function readWorktreeMemory(): WorktreeMemory {
+		if (typeof window === "undefined") return {};
+
+		try {
+			const raw = window.localStorage.getItem(WORKTREE_MEMORY_KEY);
+			if (!raw) return {};
+			const parsed = JSON.parse(raw) as unknown;
+			if (!parsed || typeof parsed !== "object") return {};
+
+			return Object.fromEntries(
+				Object.entries(parsed).filter((entry): entry is [string, string | null] => (
+					typeof entry[0] === "string"
+					&& (typeof entry[1] === "string" || entry[1] == null)
+				)),
+			);
+		} catch {
+			return {};
+		}
+	}
+
+	function writeWorktreeMemory(memory: WorktreeMemory) {
+		if (typeof window === "undefined") return;
+		window.localStorage.setItem(WORKTREE_MEMORY_KEY, JSON.stringify(memory));
+	}
+
+	function rememberProjectWorktree(projectId: string | null, worktreeId: string | null) {
+		if (!projectId) return;
+
+		const memory = readWorktreeMemory();
+		memory[projectId] = worktreeId;
+		writeWorktreeMemory(memory);
+	}
+
+	async function restoreRememberedWorktree(nextState: DesktopState): Promise<DesktopState> {
+		const projectId = nextState.view.activeProjectId;
+		if (!projectId) {
+			worktreeFilterId.value = null;
+			return nextState;
+		}
+
+		const rememberedWorktreeId = readWorktreeMemory()[projectId] ?? null;
+		if (!rememberedWorktreeId) {
+			worktreeFilterId.value = null;
+			return nextState;
+		}
+
+		if (!nextState.worktrees.some((worktree) => worktree.id === rememberedWorktreeId)) {
+			rememberProjectWorktree(projectId, null);
+			worktreeFilterId.value = null;
+			return nextState;
+		}
+
+		worktreeFilterId.value = rememberedWorktreeId;
+		if (nextState.selectedWorktreeId === rememberedWorktreeId) return nextState;
+
+		return desktop.setSelectedWorktree(rememberedWorktreeId);
 	}
 
 	function applyDesktopState(nextState: DesktopState) {
@@ -114,7 +166,7 @@ export function useDesktopProjectState(requestConfirmation: ConfirmationRequeste
 	}
 
 	async function refreshDesktopState() {
-		applyDesktopState(await desktop.readDesktopState());
+		applyDesktopState(await restoreRememberedWorktree(await desktop.readDesktopState()));
 	}
 
 	async function run(action: () => Promise<void>) {
@@ -202,30 +254,23 @@ export function useDesktopProjectState(requestConfirmation: ConfirmationRequeste
 		});
 	}
 
-	async function openWorkspaceFile() {
-		await run(async () => {
-			const next = await desktop.openWorkspaceFile();
-			if (next) view.value = next;
-		});
-	}
-
-	async function closeWorkspaceFile() {
-		await run(async () => {
-			view.value = await desktop.setActiveWorkspaceFile(null);
-		});
-	}
-
 	async function switchProject(projectId: string) {
 		if (projectId === view.value.activeProjectId) return;
 
 		await run(async () => {
-			applyDesktopState(await desktop.switchProject(projectId));
+			applyDesktopState(await restoreRememberedWorktree(await desktop.switchProject(projectId)));
 		});
 	}
 
 	async function selectWorktree(worktreeId: string) {
 		if (worktreeId === "__all__") {
 			worktreeFilterId.value = null;
+			rememberProjectWorktree(view.value.activeProjectId, null);
+			return;
+		}
+		if (worktreeFilterId.value === worktreeId) {
+			worktreeFilterId.value = null;
+			rememberProjectWorktree(view.value.activeProjectId, null);
 			return;
 		}
 		if (worktreeId === selectedWorktreeId.value && worktreeFilterId.value === worktreeId) return;
@@ -233,6 +278,7 @@ export function useDesktopProjectState(requestConfirmation: ConfirmationRequeste
 		await run(async () => {
 			applyDesktopState(await desktop.setSelectedWorktree(worktreeId));
 			worktreeFilterId.value = worktreeId;
+			rememberProjectWorktree(view.value.activeProjectId, worktreeId);
 		});
 	}
 
@@ -266,13 +312,10 @@ export function useDesktopProjectState(requestConfirmation: ConfirmationRequeste
 		addStorageSearchPath,
 		removeStorageSearchPath,
 		resetStorageSearchPaths,
-		openWorkspaceFile,
-		closeWorkspaceFile,
 		switchProject,
 		selectWorktree,
 		closeSettings,
 		closeProjectSettings,
-		activeWorkspaceFile,
 		allEntries,
 		activeProject,
 		canRemoveActiveProject,

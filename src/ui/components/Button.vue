@@ -15,16 +15,16 @@ const props = withDefaults(
 );
 
 const variants = {
-	default: "bg-primary text-primary-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.14)] hover:bg-primary/90",
-	secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-	ghost: "text-muted-foreground hover:bg-accent/70 hover:text-accent-foreground",
-	outline: "border border-border/70 bg-background/35 text-foreground hover:border-border hover:bg-accent/70",
-	destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+	default: "border border-primary/40 bg-primary/12 text-primary hover:border-primary/55 hover:bg-primary/18",
+	secondary: "border border-border/75 bg-secondary/76 text-muted-foreground hover:border-border/90 hover:bg-secondary/88 hover:text-foreground",
+	ghost: "border border-transparent bg-transparent text-muted-foreground hover:border-border/70 hover:bg-accent/72 hover:text-foreground",
+	outline: "border border-border/75 bg-background/24 text-muted-foreground hover:border-border/95 hover:bg-accent/76 hover:text-foreground",
+	destructive: "border border-destructive/40 bg-destructive/14 text-destructive hover:border-destructive/60 hover:bg-destructive/22",
 };
 
 const sizes = {
-	default: "h-8 px-3 py-1.5",
-	sm: "h-7 px-2.5 text-xs",
+	default: "h-7 px-2.5 text-[11px]",
+	sm: "h-6 px-2 text-[10px]",
 	icon: "h-7 w-7",
 };
 </script>
@@ -32,7 +32,7 @@ const sizes = {
 <template>
 	<button
 		:class="cn(
-			'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+			'trackboi-mono-font inline-flex items-center justify-center gap-1.25 whitespace-nowrap rounded-[4px] leading-none tracking-[0.01em] transition-colors [&_svg]:h-3.5 [&_svg]:w-3.5 disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
 			variants[props.variant],
 			sizes[props.size],
 			props.class,

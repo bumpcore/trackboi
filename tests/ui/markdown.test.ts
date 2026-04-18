@@ -1,16 +1,5 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { Editor } from "@tiptap/core";
-import { Markdown } from "@tiptap/markdown";
-import StarterKit from "@tiptap/starter-kit";
+import { describe, expect, test } from "bun:test";
 import { renderInlineMarkdown, renderMarkdown, renderMarkdownPreview } from "../../src/ui/lib/markdown";
-
-const editors: Editor[] = [];
-
-afterEach(() => {
-	for (const editor of editors.splice(0)) {
-		editor.destroy();
-	}
-});
 
 describe("markdown rendering", () => {
 	test("renders inline markdown for titles without block output or raw html", () => {
@@ -43,45 +32,5 @@ describe("markdown rendering", () => {
 		expect(html).toContain("[code]");
 		expect(html).not.toContain("<h2>");
 		expect(html).not.toContain("shiki");
-	});
-});
-
-describe("markdown editor round-trip", () => {
-	test("round-trips supported markdown through tiptap", () => {
-		const editor = new Editor({
-			content: "## Section\n\n**Bold**\n\n- one\n- two\n\n> quote\n\n```ts\nconst x = 1\n```",
-			contentType: "markdown",
-			extensions: [
-				StarterKit.configure({
-					horizontalRule: false,
-					strike: false,
-					heading: {
-						levels: [1, 2, 3],
-					},
-					link: {
-						autolink: true,
-						linkOnPaste: true,
-						openOnClick: false,
-						defaultProtocol: "https",
-					},
-				}),
-				Markdown.configure({
-					markedOptions: {
-						gfm: true,
-						breaks: false,
-					},
-				}),
-			],
-		});
-
-		editors.push(editor);
-
-		const markdown = editor.getMarkdown();
-
-		expect(markdown).toContain("## Section");
-		expect(markdown).toContain("**Bold**");
-		expect(markdown).toContain("- one");
-		expect(markdown).toContain("> quote");
-		expect(markdown).toContain("```ts");
 	});
 });

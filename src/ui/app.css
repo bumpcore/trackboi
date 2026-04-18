@@ -1,33 +1,14 @@
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
 @import "tailwindcss";
 @import "highlight.js/styles/github-dark.css";
 @source "../components/*.vue";
 @source "./**/*.{vue,ts}";
 
 @custom-variant dark (&:is(.dark *));
-
-@font-face {
-	font-family: "Red Hat Text";
-	src: url("./assets/fonts/RedHatText-Regular.otf") format("opentype");
-	font-weight: 400;
-	font-style: normal;
-	font-display: swap;
-}
-
-@font-face {
-	font-family: "Red Hat Text";
-	src: url("./assets/fonts/RedHatText-Medium.otf") format("opentype");
-	font-weight: 500;
-	font-style: normal;
-	font-display: swap;
-}
-
-@font-face {
-	font-family: "Red Hat Text";
-	src: url("./assets/fonts/RedHatText-SemiBold.otf") format("opentype");
-	font-weight: 600;
-	font-style: normal;
-	font-display: swap;
-}
 
 @theme inline {
 	--color-background: hsl(var(--background));
@@ -54,26 +35,26 @@
 }
 
 :root {
-	--background: 0 0% 3.5%;
-	--foreground: 0 0% 96%;
-	--card: 0 0% 7%;
-	--card-foreground: 0 0% 96%;
-	--popover: 0 0% 7%;
-	--popover-foreground: 0 0% 96%;
-	--primary: 211 78% 50%;
-	--primary-foreground: 0 0% 100%;
-	--secondary: 0 0% 10%;
-	--secondary-foreground: 0 0% 96%;
-	--muted: 0 0% 11%;
-	--muted-foreground: 0 0% 62%;
-	--accent: 0 0% 11%;
-	--accent-foreground: 0 0% 96%;
-	--destructive: 0 72% 51%;
+	--background: 210 8% 7%;
+	--foreground: 38 24% 85%;
+	--card: 210 7% 10%;
+	--card-foreground: 38 24% 85%;
+	--popover: 210 7% 10%;
+	--popover-foreground: 38 24% 85%;
+	--primary: 34 59% 58%;
+	--primary-foreground: 30 20% 10%;
+	--secondary: 220 7% 13%;
+	--secondary-foreground: 38 24% 85%;
+	--muted: 220 8% 11%;
+	--muted-foreground: 37 9% 58%;
+	--accent: 220 8% 11%;
+	--accent-foreground: 38 24% 85%;
+	--destructive: 11 50% 58%;
 	--destructive-foreground: 0 0% 98%;
-	--border: 0 0% 18%;
-	--input: 0 0% 18%;
-	--ring: 160 86% 44%;
-	--radius: 0.5rem;
+	--border: 215 10% 21%;
+	--input: 215 10% 21%;
+	--ring: 34 59% 58%;
+	--radius: 0.375rem;
 }
 
 * {
@@ -91,16 +72,181 @@ body {
 	padding: 0;
 	background: hsl(var(--background));
 	font-family:
-		"Red Hat Text", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+		Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
 		"Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 	font-weight: 400;
+}
+
+.trackboi-mono-font {
+	font-family:
+		"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+::selection {
+	background: hsl(var(--primary) / 0.34);
+	color: hsl(var(--foreground));
+}
+
+::-moz-selection {
+	background: hsl(var(--primary) / 0.34);
+	color: hsl(var(--foreground));
+}
+
+body.trackboi-resizing,
+body.trackboi-resizing * {
+	user-select: none !important;
+	-webkit-user-select: none !important;
+	cursor: col-resize !important;
 }
 
 #app {
 	min-height: 100vh;
 	overflow: hidden;
-	border-radius: 10px;
 	background: hsl(var(--background));
+}
+
+.shell-rail-button {
+	display: inline-flex;
+	height: 2rem;
+	width: 2rem;
+	align-items: center;
+	justify-content: center;
+	border-radius: 0.375rem;
+	border: 1px solid transparent;
+	color: hsl(var(--muted-foreground));
+	transition:
+		border-color 120ms ease,
+		background-color 120ms ease,
+		color 120ms ease;
+}
+
+.shell-rail-button:hover {
+	border-color: hsl(var(--border) / 0.9);
+	background: hsl(var(--secondary) / 0.92);
+	color: hsl(var(--foreground));
+}
+
+.shell-rail-button.is-active {
+	border-color: hsl(var(--primary) / 0.34);
+	background: hsl(0 0% 100% / 0.04);
+	color: hsl(var(--primary));
+}
+
+.shell-sidebar-item {
+	display: flex;
+	align-items: center;
+	gap: 0.625rem;
+	border-radius: 0.375rem;
+	border: 1px solid transparent;
+	padding: 0.625rem 0.75rem;
+	text-align: left;
+	font-size: 0.875rem;
+	color: hsl(var(--foreground));
+	transition:
+		border-color 120ms ease,
+		background-color 120ms ease,
+		color 120ms ease;
+}
+
+.shell-sidebar-item:hover {
+	border-color: hsl(var(--border) / 0.8);
+	background: hsl(var(--secondary) / 0.8);
+}
+
+.shell-sidebar-item.is-active {
+	border-color: hsl(var(--primary) / 0.34);
+	background: hsl(var(--secondary) / 0.62);
+	color: hsl(var(--foreground));
+}
+
+.shell-count {
+	border-radius: 0.25rem;
+	border: 1px solid hsl(var(--border) / 0.9);
+	padding: 0.125rem 0.375rem;
+	font-family:
+		"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+	font-size: 0.625rem;
+	color: hsl(var(--muted-foreground));
+}
+
+.shell-tab-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	height: 2rem;
+	border-radius: 0.3125rem;
+	border: 1px solid transparent;
+	padding: 0 0.75rem;
+	font-size: 0.75rem;
+	font-family:
+		Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+		"Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+	color: hsl(var(--muted-foreground));
+	transition:
+		border-color 120ms ease,
+		background-color 120ms ease,
+		color 120ms ease;
+}
+
+.shell-tab-button:hover {
+	border-color: hsl(var(--border) / 0.8);
+	background: hsl(var(--secondary) / 0.78);
+	color: hsl(var(--foreground));
+}
+
+.shell-tab-button.is-active {
+	border-color: hsl(var(--primary) / 0.34);
+	background: hsl(0 0% 100% / 0.04);
+	color: hsl(var(--foreground));
+}
+
+.shell-section {
+	display: grid;
+	gap: 1rem;
+	padding: 1rem 0 0;
+}
+
+.shell-section + .shell-section {
+	margin-top: 0.25rem;
+	border-top: 1px solid hsl(var(--border) / 0.72);
+	padding-top: 1.25rem;
+}
+
+.shell-section-title {
+	font-size: 0.6875rem;
+	font-weight: 600;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: hsl(var(--primary));
+}
+
+.shell-panel-resizer {
+	position: relative;
+	cursor: col-resize;
+}
+
+.shell-panel-resizer::after {
+	content: "";
+	position: absolute;
+	left: 50%;
+	top: 0;
+	height: 100%;
+	width: 1px;
+	transform: translateX(-50%);
+	background: transparent;
+	opacity: 0;
+	transition:
+		opacity 120ms ease,
+		width 120ms ease,
+		background-color 120ms ease;
+	transition-delay: 120ms;
+}
+
+.shell-panel-resizer:hover::after,
+.shell-panel-resizer.resizing::after {
+	opacity: 1;
+	width: 3px;
+	background: hsl(var(--primary) / 0.92);
 }
 
 .markdown-inline {
@@ -206,126 +352,27 @@ body {
 	overflow: hidden;
 }
 
-.note-editor .tiptap {
+.note-editor-grid {
+	overflow: hidden;
+	background: hsl(var(--secondary) / 0.72);
+	box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.02);
+}
+
+.note-editor-textarea {
 	min-height: 8.5rem;
-	outline: none;
-}
-
-.note-editor .tiptap p.is-editor-empty:first-child::before {
-	content: "";
-}
-
-.note-editor .tiptap > :first-child {
-	margin-top: 0;
-}
-
-.note-editor .tiptap > :last-child {
-	margin-bottom: 0;
-}
-
-.note-editor .tiptap p,
-.note-editor .tiptap h1,
-.note-editor .tiptap h2,
-.note-editor .tiptap h3,
-.note-editor .tiptap ul,
-.note-editor .tiptap ol,
-.note-editor .tiptap blockquote,
-.note-editor .tiptap pre {
-	margin: 0.45rem 0 0;
-}
-
-.note-editor .tiptap h1,
-.note-editor .tiptap h2,
-.note-editor .tiptap h3 {
-	font-weight: 600;
-	letter-spacing: 0;
-	color: hsl(var(--foreground));
-}
-
-.note-editor .tiptap h1 {
-	font-size: 1.05rem;
-}
-
-.note-editor .tiptap h2 {
-	font-size: 1rem;
-}
-
-.note-editor .tiptap h3 {
-	font-size: 0.95rem;
-}
-
-.note-editor .tiptap ul,
-.note-editor .tiptap ol {
-	padding-left: 1.2rem;
-}
-
-.note-editor .tiptap blockquote {
-	border-left: 2px solid hsl(var(--border) / 0.7);
-	padding-left: 0.85rem;
-	color: hsl(var(--muted-foreground));
-}
-
-.note-editor .tiptap pre {
-	overflow-x: auto;
-	border-radius: 8px;
-	background: hsl(var(--background) / 0.82);
-	padding: 0.7rem 0.8rem;
-}
-
-.note-editor .tiptap pre code,
-.note-editor .tiptap pre .hljs {
-	display: block;
-	background: transparent;
-	padding: 0;
-}
-
-.note-editor .tiptap code {
-	border-radius: 6px;
-	background: hsl(var(--secondary) / 0.8);
-	padding: 0.12rem 0.34rem;
+	border: 0;
 	font-family:
 		"SFMono-Regular", "Cascadia Code", Consolas, "Liberation Mono", Menlo, monospace;
-	font-size: 0.92em;
+	line-height: 1.6;
+	tab-size: 2;
 }
 
-.note-editor .tiptap pre code {
-	display: block;
-	background: transparent;
-	padding: 0;
+.note-editor-textarea::placeholder {
+	color: hsl(var(--muted-foreground) / 0.72);
 }
 
-.note-editor .tiptap .hljs-comment,
-.note-editor .tiptap .hljs-quote {
-	color: #7d8590;
-}
-
-.note-editor .tiptap .hljs-keyword,
-.note-editor .tiptap .hljs-selector-tag,
-.note-editor .tiptap .hljs-literal,
-.note-editor .tiptap .hljs-section,
-.note-editor .tiptap .hljs-link {
-	color: #ff7b72;
-}
-
-.note-editor .tiptap .hljs-string,
-.note-editor .tiptap .hljs-title,
-.note-editor .tiptap .hljs-name,
-.note-editor .tiptap .hljs-type,
-.note-editor .tiptap .hljs-attribute,
-.note-editor .tiptap .hljs-symbol,
-.note-editor .tiptap .hljs-bullet,
-.note-editor .tiptap .hljs-addition,
-.note-editor .tiptap .hljs-template-tag,
-.note-editor .tiptap .hljs-template-variable {
-	color: #a5d6ff;
-}
-
-.note-editor .tiptap .hljs-number,
-.note-editor .tiptap .hljs-meta,
-.note-editor .tiptap .hljs-built_in,
-.note-editor .tiptap .hljs-builtin-name,
-.note-editor .tiptap .hljs-params {
-	color: #79c0ff;
+.note-editor-preview {
+	min-height: 8.5rem;
 }
 
 .app-scroll {
@@ -370,25 +417,39 @@ body {
 }
 
 .column-shell {
-	backdrop-filter: blur(10px);
+	border-radius: 0.5rem;
+	backdrop-filter: blur(8px);
 }
 
 .board-card {
-	border-color: hsl(var(--border) / 0.7);
-	background:
-		linear-gradient(180deg, hsl(var(--card) / 0.98) 0%, hsl(var(--card) / 0.92) 100%);
+	border-color: hsl(var(--border) / 0.78);
+	background: hsl(var(--card) / 0.94);
 	box-shadow:
 		inset 0 1px 0 hsl(0 0% 100% / 0.035),
 		0 1px 0 hsl(0 0% 0% / 0.3),
-		0 8px 18px hsl(0 0% 0% / 0.16);
+		0 8px 18px hsl(0 0% 0% / 0.14);
+	cursor: grab;
 }
 
 .board-card:hover {
-	transform: translateY(-1px);
-	border-color: hsl(var(--border) / 0.92);
+	border-color: hsl(215 10% 29% / 0.95);
+	background: hsl(var(--card) / 0.98);
 	box-shadow:
 		inset 0 1px 0 hsl(0 0% 100% / 0.05),
-		0 14px 28px hsl(0 0% 0% / 0.22);
+		0 14px 24px hsl(0 0% 0% / 0.18);
+}
+
+.board-card[data-selected="true"] {
+	border-color: hsl(var(--primary) / 0.38);
+	background: hsl(var(--primary) / 0.075);
+	box-shadow:
+		0 0 0 1px hsl(var(--primary) / 0.35),
+		inset 0 1px 0 hsl(0 0% 100% / 0.04);
+}
+
+.board-card[data-selected="true"]:hover {
+	border-color: hsl(var(--primary) / 0.42);
+	background: hsl(var(--primary) / 0.085);
 }
 
 .card-ghost {
@@ -397,6 +458,7 @@ body {
 }
 
 .card-dragging {
+	cursor: grabbing;
 	transform: rotate(1.2deg);
 	box-shadow:
 		inset 0 1px 0 hsl(0 0% 100% / 0.05),

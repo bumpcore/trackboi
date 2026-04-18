@@ -20,7 +20,7 @@ type ProjectBoardSettings = {
 	fieldTypeOptions: ComputedRef<Array<{ value: FieldType; label: string }>>;
 	customFields: ComputedRef<CustomField[]>;
 	saveBoardName(): Promise<void>;
-	addColumn(): Promise<void>;
+	addColumn(nameOverride?: string): Promise<void>;
 	renameColumn(column: Column): Promise<void>;
 	removeColumn(column: Column): void;
 	addCustomField(): Promise<void>;
@@ -107,9 +107,14 @@ export function useProjectBoardSettings(options: {
 		});
 	}
 
-	async function addColumn() {
+	/**
+	 * Adds a new board column. The shell can provide an override name for
+	 * lightweight affordances such as the ghost add-column lane.
+	 */
+	async function addColumn(nameOverride?: string) {
 		if (!options.snapshot.value) return;
-		const name = newColumnName.value.trim();
+		const trimmedOverride = nameOverride?.trim();
+		const name = trimmedOverride || newColumnName.value.trim();
 		if (!name) return;
 
 		let id = columnIdFromName(name);
@@ -120,7 +125,7 @@ export function useProjectBoardSettings(options: {
 			...options.snapshot.value.board,
 			columns: [...options.snapshot.value.board.columns, { id, name }],
 		});
-		newColumnName.value = "";
+		if (!trimmedOverride) newColumnName.value = "";
 	}
 
 	async function renameColumn(column: Column) {

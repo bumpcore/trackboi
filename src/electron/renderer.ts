@@ -1,11 +1,18 @@
 import type {
+	AppSettings,
 	Board,
+	CardComment,
 	CardPatch,
+	CreateCardCommentInput,
 	CreateTrackInput,
 	CustomField,
 	DesktopState,
+	PersonAlias,
 	ProjectSnapshot,
+	TrackDecision,
 	TrackPatch,
+	TrackReference,
+	TrackSource,
 	TrackFileWriteInput,
 	WorkScope,
 } from "@/core/types";
@@ -21,12 +28,128 @@ function serializeCustomField(field: CustomField): CustomField {
 		: { ...field };
 }
 
+function serializeWorkScope(scope: WorkScope): WorkScope {
+	return scope.kind === "project"
+		? { kind: "project", ref: "global" }
+		: { kind: "track", ref: scope.ref };
+}
+
+function serializeCreateCardInput(input: {
+	boardId?: string;
+	title: string;
+	description?: string;
+	parentId?: string | null;
+	column: string;
+	scope?: WorkScope;
+	trackId?: string | null;
+	actorId?: string;
+}) {
+	return {
+		boardId: input.boardId,
+		title: input.title,
+		description: input.description,
+		parentId: input.parentId,
+		column: input.column,
+		scope: input.scope ? serializeWorkScope(input.scope) : undefined,
+		trackId: input.trackId,
+		actorId: input.actorId,
+	};
+}
+
+function serializeCardPatch(patch: CardPatch): CardPatch {
+	return {
+		boardId: patch.boardId,
+		title: patch.title,
+		description: patch.description,
+		parentId: patch.parentId,
+		scope: patch.scope ? serializeWorkScope(patch.scope) : undefined,
+		trackId: patch.trackId,
+		column: patch.column,
+		rank: patch.rank,
+		labels: patch.labels ? [...patch.labels] : undefined,
+		assignee: patch.assignee,
+		fieldValues: patch.fieldValues ? { ...patch.fieldValues } : undefined,
+		actorId: patch.actorId,
+	};
+}
+
+function serializeCreateCardCommentInput(input: CreateCardCommentInput): CreateCardCommentInput {
+	return {
+		cardId: input.cardId,
+		body: input.body,
+		actorId: input.actorId,
+	};
+}
+
+function serializeTrackSource(source: TrackSource): TrackSource {
+	return source.kind === "branch"
+		? { kind: "branch", ref: source.ref }
+		: { kind: "manual" };
+}
+
+function serializeTrackDecision(decision: TrackDecision): TrackDecision {
+	return {
+		id: decision.id,
+		title: decision.title,
+		body: decision.body,
+		status: decision.status,
+		createdAt: decision.createdAt,
+		updatedAt: decision.updatedAt,
+	};
+}
+
+function serializeTrackReference(reference: TrackReference): TrackReference {
+	return {
+		id: reference.id,
+		kind: reference.kind,
+		label: reference.label,
+		value: reference.value,
+	};
+}
+
+function serializeTrackActivityComment(comment: CardComment): CardComment {
+	return {
+		id: comment.id,
+		cardId: comment.cardId,
+		body: comment.body,
+		createdAt: comment.createdAt,
+		updatedAt: comment.updatedAt,
+		createdBy: comment.createdBy,
+		updatedBy: comment.updatedBy,
+	};
+}
+
+function serializeCreateTrackInput(input: CreateTrackInput): CreateTrackInput {
+	return {
+		title: input.title,
+		boardId: input.boardId,
+		source: input.source ? serializeTrackSource(input.source) : undefined,
+		summary: input.summary,
+		plan: input.plan,
+		actorId: input.actorId,
+	};
+}
+
+function serializeTrackPatch(patch: TrackPatch): TrackPatch {
+	return {
+		title: patch.title,
+		source: patch.source ? serializeTrackSource(patch.source) : undefined,
+		summary: patch.summary,
+		plan: patch.plan,
+		decisions: patch.decisions ? patch.decisions.map(serializeTrackDecision) : undefined,
+		references: patch.references ? patch.references.map(serializeTrackReference) : undefined,
+		activity: patch.activity ? patch.activity.map(serializeTrackActivityComment) : undefined,
+		actorId: patch.actorId,
+	};
+}
+
 /**
  * Electron IPC expects plain cloneable data. Board settings often originate
  * from Vue-managed snapshots, so flatten them before crossing the bridge.
  */
 function serializeBoard(board: Board): Board {
 	return {
+		id: board.id,
 		version: board.version,
 		name: board.name,
 		columns: board.columns.map((column) => ({ ...column })),
@@ -128,11 +251,37 @@ export function createDesktopFacade(
 		scheduleProjectPrewarm();
 		return nextState;
 	},
+	async listBoards() {
+		return trackboiApi.listBoards();
+	},
+	async setActiveBoard(boardId: string): Promise<DesktopState> {
+		const nextState = await trackboiApi.setActiveBoard(boardId);
+		notifyListeners(nextState.snapshot);
+		return nextState;
+	},
+	async readAppSettings() {
+		return trackboiApi.readAppSettings();
+	},
+	async updateAppSettings(settings: AppSettings) {
+		return trackboiApi.updateAppSettings(settings);
+	},
+	async listDetectedEditors() {
+		return trackboiApi.listDetectedEditors();
+	},
+	async openCardInEditor(cardId: string) {
+		return trackboiApi.openCardInEditor(cardId);
+	},
 	async setStorageSearchPaths(paths: string[]) {
 		return trackboiApi.setStorageSearchPaths(paths);
 	},
 	async setActiveWorkspaceFile(filePath: string | null) {
 		return trackboiApi.setActiveWorkspaceFile(filePath);
+	},
+	async createBoard(input: { name: string }) {
+		return refreshAfterMutation(() => trackboiApi.createBoard(input));
+	},
+	async deleteBoard(boardId: string) {
+		return refreshAfterMutation(() => trackboiApi.deleteBoard(boardId));
 	},
 	async listTracks() {
 		return trackboiApi.listTracks();
@@ -141,10 +290,10 @@ export function createDesktopFacade(
 		return trackboiApi.getTrack(trackId);
 	},
 	async createTrack(input: CreateTrackInput) {
-		return refreshAfterMutation(() => trackboiApi.createTrack(input));
+		return refreshAfterMutation(() => trackboiApi.createTrack(serializeCreateTrackInput(input)));
 	},
 	async updateTrack(trackId: string, patch: TrackPatch) {
-		return refreshAfterMutation(() => trackboiApi.updateTrack(trackId, patch));
+		return refreshAfterMutation(() => trackboiApi.updateTrack(trackId, serializeTrackPatch(patch)));
 	},
 	async deleteTrack(trackId: string) {
 		return refreshAfterMutation(() => trackboiApi.deleteTrack(trackId));
@@ -174,24 +323,32 @@ export function createDesktopFacade(
 		return refreshAfterProjectSelection(() => trackboiApi.switchProject(projectId), (nextState) => nextState.snapshot);
 	},
 	async createCard(input: {
+		boardId?: string;
 		title: string;
 		description?: string;
 		parentId?: string | null;
 		column: string;
 		scope?: WorkScope;
 		trackId?: string | null;
-		targetWorktreeId?: string | null;
 	}) {
-		return refreshAfterMutation(() => trackboiApi.createCard(input));
+		return refreshAfterMutation(() => trackboiApi.createCard(serializeCreateCardInput(input)));
 	},
 	async updateCard(cardId: string, patch: CardPatch) {
-		return refreshAfterMutation(() => trackboiApi.updateCard(cardId, patch));
+		return refreshAfterMutation(() => trackboiApi.updateCard(cardId, serializeCardPatch(patch)));
 	},
 	async updateBoard(board: Board) {
 		return refreshAfterMutation(() => trackboiApi.updateBoard(serializeBoard(board)));
 	},
-	async updateCustomFields(customFields: CustomField[]) {
-		return refreshAfterMutation(() => trackboiApi.updateCustomFields(customFields.map(serializeCustomField)));
+	async updateProjectPeople(people: PersonAlias[]) {
+		return refreshAfterMutation(() => trackboiApi.updateProjectPeople(people.map((person) => ({
+			id: person.id,
+			displayName: person.displayName,
+			gitEmails: [...person.gitEmails],
+			gitNames: [...person.gitNames],
+		}))));
+	},
+	async addCardComment(input: CreateCardCommentInput) {
+		return refreshAfterMutation(() => trackboiApi.addCardComment(serializeCreateCardCommentInput(input)));
 	},
 	async moveCard(cardId: string, toColumn: string, beforeCardId: string | null) {
 		return refreshAfterMutation(() => trackboiApi.moveCard(cardId, toColumn, beforeCardId));

@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import type { GitContext, WorkScope } from "./types";
+import type { GitContext, GitIdentity, WorkScope } from "./types";
 
 export type GitWorktree = {
 	path: string;
@@ -107,4 +107,17 @@ export function listGitWorktrees(repoRoot: string): GitWorktree[] {
 	} catch {
 		return [];
 	}
+}
+
+export function readGitIdentity(projectPath: string): GitIdentity | null {
+	const root = findGitRoot(projectPath);
+	if (!root) return null;
+
+	const name = runGit(root, ["config", "user.name"]) ?? "";
+	const email = runGit(root, ["config", "user.email"]) ?? "";
+	if (!name.trim() && !email.trim()) return null;
+	return {
+		name: name.trim(),
+		email: email.trim(),
+	};
 }

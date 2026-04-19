@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createNodeFsTrackboiActions, createRuntime } from "../../src/core";
+import { writeFrontmatter } from "../../src/core/frontmatter";
 import { writeJsonAtomic } from "../../src/core/json";
 import type { Board, Card, ProjectMetadata } from "../../src/core/types";
 
@@ -79,17 +80,14 @@ describe("nodefs trackboi actions", () => {
 		const updated = await trackboi.updateCard(created.id, { title: "Updated through actions" });
 		expect(updated.title).toBe("Updated through actions");
 
-		const commented = await trackboi.updateCard(created.id, {
-			comments: [{
-				id: "comment_1",
-				author: "Agent",
-				body: "Checked the failing path and left a handoff note.",
-				createdAt: "2026-04-18T10:02:00.000Z",
-				updatedAt: "2026-04-18T10:02:00.000Z",
-			}],
+		const comment = await trackboi.addCardComment({
+			cardId: created.id,
+			body: "Checked the failing path and left a handoff note.",
 		});
-		expect(commented.comments).toHaveLength(1);
-		expect(commented.comments[0]?.author).toBe("Agent");
+		const snapshotWithComment = await trackboi.getActiveProject();
+		const commented = snapshotWithComment?.cards.find((card) => card.id === created.id);
+		expect(commented?.comments).toHaveLength(1);
+		expect(comment?.body).toBe("Checked the failing path and left a handoff note.");
 
 		const moved = await trackboi.moveCard(created.id, "done", null);
 		expect(moved.column).toBe("done");
@@ -150,6 +148,85 @@ describe("nodefs trackboi actions", () => {
 		expect(snapshot?.tracks.find((track) => track.id === created.id)).toBeUndefined();
 		expect(snapshot?.cards.find((card) => card.id === linked.id)?.trackId).toBeNull();
 	});
+
+	test("explicit actor ids are stamped onto card, comment, and track mutations", async () => {
+		const fixture = createActionsFixture();
+		fixture.seedStore(fixture.repo, ".trackboi", {
+			board: {
+				name: "Main board",
+				columns: [{ id: "todo", name: "To Do" }],
+			},
+			cards: [],
+		});
+
+		const trackboi = createNodeFsTrackboiActions({
+			runtime: createRuntime({ configPath: fixture.configPath, legacyConfigPaths: [] }),
+			dialogs: {
+				chooseProjectDirectory: async () => fixture.repo,
+			},
+		});
+
+		await trackboi.chooseProject();
+		const created = await trackboi.createCard({
+			title: "Actor stamped card",
+			column: "todo",
+			actorId: "agent_codex",
+		});
+		expect(created.createdBy).toBe("agent_codex");
+
+		const updated = await trackboi.updateCard(created.id, {
+			title: "Actor stamped update",
+			actorId: "agent_codex_2",
+		});
+		expect(updated.updatedBy).toBe("agent_codex_2");
+
+		const comment = await trackboi.addCardComment({
+			cardId: created.id,
+			body: "Tracked by agent identity.",
+			actorId: "agent_codex_3",
+		});
+		expect(comment.createdBy).toBe("agent_codex_3");
+
+		const track = await trackboi.createTrack({
+			title: "Actor stamped track",
+			actorId: "agent_codex_4",
+		});
+		expect(track.createdBy).toBe("agent_codex_4");
+	});
+
+	test("board actions flow through the runtime-backed actions facade", async () => {
+		const fixture = createActionsFixture();
+		fixture.seedStore(fixture.repo, ".trackboi", {
+			board: {
+				name: "Main board",
+				columns: [{ id: "todo", name: "To Do" }],
+			},
+			cards: [],
+		});
+
+		const trackboi = createNodeFsTrackboiActions({
+			runtime: createRuntime({ configPath: fixture.configPath, legacyConfigPaths: [] }),
+			dialogs: {
+				chooseProjectDirectory: async () => fixture.repo,
+			},
+		});
+
+		await trackboi.chooseProject();
+		const createdSnapshot = await trackboi.createBoard({ name: "Delivery" });
+		const createdBoard = createdSnapshot.boards.find((board) => board.name === "Delivery");
+
+		expect(createdBoard).toBeDefined();
+		await trackboi.setActiveBoard(createdBoard?.id ?? "");
+		const createdCard = await trackboi.createCard({
+			title: "Board scoped card",
+			column: "todo",
+		});
+		expect(createdCard.boardId).toBe(createdBoard?.id);
+
+		await trackboi.updateCard(createdCard.id, { boardId: "default" });
+		const deletedSnapshot = await trackboi.deleteBoard(createdBoard?.id ?? "");
+		expect(deletedSnapshot.boards.map((board) => board.id)).not.toContain(createdBoard?.id);
+	});
 });
 
 type SeedCard = {
@@ -164,6 +241,7 @@ type SeedCard = {
 
 type SeedStoreInput = {
 	board: {
+		id?: string;
 		name: string;
 		columns: Board["columns"];
 	};
@@ -189,6 +267,7 @@ function createActionsFixture() {
 		seedStore(projectPath: string, storagePath: string, input: SeedStoreInput) {
 			const storageRoot = path.join(projectPath, storagePath);
 			const board: Board = {
+				id: input.board.id ?? "default",
 				version: 1,
 				name: input.board.name,
 				columns: input.board.columns,
@@ -201,6 +280,7 @@ function createActionsFixture() {
 				storagePath,
 				createdAt: "2026-04-18T07:59:00.000Z",
 				customFields: [],
+				people: [],
 			};
 			writeJsonAtomic(path.join(storageRoot, "boards/default.json"), board);
 			writeJsonAtomic(path.join(storageRoot, "project.json"), metadata);
@@ -226,11 +306,30 @@ function writeCardFile(storageRoot: string, seed: SeedCard): void {
 		labels: [],
 		assignee: null,
 		fieldValues: {},
-		comments: [],
 		createdAt: timestamp,
 		updatedAt: timestamp,
+		createdBy: "person_fixture",
+		updatedBy: "person_fixture",
 	};
-	writeJsonAtomic(path.join(storageRoot, "cards", `${seed.id}.json`), card);
+	const cardRoot = path.join(storageRoot, "cards", seed.id);
+	mkdirSync(path.join(cardRoot, "comments"), { recursive: true });
+	writeFileSync(path.join(cardRoot, "index.md"), writeFrontmatter({
+		id: card.id,
+		boardId: card.boardId,
+		title: card.title,
+		parentId: card.parentId,
+		scope: card.scope,
+		trackId: card.trackId,
+		column: card.column,
+		rank: card.rank,
+		labels: card.labels,
+		assignee: card.assignee,
+		fieldValues: card.fieldValues,
+		createdAt: card.createdAt,
+		updatedAt: card.updatedAt,
+		createdBy: card.createdBy,
+		updatedBy: card.updatedBy,
+	}, card.description));
 }
 
 function runGit(cwd: string, args: string[]): string {

@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { FolderOpen, Plus } from "lucide-vue-next";
-import type { Card as TrackboiCard, CustomField, ProjectEntry, ProjectSnapshot, Track, WorktreeContext } from "@/core/types";
+import { FolderOpen, Plus, Settings2 } from "lucide-vue-next";
+import type { BoardDescriptor, Card as TrackboiCard, CustomField, ProjectEntry, ProjectSnapshot, Track, WorktreeContext } from "@/core/types";
 import BoardColumn from "@/ui/components/BoardColumn.vue";
 import Button from "@/ui/components/Button.vue";
 import UiCard from "@/ui/components/Card.vue";
+import Select, { type SelectOption } from "@/ui/components/Select.vue";
 import Tooltip from "@/ui/components/Tooltip.vue";
 import type { ChildProgress } from "@/ui/viewTypes";
 
 const props = defineProps<{
 	activeProject: ProjectEntry | null;
+	boards: BoardDescriptor[];
 	busy: boolean;
 	cardsByColumn: Record<string, TrackboiCard[]>;
 	childProgress: Record<string, ChildProgress>;
@@ -19,6 +21,7 @@ const props = defineProps<{
 	hasProjects: boolean;
 	loading: boolean;
 	scopeEmptyMessage: string | null;
+	selectedBoardId: string | null;
 	selectedTrack: Track | null;
 	selectedWorktree: WorktreeContext | null;
 	snapshot: ProjectSnapshot | null;
@@ -29,26 +32,42 @@ const props = defineProps<{
 
 const emit = defineEmits<{
 	chooseProject: [];
+	selectBoard: [boardId: string];
+	openBoardSettings: [];
 	createCard: [columnId?: string];
 	createColumn: [];
+	selectCard: [card: TrackboiCard];
 	editCard: [card: TrackboiCard];
 	deleteCard: [card: TrackboiCard];
+	openCardInEditor: [card: TrackboiCard];
 	freshSeen: [cardId: string];
 	moveCard: [cardId: string, toColumn: string, beforeCardId: string | null];
 }>();
 
 const boardSubtitle = computed(() => {
 	if (props.selectedTrack) {
-		return `${props.selectedTrack.title} · filtered workspace view with ${props.visibleCardCount} visible cards`;
+		return `${props.selectedWorktree?.name ?? "Current worktree"} · ${props.selectedTrack.title} · ${props.visibleCardCount} visible cards`;
 	}
 	if (props.selectedWorktree) {
-		return `${props.selectedWorktree.name} · filtered worktree view with ${props.visibleCardCount} visible cards`;
+		return `${props.selectedWorktree.name} · current worktree context · ${props.visibleCardCount} visible cards`;
 	}
-	return `Board-wide workspace view with ${props.visibleCardCount} visible cards`;
+	return `Current workspace context · ${props.visibleCardCount} visible cards`;
 });
+
+const boardOptions = computed<SelectOption[]>(() => (
+	props.boards.map((board) => ({
+		value: board.id,
+		label: board.status === "stale" ? `${board.name} (stale)` : board.name,
+	}))
+));
 
 function forwardMove(cardId: string, toColumn: string, beforeCardId: string | null) {
 	emit("moveCard", cardId, toColumn, beforeCardId);
+}
+
+function forwardBoardSelection(boardId: string | undefined) {
+	if (!boardId) return;
+	emit("selectBoard", boardId);
 }
 </script>
 
@@ -67,6 +86,24 @@ function forwardMove(cardId: string, toColumn: string, beforeCardId: string | nu
 				</div>
 
 				<div class="flex shrink-0 items-center gap-2">
+					<Select
+						v-if="snapshot"
+						:model-value="selectedBoardId ?? snapshot.board.id"
+						:options="boardOptions"
+						class="w-[220px]"
+						@update:model-value="forwardBoardSelection"
+					/>
+					<Tooltip v-if="snapshot" content="Board settings" side="left">
+						<Button
+							type="button"
+							size="icon"
+							variant="outline"
+							:disabled="busy"
+							@click="emit('openBoardSettings')"
+						>
+							<Settings2 class="h-4 w-4" />
+						</Button>
+					</Tooltip>
 					<Tooltip v-if="snapshot" content="New card" side="left">
 						<Button
 							type="button"
@@ -113,6 +150,7 @@ function forwardMove(cardId: string, toColumn: string, beforeCardId: string | nu
 							v-for="column in snapshot.board.columns"
 							:key="column.id"
 							:column="column"
+							:columns="snapshot.board.columns"
 							:cards="cardsByColumn[column.id] ?? []"
 							:child-progress="childProgress"
 							:custom-fields="customFields"
@@ -121,8 +159,10 @@ function forwardMove(cardId: string, toColumn: string, beforeCardId: string | nu
 							:track-labels="trackLabels"
 							@move="forwardMove"
 							@create="emit('createCard', $event)"
+							@select="emit('selectCard', $event)"
 							@edit="emit('editCard', $event)"
 							@delete="emit('deleteCard', $event)"
+							@open-in-editor="emit('openCardInEditor', $event)"
 							@fresh-seen="emit('freshSeen', $event)"
 						/>
 

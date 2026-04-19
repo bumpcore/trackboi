@@ -1,21 +1,28 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
-import { Keyboard, ListPlus, Monitor, Moon, RotateCcw, Search, Sun, Trash2, X } from "lucide-vue-next";
+import { computed, ref, watch } from "vue";
+import { Keyboard, ListPlus, Monitor, Moon, RotateCcw, Search, Sun, Trash2, UserRoundCog, Wrench, X } from "lucide-vue-next";
 import Button from "@/ui/components/Button.vue";
 import Input from "@/ui/components/Input.vue";
 import { shortcutFromKeyboardEvent } from "@/ui/lib/keyboardShortcuts";
+import type { AgentRegistration } from "@/core/types";
 import type { ThemeMode } from "@/ui/composables/useAppPreferences";
 
 const props = defineProps<{
 	open: boolean;
 	paths: string[];
 	busy: boolean;
+	agents: AgentRegistration[];
+	detectedEditors: Array<{ id: string; label: string; command: string }>;
 }>();
 
 const draft = defineModel<string>("draft", { required: true });
 const leftPanelShortcut = defineModel<string>("leftPanelShortcut", { required: true });
 const rightPanelShortcut = defineModel<string>("rightPanelShortcut", { required: true });
 const themeMode = defineModel<ThemeMode>("themeMode", { required: true });
+const preferredEditorId = defineModel<string>("preferredEditorId", { required: true });
+const customEditorCommand = defineModel<string>("customEditorCommand", { required: true });
+const agentNameDraft = defineModel<string>("agentNameDraft", { required: true });
+const agentDescriptionDraft = defineModel<string>("agentDescriptionDraft", { required: true });
 
 const emit = defineEmits<{
 	close: [];
@@ -24,9 +31,12 @@ const emit = defineEmits<{
 	reset: [];
 	resetShortcuts: [];
 	resetTheme: [];
+	registerAgent: [];
+	removeAgent: [agentId: string];
+	saveEditor: [];
 }>();
 
-type SettingsSection = "storage" | "appearance" | "shortcuts";
+type SettingsSection = "storage" | "appearance" | "shortcuts" | "agents" | "editor";
 
 const activeSection = ref<SettingsSection>("storage");
 const captureArmed = ref<"left" | "right" | null>(null);
@@ -46,6 +56,16 @@ const themeOptions: Array<{ value: ThemeMode; label: string; description: string
 	{ value: "light", label: "Light", description: "Use a brighter canvas with the same warm accent direction.", icon: Sun },
 	{ value: "system", label: "System", description: "Follow the desktop color-scheme preference automatically.", icon: Monitor },
 ];
+
+const editorOptions = computed(() => [
+	{ id: "auto", label: "Auto detect", description: "Pick the first detected editor, then fall back to the OS default." },
+	...props.detectedEditors.map((editor) => ({
+		id: editor.id,
+		label: editor.label,
+		description: editor.command,
+	})),
+	{ id: "custom", label: "Custom command", description: "Run your own shell command, using {path} as the file placeholder." },
+]);
 
 function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 	event.preventDefault();
@@ -121,6 +141,30 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 									Panel shortcuts
 								</button>
 							</div>
+
+							<div>
+								<p class="px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Actors</p>
+								<button
+									type="button"
+									class="mt-2 flex w-full items-center gap-2 rounded-md bg-card/55 px-3 py-2 text-left text-sm font-medium text-foreground"
+									@click="activeSection = 'agents'"
+								>
+									<UserRoundCog class="h-4 w-4 text-muted-foreground" />
+									Agents
+								</button>
+							</div>
+
+							<div>
+								<p class="px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Editor</p>
+								<button
+									type="button"
+									class="mt-2 flex w-full items-center gap-2 rounded-md bg-card/55 px-3 py-2 text-left text-sm font-medium text-foreground"
+									@click="activeSection = 'editor'"
+								>
+									<Wrench class="h-4 w-4 text-muted-foreground" />
+									Open in editor
+								</button>
+							</div>
 						</div>
 					</div>
 				</div>
@@ -135,7 +179,11 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 										? "Storage lookup"
 										: activeSection === "appearance"
 											? "Theme"
-											: "Panel shortcuts"
+											: activeSection === "shortcuts"
+												? "Panel shortcuts"
+												: activeSection === "agents"
+													? "Agents"
+													: "Open in editor"
 								}}
 							</h2>
 							<p class="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
@@ -144,7 +192,11 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 										? "Trackboi searches these repo-relative locations in order and opens the first store it finds."
 										: activeSection === "appearance"
 											? "Choose how Trackboi paints the desktop shell and code surfaces."
-											: "Configure the global shortcuts that collapse or reopen the desktop side panels."
+											: activeSection === "shortcuts"
+												? "Configure the global shortcuts that collapse or reopen the desktop side panels."
+												: activeSection === "agents"
+													? "Manage globally registered agents used by MCP mutations."
+													: "Choose how card files open in an external editor."
 								}}
 							</p>
 						</div>
@@ -288,6 +340,90 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 								<Button variant="outline" type="button" @click="emit('resetShortcuts')">
 									<RotateCcw class="h-4 w-4" />
 									Restore defaults
+								</Button>
+							</div>
+						</section>
+					</section>
+
+					<section v-else-if="activeSection === 'agents'" class="grid gap-4">
+						<section class="grid gap-4 rounded-lg bg-background/12 p-4">
+							<div>
+								<h3 class="text-sm font-semibold text-foreground">Registered agents</h3>
+								<p class="mt-1 text-sm leading-6 text-muted-foreground">
+									MCP mutations are attributed to the active registered agent instead of a freeform model label.
+								</p>
+							</div>
+
+							<div v-if="agents.length > 0" class="grid gap-2">
+								<div
+									v-for="agent in agents"
+									:key="agent.id"
+									class="flex items-center justify-between gap-3 rounded-md border border-border/70 bg-secondary/55 px-3 py-3"
+								>
+									<div class="min-w-0">
+										<div class="trackboi-mono-font text-[12px] text-foreground">{{ agent.name }}</div>
+										<p class="mt-1 text-sm text-muted-foreground">{{ agent.description }}</p>
+									</div>
+									<Button variant="outline" type="button" @click="emit('removeAgent', agent.id)">
+										<Trash2 class="h-4 w-4" />
+									</Button>
+								</div>
+							</div>
+
+							<form class="grid gap-3" @submit.prevent="emit('registerAgent')">
+								<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+									Agent name
+									<Input v-model="agentNameDraft" autocomplete="off" placeholder="Claude Code" />
+								</label>
+								<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+									Description
+									<Input v-model="agentDescriptionDraft" autocomplete="off" placeholder="Primary coding agent on this machine" />
+								</label>
+								<div>
+									<Button type="submit" :disabled="!agentNameDraft.trim()">
+										<ListPlus class="h-4 w-4" />
+										Register agent
+									</Button>
+								</div>
+							</form>
+						</section>
+					</section>
+
+					<section v-else-if="activeSection === 'editor'" class="grid gap-4">
+						<section class="grid gap-4 rounded-lg bg-background/12 p-4">
+							<div>
+								<h3 class="text-sm font-semibold text-foreground">Preferred editor</h3>
+								<p class="mt-1 text-sm leading-6 text-muted-foreground">
+									Use auto-detect, pick a detected editor, or provide a custom shell command. Use <span class="trackboi-mono-font">{path}</span> as the file placeholder.
+								</p>
+							</div>
+
+							<div class="grid gap-2">
+								<button
+									v-for="option in editorOptions"
+									:key="option.id"
+									type="button"
+									class="flex items-start gap-3 rounded-md border px-3 py-3 text-left transition-colors"
+									:class="preferredEditorId === option.id
+										? 'border-primary/35 bg-primary/10 text-foreground'
+										: 'border-border/70 bg-secondary/55 text-foreground hover:border-border/90 hover:bg-secondary/78'"
+									@click="preferredEditorId = option.id"
+								>
+									<div class="min-w-0">
+										<div class="trackboi-mono-font text-[12px] text-foreground">{{ option.label }}</div>
+										<p class="mt-1 text-sm leading-6 text-muted-foreground">{{ option.description }}</p>
+									</div>
+								</button>
+							</div>
+
+							<label v-if="preferredEditorId === 'custom'" class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+								Custom command
+								<Input v-model="customEditorCommand" autocomplete="off" placeholder='cursor "{path}"' />
+							</label>
+
+							<div>
+								<Button type="button" @click="emit('saveEditor')">
+									Save editor
 								</Button>
 							</div>
 						</section>

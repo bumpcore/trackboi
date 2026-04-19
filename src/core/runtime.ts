@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs";
-import { createCardInStore, deleteCardInStore, moveCardInStore, updateCardInStore } from "./cards";
+import { existsSync, rmSync } from "node:fs";
+import { addCardCommentInStore, createCardInStore, deleteCardInStore, moveCardInStore, updateCardInStore } from "./cards";
 import { newId } from "./id";
 import { readJson, writeJsonAtomic } from "./json";
 import { boardPath, projectMetadataPath, runtimePaths } from "./paths";
@@ -12,8 +12,10 @@ import {
 } from "./sources";
 import {
 	canonicalProjectPath,
+	defaultColumns,
 	openStore,
 	projectName,
+	readCards,
 	resolveProjectStorage,
 	storageCandidates,
 	type ProjectStore,
@@ -26,7 +28,7 @@ import {
 	updateTrackInStore,
 	writeTrackFileInStore,
 } from "./tracks";
-import { aggregateSnapshot as aggregateRuntimeSnapshot, stripInternalSnapshotFields, withSelectedWorktree } from "./services/runtimeAggregation";
+import { aggregateSnapshot as aggregateRuntimeSnapshot, stripInternalSnapshotFields } from "./services/runtimeAggregation";
 import { readSnapshotForProjectPath } from "./services/runtimeSnapshots";
 import type { CachedDesktopState, DesktopStateCache, WorktreeStore } from "./services/runtimeTypes";
 import {
@@ -37,14 +39,20 @@ import {
 	stripProjectFromWorktree,
 } from "./services/runtimeWorktrees";
 import type {
+	AppSettings,
 	Board,
+	BoardDescriptor,
 	Card,
+	CardComment,
 	CardPatch,
-	CreateTrackInput,
+	CreateCardCommentInput,
 	CreateCardInput,
-	CustomField,
+	CreateBoardInput,
+	CreateTrackInput,
 	DesktopState,
+	GitIdentity,
 	MoveCardInput,
+	PersonAlias,
 	Project,
 	ProjectMetadata,
 	ProjectSnapshot,
@@ -59,6 +67,7 @@ import type {
 	TrackboiRuntime,
 } from "./types";
 import { normalizeProjectMetadata } from "./storage";
+import { readGitIdentity } from "./git";
 
 export type RuntimeOptions = RegistryOptions;
 
@@ -173,6 +182,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		return aggregateRuntimeSnapshot({
 			project,
 			create,
+			selectedBoardId: registry.readRegistry().selectedBoardId,
 			discoverWorktrees,
 			pickSelectedWorktree: pickCurrentWorktree,
 			createSelectedWorktreeStore: (activeProject, worktree) => (
@@ -187,11 +197,14 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 	}
 
 	function getCachedDesktopState(create: boolean): CachedDesktopState {
-		const project = activeProjectFromRegistry(registry.readRegistry());
+		const current = registry.readRegistry();
+		const project = activeProjectFromRegistry(current);
 		const view = listView();
+		const selectedBoardId = current.selectedBoardId;
 		if (!project || !existsSync(project.path)) {
 			return {
 				projectKey: "none",
+				selectedBoardId,
 				snapshotBase: null,
 				view,
 				worktrees: [],
@@ -200,7 +213,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 
 		const cacheKey = projectCacheKey(project);
 		const cached = desktopStateCache.get(cacheKey);
-		if (cached) {
+		if (cached && cached.selectedBoardId === selectedBoardId) {
 			return {
 				...cached,
 				view,
@@ -210,6 +223,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		const aggregated = aggregateSnapshot(project, create);
 		const nextCachedState = {
 			projectKey: cacheKey,
+			selectedBoardId,
 			snapshotBase: aggregated.snapshotBase,
 			view,
 			worktrees: aggregated.worktrees,
@@ -225,22 +239,23 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			: null;
 		const fallback = selected ?? cached.worktrees.find((worktree) => worktree.isPrimary) ?? cached.worktrees[0] ?? null;
 		const selectedWorktreeId = fallback?.id ?? null;
-		if (current.selectedWorktreeId !== selectedWorktreeId) {
-			current.selectedWorktreeId = selectedWorktreeId;
-			registry.writeRegistry(current);
-		}
+		const selectedBoardId = cached.snapshotBase?.board.id ?? null;
+		if (current.selectedWorktreeId !== selectedWorktreeId) current.selectedWorktreeId = selectedWorktreeId;
+		if (current.selectedBoardId !== selectedBoardId) current.selectedBoardId = selectedBoardId;
+		registry.writeRegistry(current);
 
 		return {
-			snapshot: withSelectedWorktree(cached.snapshotBase, fallback),
+			snapshot: cached.snapshotBase,
 			view: cached.view,
 			worktrees: cached.worktrees.map(stripProjectFromWorktree),
 			selectedWorktreeId,
+			selectedBoardId,
 		};
 	}
 
 	function activeSnapshotWithInternals(): ProjectSnapshotWithInternals | null {
 		const cached = getCachedDesktopState(true);
-		return withSelectedWorktree(cached.snapshotBase, pickCurrentWorktree(cached.worktrees));
+		return cached.snapshotBase;
 	}
 
 	function activeSnapshot(): ProjectSnapshot | null {
@@ -262,13 +277,14 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			const cacheKey = projectCacheKey(project);
 			if (desktopStateCache.has(cacheKey)) continue;
 
-			const aggregated = aggregateSnapshot(project, false);
-			desktopStateCache.set(cacheKey, {
-				projectKey: cacheKey,
-				snapshotBase: aggregated.snapshotBase,
-				view,
-				worktrees: aggregated.worktrees,
-			});
+				const aggregated = aggregateSnapshot(project, false);
+				desktopStateCache.set(cacheKey, {
+					projectKey: cacheKey,
+					selectedBoardId: registry.readRegistry().selectedBoardId,
+					snapshotBase: aggregated.snapshotBase,
+					view,
+					worktrees: aggregated.worktrees,
+				});
 		}
 	}
 
@@ -279,19 +295,44 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		return toDesktopState(getCachedDesktopState(true));
 	}
 
+	function listBoards(): BoardDescriptor[] {
+		return activeSnapshot()?.boards ?? [];
+	}
+
+	function setActiveBoard(boardId: string): DesktopState {
+		const current = registry.readRegistry();
+		current.selectedBoardId = boardId;
+		registry.writeRegistry(current);
+		return toDesktopState(getCachedDesktopState(true));
+	}
+
+	function readAppSettings(): AppSettings {
+		return registry.readRegistry().appSettings;
+	}
+
+	function updateAppSettings(settings: AppSettings): AppSettings {
+		const current = registry.readRegistry();
+		current.appSettings = settings;
+		registry.writeRegistry(current);
+		return current.appSettings;
+	}
+
 	function requireActiveProject(): Project {
 		const project = activeProjectFromRegistry(registry.readRegistry());
 		if (!project) throw new Error("Choose a project first");
 		return project;
 	}
 
-	function requireSelectedWorktree(targetWorktreeId?: string | null): WorktreeStore {
+	function requireActiveBoard(): Board {
+		const board = activeSnapshotWithInternals()?.board;
+		if (!board) throw new Error("Choose a board first");
+		return board;
+	}
+
+	function requireSelectedWorktree(): WorktreeStore {
 		const project = requireActiveProject();
 		let worktrees = discoverWorktrees(project);
-		const explicit = targetWorktreeId
-			? worktrees.find((worktree) => worktree.id === targetWorktreeId) ?? null
-			: null;
-		let selected = explicit ?? pickCurrentWorktree(worktrees);
+		let selected = pickCurrentWorktree(worktrees);
 		if (!selected) throw new Error("No worktree available for this project");
 		if (selected.status !== "ready") {
 			selected = promoteWorktreeStore({
@@ -314,9 +355,38 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		return selected;
 	}
 
-	function openTargetStore(targetWorktreeId?: string | null, create = false): ProjectStore {
+	function resolveDesktopActorId(store: ProjectStore, worktreePath: string, explicitActorId?: string): string {
+		if (explicitActorId) return explicitActorId;
+		const identity = readGitIdentity(worktreePath);
+		if (!identity) return "person_unknown";
+		return ensurePersonAlias(store, identity).id;
+	}
+
+	function ensurePersonAlias(store: ProjectStore, identity: GitIdentity): PersonAlias {
+		const metadataPath = projectMetadataPath(store.rootPath);
+		const metadata = normalizeProjectMetadata(readJson<ProjectMetadata>(metadataPath), store.project, store.storagePath);
+		const normalizedEmail = identity.email.trim().toLowerCase();
+		const normalizedName = identity.name.trim();
+		const existing = metadata.people.find((person) => (
+			(normalizedEmail && person.gitEmails.some((email) => email.toLowerCase() === normalizedEmail)) ||
+			(!normalizedEmail && normalizedName && person.gitNames.some((name) => name === normalizedName))
+		));
+		if (existing) return existing;
+
+		const created: PersonAlias = {
+			id: newId("person"),
+			displayName: normalizedName || normalizedEmail || "Unknown person",
+			gitEmails: normalizedEmail ? [normalizedEmail] : [],
+			gitNames: normalizedName ? [normalizedName] : [],
+		};
+		metadata.people = [...metadata.people, created];
+		writeJsonAtomic(metadataPath, metadata);
+		return created;
+	}
+
+	function openTargetStore(create = false): ProjectStore {
 		const project = requireActiveProject();
-		const worktree = requireSelectedWorktree(targetWorktreeId);
+		const worktree = requireSelectedWorktree();
 		return openStore({
 			...project,
 			path: worktree.path,
@@ -361,10 +431,11 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		const existing = findExistingBranchTrack(ref);
 		if (existing) return existing;
 
-			const created = createTrackInStore(openTargetStore(null, true), {
-				title,
-				source: { kind: "branch", ref },
-			});
+		const created = createTrackInStore(openTargetStore(true), {
+			title,
+			boardId: requireActiveBoard().id,
+			source: { kind: "branch", ref },
+		});
 		invalidateCache();
 		return created;
 	}
@@ -389,7 +460,13 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		if (input.source?.kind === "branch") {
 			return materializeBranchTrack(input.source.ref, input.title);
 		}
-		const track = createTrackInStore(openTargetStore(null, true), input);
+		const store = openTargetStore(true);
+		const worktree = requireSelectedWorktree();
+		const track = createTrackInStore(store, {
+			...input,
+			boardId: input.boardId ?? requireActiveBoard().id,
+			actorId: resolveDesktopActorId(store, worktree.path, input.actorId),
+		});
 		invalidateCache();
 		return track;
 	}
@@ -416,7 +493,10 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			path: origin.worktreePath,
 			storagePath: undefined,
 		}, registry.readRegistry(), false);
-		const next = updateTrackInStore(store, trackId, patch);
+		const next = updateTrackInStore(store, trackId, {
+			...patch,
+			actorId: resolveDesktopActorId(store, origin.worktreePath, patch.actorId),
+		});
 		invalidateCache();
 		return next;
 	}
@@ -424,15 +504,12 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 	function deleteTrack(trackId: string): { ok: true } {
 		const project = requireActiveProject();
 		const track = getTrack(trackId);
-		const worktrees = discoverWorktrees(project);
-
-		for (const worktree of worktrees) {
-			if (!worktree.storageRoot) continue;
-			const snapshot = readSnapshotForPath(project, worktree.path, false);
-			if (!snapshot) continue;
+		const selectedWorktree = requireSelectedWorktree();
+		const snapshot = readSnapshotForPath(project, selectedWorktree.path, false);
+		if (snapshot) {
 			const store = openStore({
 				...project,
-				path: worktree.path,
+				path: selectedWorktree.path,
 				storagePath: undefined,
 			}, registry.readRegistry(), false);
 			for (const card of snapshot.cards) {
@@ -521,9 +598,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			current.selectedWorktreeId = canonicalPath;
 			registry.writeRegistry(current);
 			invalidateCache();
-			return stripInternalSnapshotFields(
-				readSnapshotForPath(existing, canonicalPath, true) ?? aggregateSnapshot(existing, true).snapshotBase!,
-			)!;
+			return stripInternalSnapshotFields(aggregateSnapshot(existing, true).snapshotBase)!;
 		}
 
 		const project: Project = {
@@ -580,6 +655,57 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		return toDesktopState(getCachedDesktopState(true));
 	}
 
+	function createBoard(input: CreateBoardInput): ProjectSnapshot {
+		const store = openTargetStore(true);
+		const currentSnapshot = activeSnapshotWithInternals();
+		const name = input.name.trim();
+		if (!name) throw new Error("Board name is required");
+
+		const existingIds = new Set(currentSnapshot?.boards.map((board) => board.id) ?? []);
+		const slug = name
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-|-$/g, "");
+		let boardId = slug || `board-${newId("board").slice(-8)}`;
+		while (existingIds.has(boardId)) {
+			boardId = `${slug || "board"}-${newId("board").slice(-6)}`;
+		}
+
+		writeJsonAtomic(boardPath(store.rootPath, boardId), {
+			id: boardId,
+			version: 1,
+			name,
+			columns: defaultColumns(),
+			customFields: [],
+		});
+
+		const current = registry.readRegistry();
+		current.selectedBoardId = boardId;
+		registry.writeRegistry(current);
+		invalidateCache();
+		return stripInternalSnapshotFields(activeSnapshotWithInternals())!;
+	}
+
+	function deleteBoard(boardId: string): ProjectSnapshot {
+		const currentSnapshot = activeSnapshotWithInternals();
+		const descriptors = currentSnapshot?.boards ?? [];
+		if (!descriptors.some((board) => board.id === boardId)) throw new Error(`Unknown board: ${boardId}`);
+		if (descriptors.length <= 1) throw new Error("Trackboi needs at least one board");
+		if (currentSnapshot?.cards.some((card) => card.boardId === boardId) || currentSnapshot?.tracks.some((track) => track.boardId === boardId)) {
+			throw new Error("Move or delete board cards and tracks before removing this board");
+		}
+		const store = openTargetStore(false);
+		rmSync(boardPath(store.rootPath, boardId), { force: true });
+
+		const current = registry.readRegistry();
+		if (current.selectedBoardId === boardId) {
+			current.selectedBoardId = descriptors.find((board) => board.id !== boardId)?.id ?? null;
+			registry.writeRegistry(current);
+		}
+		invalidateCache();
+		return stripInternalSnapshotFields(activeSnapshotWithInternals())!;
+	}
+
 	function setStorageSearchPaths(paths: string[]): ProjectView {
 		const current = registry.readRegistry();
 		current.storageSearchPaths = normalizeStorageSearchPaths(paths);
@@ -596,16 +722,30 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		return listView();
 	}
 
+	function updateProjectPeople(people: PersonAlias[]): ProjectMetadata {
+		const store = openTargetStore(true);
+		const filePath = projectMetadataPath(store.rootPath);
+		const metadata = normalizeProjectMetadata(readJson<ProjectMetadata>(filePath), store.project, store.storagePath);
+		const nextMetadata = { ...metadata, people };
+		writeJsonAtomic(filePath, nextMetadata);
+		invalidateCache();
+		return nextMetadata;
+	}
+
 	function createCard(input: CreateCardInput): Card {
 		const project = requireActiveProject();
-		const worktree = requireSelectedWorktree(input.targetWorktreeId);
+		const worktree = requireSelectedWorktree();
 		const snapshot = readSnapshotForPath(project, worktree.path, true);
 		if (!snapshot) throw new Error("Choose a project first");
 		const trackId = ensureTrackIdForCardInput(input, input.title);
-		const card = createCardInStore(openTargetStore(worktree.id, true), snapshot, {
+		const store = openTargetStore(true);
+		const actorId = resolveDesktopActorId(store, worktree.path, input.actorId);
+		const card = createCardInStore(store, snapshot, {
 			...input,
+			boardId: input.boardId ?? requireActiveBoard().id,
 			trackId,
 			scope: { kind: "project", ref: "global" },
+			actorId,
 		});
 		invalidateCache();
 		return {
@@ -641,9 +781,32 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			path: origin.worktreePath,
 			storagePath: undefined,
 		}, registry.readRegistry(), false);
-		const card = updateCardInStore(store, cardId, toStoredCardPatch(patch, trackId));
+		const actorId = resolveDesktopActorId(store, origin.worktreePath, (patch as CardPatch & { actorId?: string }).actorId);
+		const card = updateCardInStore(store, cardId, {
+			...toStoredCardPatch(patch, trackId),
+			actorId,
+		} as CardPatch);
 		invalidateCache();
 		return card;
+	}
+
+	function addCardComment(input: CreateCardCommentInput): CardComment {
+		const project = requireActiveProject();
+		const origin = findCardOrigin(input.cardId);
+		const store = openStore({
+			...project,
+			path: origin.worktreePath,
+			storagePath: undefined,
+		}, registry.readRegistry(), false);
+		const card = readCards(store.rootPath).find((candidate) => candidate.id === input.cardId);
+		if (!card) throw new Error(`Unknown card: ${input.cardId}`);
+		const actorId = resolveDesktopActorId(store, origin.worktreePath, input.actorId);
+		const comment = addCardCommentInStore(store, card, {
+			...input,
+			actorId,
+		});
+		invalidateCache();
+		return comment;
 	}
 
 	function moveCard(input: MoveCardInput): Card {
@@ -662,20 +825,10 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 	}
 
 	function updateBoard(board: Board): Board {
-		const store = openTargetStore(null, true);
-		writeJsonAtomic(boardPath(store.rootPath), board);
+		const store = openTargetStore(true);
+		writeJsonAtomic(boardPath(store.rootPath, board.id), board);
 		invalidateCache();
 		return board;
-	}
-
-	function updateCustomFields(customFields: CustomField[]): ProjectMetadata {
-		const store = openTargetStore(null, true);
-		const filePath = projectMetadataPath(store.rootPath);
-		const metadata = normalizeProjectMetadata(readJson<ProjectMetadata>(filePath), store.project, store.storagePath);
-		const nextMetadata = { ...metadata, customFields };
-		writeJsonAtomic(filePath, nextMetadata);
-		invalidateCache();
-		return nextMetadata;
 	}
 
 	function deleteCard(cardId: string): { ok: true } {
@@ -702,12 +855,19 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		prewarmProjects,
 		invalidateCache,
 		setSelectedWorktree,
+		listBoards,
+		setActiveBoard,
+		readAppSettings,
+		updateAppSettings,
+		updateProjectPeople,
 		chooseProjectPath,
 		locateProjectPath,
 		removeProject,
 		switchProject,
 		setStorageSearchPaths,
 		setActiveWorkspaceFile,
+		createBoard,
+		deleteBoard,
 		listTracks,
 		getTrack,
 		createTrack,
@@ -717,9 +877,9 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		writeTrackFile,
 		deleteTrackFile,
 		createCard,
+		addCardComment,
 		updateCard,
 		updateBoard,
-		updateCustomFields,
 		moveCard,
 		deleteCard,
 	};

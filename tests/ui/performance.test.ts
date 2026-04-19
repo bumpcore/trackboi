@@ -22,8 +22,8 @@ describe("ui performance", () => {
 				cards,
 				columns,
 				boardScopeMode: index % 2 === 0 ? "all" : "global",
+				selectedBoardId: "default",
 				selectedTrackId: index % 4 === 0 ? `track_${index % 9}` : null,
-				worktreeFilterId: index % 3 === 0 ? "wt-main" : index % 3 === 1 ? "wt-feature" : null,
 				editingCardId: "card_120",
 			});
 			visibleCardCount += presentation.visibleCardCount;
@@ -104,17 +104,17 @@ describe("ui performance", () => {
 		const trackOnly = buildBoardPresentation({
 			cards,
 			columns,
+			selectedBoardId: "default",
 			boardScopeMode: "all",
 			selectedTrackId: "track_a",
-			worktreeFilterId: null,
 			editingCardId: null,
 		});
 		const globalOnly = buildBoardPresentation({
 			cards,
 			columns,
+			selectedBoardId: "default",
 			boardScopeMode: "global",
 			selectedTrackId: null,
-			worktreeFilterId: null,
 			editingCardId: null,
 		});
 

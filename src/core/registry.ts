@@ -2,7 +2,7 @@ import os from "node:os";
 import path from "node:path";
 import { STORAGE_SEARCH_PATHS } from "./constants";
 import { readJson, writeJsonAtomic } from "./json";
-import type { Project, ProjectRegistry } from "./types";
+import type { AgentRegistration, AppSettings, EditorPreference, Project, ProjectRegistry } from "./types";
 
 export type RegistryOptions = {
 	configPath?: string;
@@ -68,6 +68,23 @@ export function defaultRegistry(): ProjectRegistry {
 		storageSearchPaths: [...STORAGE_SEARCH_PATHS],
 		activeWorkspaceFile: null,
 		selectedWorktreeId: null,
+		selectedBoardId: null,
+		appSettings: defaultAppSettings(),
+	};
+}
+
+export function defaultAppSettings(): AppSettings {
+	return {
+		version: 1,
+		agents: [],
+		editor: defaultEditorPreference(),
+	};
+}
+
+export function defaultEditorPreference(): EditorPreference {
+	return {
+		preferredEditorId: "auto",
+		customCommand: "",
 	};
 }
 
@@ -108,7 +125,34 @@ export function sanitizeRegistry(registry: Partial<ProjectRegistry>): ProjectReg
 		storageSearchPaths,
 		activeWorkspaceFile: typeof registry.activeWorkspaceFile === "string" ? registry.activeWorkspaceFile : null,
 		selectedWorktreeId: typeof registry.selectedWorktreeId === "string" ? registry.selectedWorktreeId : null,
+		selectedBoardId: typeof registry.selectedBoardId === "string" ? registry.selectedBoardId : null,
+		appSettings: sanitizeAppSettings(registry.appSettings),
 	};
+}
+
+function sanitizeAppSettings(value: Partial<AppSettings> | undefined): AppSettings {
+	return {
+		version: 1,
+		agents: Array.isArray(value?.agents) ? value.agents.filter(isValidAgentRegistration) : [],
+		editor: sanitizeEditorPreference(value?.editor),
+	};
+}
+
+function sanitizeEditorPreference(value: Partial<EditorPreference> | undefined): EditorPreference {
+	return {
+		preferredEditorId: typeof value?.preferredEditorId === "string" && value.preferredEditorId.trim()
+			? value.preferredEditorId.trim()
+			: "auto",
+		customCommand: typeof value?.customCommand === "string" ? value.customCommand : "",
+	};
+}
+
+function isValidAgentRegistration(agent: unknown): agent is AgentRegistration {
+	if (typeof agent !== "object" || agent === null) return false;
+	if (!("id" in agent) || !("name" in agent) || !("description" in agent)) return false;
+	return typeof agent.id === "string" &&
+		typeof agent.name === "string" &&
+		typeof agent.description === "string";
 }
 
 function isValidProject(project: unknown): project is Project {

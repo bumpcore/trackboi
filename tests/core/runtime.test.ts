@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { parseFrontmatter, writeFrontmatter } from "../../src/core/frontmatter";
 import { createRuntime } from "../../src/core/runtime";
 import { writeJsonAtomic } from "../../src/core/json";
 import type { Board, Card, ProjectMetadata } from "../../src/core/types";
@@ -16,7 +17,7 @@ afterEach(() => {
 });
 
 describe("runtime worktree integration", () => {
-	test("aggregates cards across worktree storage roots and unions columns", () => {
+	test("selected worktree provides the active board and cards", () => {
 		const fixture = createRuntimeFixture();
 
 		fixture.seedStore(fixture.mainRepo, ".trackboi", {
@@ -87,21 +88,12 @@ describe("runtime worktree integration", () => {
 			"checkout-mcp",
 			"onboarding",
 		]);
-		expect(state.snapshot?.board.columns.map((column) => column.id)).toEqual([
-			"todo",
-			"doing",
-			"done",
-			"qa",
-			"review",
-		]);
-		expect(state.snapshot?.cards.map((card) => card.id).sort()).toEqual([
-			"card_checkout_1",
-			"card_main_1",
-			"card_onboarding_1",
-		]);
+		expect(state.selectedWorktreeId).toBe(fixture.mainRepo);
+		expect(state.snapshot?.board.columns.map((column) => column.id)).toEqual(["todo", "doing", "done"]);
+		expect(state.snapshot?.cards.map((card) => card.id)).toEqual(["card_main_1"]);
 	});
 
-	test("merges same card id across worktrees and flags conflict with newest winner", () => {
+	test("switching worktrees replaces the active card context", () => {
 		const fixture = createRuntimeFixture();
 
 		fixture.seedStore(fixture.onboardingWorktree, ".etc/.trackboi", {
@@ -138,16 +130,16 @@ describe("runtime worktree integration", () => {
 
 		const runtime = fixture.runtime();
 		runtime.chooseProjectPath(fixture.mainRepo);
+		const checkoutId = runtime.readDesktopState().worktrees.find((worktree) => worktree.name === "checkout-mcp")?.id;
+		expect(checkoutId).toBeDefined();
+		runtime.setSelectedWorktree(checkoutId ?? null);
 		const card = runtime.readDesktopState().snapshot?.cards.find((entry) => entry.id === "card_shared");
-
-		expect(card).toBeDefined();
 		expect(card?.description).toBe("Checkout variant wins.");
-		expect(card?.conflicted).toBe(true);
-		expect(card?.variants?.length).toBe(2);
-		expect(card?.worktreeIds?.length).toBe(2);
+		expect(card?.conflicted).toBe(false);
+		expect(card?.worktreeIds).toEqual([checkoutId]);
 	});
 
-	test("createCard targets the requested worktree store", () => {
+	test("createCard uses the active selected worktree store", () => {
 		const fixture = createRuntimeFixture();
 		fixture.seedStore(fixture.checkoutWorktree, ".etc/trackboi", {
 			board: {
@@ -162,20 +154,20 @@ describe("runtime worktree integration", () => {
 		const checkoutId = runtime.readDesktopState().worktrees.find((worktree) => worktree.name === "checkout-mcp")?.id;
 
 		expect(checkoutId).toBeDefined();
+		runtime.setSelectedWorktree(checkoutId ?? null);
 		const card = runtime.createCard({
 			title: "Targeted create",
 			column: "todo",
-			targetWorktreeId: checkoutId,
 			scope: { kind: "project", ref: "global" },
 		});
 
-		const expectedPath = path.join(fixture.checkoutWorktree, ".etc/trackboi/cards", `${card.id}.json`);
+		const expectedPath = path.join(fixture.checkoutWorktree, ".etc/trackboi/cards", card.id, "index.md");
 		expect(existsSync(expectedPath)).toBe(true);
 		expect(card.originWorktreeId).toBe(checkoutId);
 		expect(card.comments).toEqual([]);
 	});
 
-	test("updateCard persists comments and normalizes missing comment arrays from disk", () => {
+	test("addCardComment persists comments as markdown files under the card folder", () => {
 		const fixture = createRuntimeFixture();
 		fixture.seedStore(fixture.mainRepo, ".trackboi", {
 			board: {
@@ -193,27 +185,18 @@ describe("runtime worktree integration", () => {
 			}],
 		});
 
-		const legacyCardPath = path.join(fixture.mainRepo, ".trackboi/cards/card_main_1.json");
-		const legacyCard = JSON.parse(readFileSync(legacyCardPath, "utf8")) as Record<string, unknown>;
-		delete legacyCard.comments;
-		writeJsonAtomic(legacyCardPath, legacyCard);
-
 		const runtime = fixture.runtime();
 		runtime.chooseProjectPath(fixture.mainRepo);
 
 		expect(runtime.readDesktopState().snapshot?.cards[0]?.comments).toEqual([]);
 
-		const updated = runtime.updateCard("card_main_1", {
-			comments: [{
-				id: "comment_1",
-				author: "Agent",
-				body: "Left context for the next pass.",
-				createdAt: "2026-04-18T10:04:00.000Z",
-				updatedAt: "2026-04-18T10:04:00.000Z",
-			}],
+		const comment = runtime.addCardComment({
+			cardId: "card_main_1",
+			body: "Left context for the next pass.",
 		});
+		const commentPath = path.join(fixture.mainRepo, ".trackboi/cards/card_main_1/comments", `${comment.id}.md`);
 
-		expect(updated.comments).toHaveLength(1);
+		expect(existsSync(commentPath)).toBe(true);
 		expect(runtime.readDesktopState().snapshot?.cards[0]?.comments[0]?.body).toBe("Left context for the next pass.");
 	});
 
@@ -255,7 +238,144 @@ describe("runtime worktree integration", () => {
 		expect(runtime.readDesktopState().snapshot?.cards).toHaveLength(2);
 	});
 
-	test("readDesktopState does not rewrite normalized board or project files", () => {
+	test("desktop card writes resolve git identities into project-scoped person aliases", () => {
+		const fixture = createRuntimeFixture();
+		fixture.seedStore(fixture.mainRepo, ".trackboi", {
+			board: {
+				name: "Main board",
+				columns: [{ id: "todo", name: "To Do" }],
+			},
+			cards: [],
+		});
+
+		const runtime = fixture.runtime();
+		runtime.chooseProjectPath(fixture.mainRepo);
+
+		const created = runtime.createCard({
+			title: "Actor resolution",
+			column: "todo",
+			scope: { kind: "project", ref: "global" },
+		});
+		const snapshot = runtime.readDesktopState().snapshot;
+		const person = snapshot?.metadata.people.find((entry) => entry.id === created.createdBy);
+
+		expect(person).toBeDefined();
+		expect(person?.gitEmails).toContain("tests@trackboi.local");
+		expect(created.updatedBy).toBe(created.createdBy);
+	});
+
+	test("lists multiple boards and filters cards by the selected board", () => {
+		const fixture = createRuntimeFixture();
+		fixture.seedStore(fixture.mainRepo, ".trackboi", {
+			board: {
+				name: "Main board",
+				columns: [{ id: "todo", name: "To Do" }],
+			},
+			extraBoards: [{
+				id: "ops",
+				name: "Ops board",
+				columns: [{ id: "todo", name: "Queued" }],
+			}],
+			cards: [{
+				id: "card_default_1",
+				boardId: "default",
+				title: "Default board card",
+				description: "",
+				column: "todo",
+				rank: "a0",
+				scope: { kind: "project", ref: "global" },
+				updatedAt: "2026-04-18T10:00:00.000Z",
+			}, {
+				id: "card_ops_1",
+				boardId: "ops",
+				title: "Ops board card",
+				description: "",
+				column: "todo",
+				rank: "a0",
+				scope: { kind: "project", ref: "global" },
+				updatedAt: "2026-04-18T10:01:00.000Z",
+			}],
+		});
+
+		const runtime = fixture.runtime();
+		runtime.chooseProjectPath(fixture.mainRepo);
+
+		expect(runtime.listBoards().map((board) => board.id)).toEqual(["default", "ops"]);
+		expect(runtime.readDesktopState().snapshot?.cards.map((card) => card.id)).toEqual(["card_default_1"]);
+
+		runtime.setActiveBoard("ops");
+		const snapshot = runtime.readDesktopState().snapshot;
+		expect(snapshot?.board.id).toBe("ops");
+		expect(snapshot?.cards.map((card) => card.id)).toEqual(["card_ops_1"]);
+	});
+
+	test("falls back to the selected worktree board set when another worktree has different boards", () => {
+		const fixture = createRuntimeFixture();
+		fixture.seedStore(fixture.mainRepo, ".trackboi", {
+			board: {
+				name: "Main board",
+				columns: [{ id: "todo", name: "To Do" }],
+			},
+			extraBoards: [{
+				id: "delivery",
+				name: "Delivery",
+				columns: [{ id: "todo", name: "Queued" }],
+			}],
+			cards: [{
+				id: "card_delivery_1",
+				boardId: "delivery",
+				title: "Delivery card",
+				description: "",
+				column: "todo",
+				rank: "a0",
+				scope: { kind: "project", ref: "global" },
+				updatedAt: "2026-04-18T10:00:00.000Z",
+			}],
+		});
+		fixture.seedStore(fixture.onboardingWorktree, ".etc/.trackboi", {
+			board: {
+				name: "Onboarding board",
+				columns: [{ id: "todo", name: "To Do" }],
+			},
+			cards: [],
+		});
+
+		const runtime = fixture.runtime();
+		runtime.chooseProjectPath(fixture.mainRepo);
+		const onboardingId = runtime.readDesktopState().worktrees.find((worktree) => worktree.name === "onboarding")?.id;
+
+		expect(onboardingId).toBeDefined();
+		runtime.setSelectedWorktree(onboardingId ?? null);
+		runtime.setActiveBoard("delivery");
+
+		const state = runtime.readDesktopState();
+		expect(state.snapshot?.board.id).toBe("default");
+		expect(state.snapshot?.boards.map((board) => board.id)).toEqual(["default"]);
+	});
+
+	test("normalizes legacy board files that are missing an explicit id", () => {
+		const fixture = createRuntimeFixture();
+		fixture.seedStore(fixture.mainRepo, ".trackboi", {
+			board: {
+				name: "Legacy board",
+				columns: [{ id: "todo", name: "To Do" }],
+			},
+			cards: [],
+		});
+
+		writeJsonAtomic(path.join(fixture.mainRepo, ".trackboi/boards/default.json"), {
+			version: 1,
+			name: "Legacy board",
+			columns: [{ id: "todo", name: "To Do" }],
+			customFields: [],
+		});
+
+		const runtime = fixture.runtime();
+		runtime.chooseProjectPath(fixture.mainRepo);
+		expect(runtime.readDesktopState().snapshot?.board.id).toBe("default");
+	});
+
+	test("readDesktopState settles normalized board and project files after the first read", () => {
 		const fixture = createRuntimeFixture();
 		fixture.seedStore(fixture.mainRepo, ".trackboi", {
 			board: {
@@ -275,16 +395,15 @@ describe("runtime worktree integration", () => {
 
 		const boardFile = path.join(fixture.mainRepo, ".trackboi/boards/default.json");
 		const projectFile = path.join(fixture.mainRepo, ".trackboi/project.json");
-		const boardMtimeBefore = statSync(boardFile).mtimeMs;
-		const projectMtimeBefore = statSync(projectFile).mtimeMs;
-
 		const runtime = fixture.runtime();
 		runtime.chooseProjectPath(fixture.mainRepo);
 		runtime.readDesktopState();
+		const boardMtimeAfterFirstRead = statSync(boardFile).mtimeMs;
+		const projectMtimeAfterFirstRead = statSync(projectFile).mtimeMs;
 		runtime.readDesktopState();
 
-		expect(statSync(boardFile).mtimeMs).toBe(boardMtimeBefore);
-		expect(statSync(projectFile).mtimeMs).toBe(projectMtimeBefore);
+		expect(statSync(boardFile).mtimeMs).toBe(boardMtimeAfterFirstRead);
+		expect(statSync(projectFile).mtimeMs).toBe(projectMtimeAfterFirstRead);
 	});
 
 	test("surfaces legacy branch-scoped cards as synthetic tracks and materializes them on edit", () => {
@@ -325,10 +444,10 @@ describe("runtime worktree integration", () => {
 			track.source.ref === "feature/onboarding" &&
 			!track.synthetic
 		));
-		const cardFile = JSON.parse(readFileSync(
-			path.join(fixture.mainRepo, ".trackboi/cards/card_legacy_track.json"),
+		const cardFile = parseFrontmatter<Card>(readFileSync(
+			path.join(fixture.mainRepo, ".trackboi/cards/card_legacy_track/index.md"),
 			"utf8",
-		)) as Card;
+		)).data as Card;
 
 		expect(materializedTrack).toBeDefined();
 		expect(updated.trackId).toBe(materializedTrack?.id);
@@ -404,6 +523,7 @@ describe("runtime worktree integration", () => {
 
 type SeedCard = {
 	id: string;
+	boardId?: string;
 	title: string;
 	description: string;
 	column: string;
@@ -414,9 +534,15 @@ type SeedCard = {
 
 type SeedStoreInput = {
 	board: {
+		id?: string;
 		name: string;
 		columns: Board["columns"];
 	};
+	extraBoards?: Array<{
+		id: string;
+		name: string;
+		columns: Board["columns"];
+	}>;
 	cards: SeedCard[];
 };
 
@@ -450,6 +576,7 @@ function createRuntimeFixture() {
 		seedStore(projectPath: string, storagePath: string, input: SeedStoreInput) {
 			const storageRoot = path.join(projectPath, storagePath);
 			const board: Board = {
+				id: input.board.id ?? "default",
 				version: 1,
 				name: input.board.name,
 				columns: input.board.columns,
@@ -462,8 +589,18 @@ function createRuntimeFixture() {
 				storagePath,
 				createdAt: "2026-04-18T07:59:00.000Z",
 				customFields: [],
+				people: [],
 			};
 			writeJsonAtomic(path.join(storageRoot, "boards/default.json"), board);
+			for (const extraBoard of input.extraBoards ?? []) {
+				writeJsonAtomic(path.join(storageRoot, "boards", `${extraBoard.id}.json`), {
+					id: extraBoard.id,
+					version: 1,
+					name: extraBoard.name,
+					columns: extraBoard.columns,
+					customFields: [],
+				} satisfies Board);
+			}
 			writeJsonAtomic(path.join(storageRoot, "project.json"), metadata);
 			for (const card of input.cards) {
 				writeCardFile(storageRoot, card);
@@ -476,7 +613,7 @@ function writeCardFile(storageRoot: string, seed: SeedCard): void {
 	const timestamp = seed.updatedAt;
 	const card: Card = {
 		id: seed.id,
-		boardId: "default",
+		boardId: seed.boardId ?? "default",
 		title: seed.title,
 		description: seed.description,
 		parentId: null,
@@ -487,11 +624,30 @@ function writeCardFile(storageRoot: string, seed: SeedCard): void {
 		labels: [],
 		assignee: null,
 		fieldValues: {},
-		comments: [],
 		createdAt: timestamp,
 		updatedAt: timestamp,
+		createdBy: "person_fixture",
+		updatedBy: "person_fixture",
 	};
-	writeJsonAtomic(path.join(storageRoot, "cards", `${seed.id}.json`), card);
+	const cardRoot = path.join(storageRoot, "cards", seed.id);
+	mkdirSync(path.join(cardRoot, "comments"), { recursive: true });
+	writeFileSync(path.join(cardRoot, "index.md"), writeFrontmatter({
+		id: card.id,
+		boardId: card.boardId,
+		title: card.title,
+		parentId: card.parentId,
+		scope: card.scope,
+		trackId: card.trackId,
+		column: card.column,
+		rank: card.rank,
+		labels: card.labels,
+		assignee: card.assignee,
+		fieldValues: card.fieldValues,
+		createdAt: card.createdAt,
+		updatedAt: card.updatedAt,
+		createdBy: card.createdBy,
+		updatedBy: card.updatedBy,
+	}, card.description));
 }
 
 function runGit(cwd: string, args: string[]): string {

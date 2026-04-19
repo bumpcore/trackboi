@@ -12,9 +12,9 @@ export type BoardPresentation = {
 type BuildBoardPresentationInput = {
 	cards: Card[];
 	columns: Column[];
+	selectedBoardId: string | null;
 	boardScopeMode: BoardScopeMode;
 	selectedTrackId: string | null;
-	worktreeFilterId: string | null;
 	editingCardId: string | null;
 };
 
@@ -27,7 +27,7 @@ export function buildBoardPresentation(input: BuildBoardPresentationInput): Boar
 	const visibleParentCards: Card[] = [];
 
 	for (const card of input.cards) {
-		if (input.worktreeFilterId && !(card.worktreeIds?.includes(input.worktreeFilterId) ?? false)) {
+		if (input.selectedBoardId && card.boardId !== input.selectedBoardId) {
 			continue;
 		}
 

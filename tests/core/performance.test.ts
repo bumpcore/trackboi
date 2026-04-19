@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { performance } from "node:perf_hooks";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { writeFrontmatter } from "../../src/core/frontmatter";
 import { createRuntime } from "../../src/core/runtime";
 import { writeJsonAtomic } from "../../src/core/json";
 import type { Board, Card, ProjectMetadata } from "../../src/core/types";
@@ -119,6 +120,7 @@ function createPerformanceFixture() {
 		seedStore(projectPath: string, storagePath: string, cardCount: number, prefix: string) {
 			const storageRoot = path.join(projectPath, storagePath);
 			const board: Board = {
+				id: "default",
 				version: 1,
 				name: `${prefix} board`,
 				columns: [
@@ -135,6 +137,7 @@ function createPerformanceFixture() {
 				storagePath,
 				createdAt: "2026-04-18T07:59:00.000Z",
 				customFields: [],
+				people: [],
 			};
 
 			writeJsonAtomic(path.join(storageRoot, "boards/default.json"), board);
@@ -153,11 +156,30 @@ function createPerformanceFixture() {
 					labels: [],
 					assignee: null,
 					fieldValues: {},
-					comments: [],
 					createdAt: "2026-04-18T10:00:00.000Z",
 					updatedAt: "2026-04-18T10:00:00.000Z",
+					createdBy: "person_fixture",
+					updatedBy: "person_fixture",
 				};
-				writeJsonAtomic(path.join(storageRoot, "cards", `${card.id}.json`), card);
+				const cardRoot = path.join(storageRoot, "cards", card.id);
+				mkdirSync(path.join(cardRoot, "comments"), { recursive: true });
+				writeFileSync(path.join(cardRoot, "index.md"), writeFrontmatter({
+					id: card.id,
+					boardId: card.boardId,
+					title: card.title,
+					parentId: card.parentId,
+					scope: card.scope,
+					trackId: card.trackId,
+					column: card.column,
+					rank: card.rank,
+					labels: card.labels,
+					assignee: card.assignee,
+					fieldValues: card.fieldValues,
+					createdAt: card.createdAt,
+					updatedAt: card.updatedAt,
+					createdBy: card.createdBy,
+					updatedBy: card.updatedBy,
+				}, card.description));
 			}
 		},
 	};

@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, type OpenDialogOptions } from "electron";
 import { findCliArgs, runCli } from "../cli/main";
 import { createNodeFsTrackboiActions } from "../core";
 import { createAppWindow } from "./main/createWindow";
+import { listDetectedEditors, openCardInEditor } from "./main/editorIntegration";
 import { createProjectStorageWatcher } from "./main/storageWatcher";
 import { registerTrackboiIpcHandlers } from "./main/trackboiIpc";
 import { registerWindowIpcHandlers } from "./main/windowIpc";
@@ -17,7 +18,14 @@ const trackboi = createNodeFsTrackboiActions({
 	},
 });
 const storageWatcher = createProjectStorageWatcher({
-	paths: trackboi.paths,
+	paths: {
+		boardsPath: trackboi.paths.boardsPath,
+		cardsPath: trackboi.paths.cardsPath,
+		cardDirPath: trackboi.paths.cardDirPath,
+		cardCommentsPath: trackboi.paths.cardCommentsPath,
+		tracksPath: trackboi.paths.tracksPath,
+		trackFilesPath: trackboi.paths.trackFilesPath,
+	},
 	onProjectChanged(rootPath) {
 		trackboi.invalidateCache();
 		mainWindow?.webContents.send(ipcChannels.events.projectChanged, { rootPath });
@@ -83,7 +91,13 @@ async function chooseWorkspaceFile(): Promise<string | null> {
 
 function registerIpc(): void {
 	registerWindowIpcHandlers();
-	registerTrackboiIpcHandlers({ trackboi, getActiveProject, readDesktopState });
+	registerTrackboiIpcHandlers({
+		trackboi,
+		getActiveProject,
+		readDesktopState,
+		listDetectedEditors,
+		openCardInEditor: (cardId) => openCardInEditor(trackboi, cardId),
+	});
 }
 
 function createWindow(): void {

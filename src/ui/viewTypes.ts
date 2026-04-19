@@ -8,7 +8,7 @@ export type ScopeMode = "track" | "global" | "existing";
 
 export type LeftPanelView = "explorer" | "agents";
 
-export type RightPanelView = "card" | "track" | "activity" | "context" | "project-settings";
+export type RightPanelView = "card" | "track" | "activity" | "context";
 
 export type WorkspaceShellPrefs = {
 	leftWidth: number;

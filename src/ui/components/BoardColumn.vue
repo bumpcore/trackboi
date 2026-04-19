@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useSortable } from "@vueuse/integrations/useSortable";
-import { ref, watch } from "vue";
-import { CircleDashed, Plus, Trash2 } from "lucide-vue-next";
+import { onBeforeUnmount, ref, watch } from "vue";
+import { ChevronRight, CircleDashed, Plus, Trash2 } from "lucide-vue-next";
 import Badge from "@/ui/components/Badge.vue";
 import Button from "@/ui/components/Button.vue";
 import MarkdownContent from "@/ui/components/MarkdownContent.vue";
@@ -12,6 +12,7 @@ import type { Card as TrackboiCard, Column, CustomField, FieldValue } from "@/co
 
 const props = defineProps<{
 	column: Column;
+	columns: Column[];
 	cards: TrackboiCard[];
 	childProgress: Record<string, { total: number; done: number }>;
 	customFields: CustomField[];
@@ -23,15 +24,28 @@ const props = defineProps<{
 const emit = defineEmits<{
 	move: [cardId: string, toColumn: string, beforeCardId: string | null];
 	create: [columnId: string];
+	select: [card: TrackboiCard];
 	edit: [card: TrackboiCard];
 	delete: [card: TrackboiCard];
+	openInEditor: [card: TrackboiCard];
 	freshSeen: [cardId: string];
 }>();
 
 const listElement = ref<HTMLElement | null>(null);
 const sortableCards = ref<TrackboiCard[]>([]);
+const contextMenu = ref<{
+	card: TrackboiCard;
+	x: number;
+	y: number;
+	moveOpen: boolean;
+	moveMenuSide: "left" | "right";
+} | null>(null);
+const CONTEXT_MENU_WIDTH = 208;
+const CONTEXT_MENU_HEIGHT = 180;
+const CONTEXT_MENU_MARGIN = 8;
 let suppressActivation = false;
 let activationResetTimer: number | null = null;
+let moveMenuCloseTimer: number | null = null;
 
 watch(
 	() => props.cards,
@@ -84,8 +98,101 @@ function visibleFieldEntries(card: TrackboiCard) {
 
 function activateCard(card: TrackboiCard) {
 	if (suppressActivation) return;
+	emit("select", card);
+}
+
+function openCardEditor(card: TrackboiCard) {
+	if (suppressActivation) return;
 	emit("edit", card);
 }
+
+function openContextMenu(card: TrackboiCard, event: MouseEvent) {
+	event.preventDefault();
+	event.stopPropagation();
+	emit("select", card);
+	const currentTarget = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+	const rect = currentTarget?.getBoundingClientRect();
+	const pointerX = Number.isFinite(event.clientX) && event.clientX > 0
+		? event.clientX
+		: (rect?.left ?? 0) + 20;
+	const pointerY = Number.isFinite(event.clientY) && event.clientY > 0
+		? event.clientY
+		: (rect?.top ?? 0) + 20;
+	const maxX = Math.max(CONTEXT_MENU_MARGIN, window.innerWidth - CONTEXT_MENU_WIDTH - CONTEXT_MENU_MARGIN);
+	const maxY = Math.max(CONTEXT_MENU_MARGIN, window.innerHeight - CONTEXT_MENU_HEIGHT - CONTEXT_MENU_MARGIN);
+	contextMenu.value = {
+		card,
+		x: Math.min(Math.max(pointerX, CONTEXT_MENU_MARGIN), maxX),
+		y: Math.min(Math.max(pointerY, CONTEXT_MENU_MARGIN), maxY),
+		moveOpen: false,
+		moveMenuSide: pointerX > window.innerWidth - (CONTEXT_MENU_WIDTH * 2) ? "left" : "right",
+	};
+}
+
+function closeContextMenu() {
+	if (moveMenuCloseTimer !== null) {
+		window.clearTimeout(moveMenuCloseTimer);
+		moveMenuCloseTimer = null;
+	}
+	contextMenu.value = null;
+}
+
+function handlePointerDown() {
+	closeContextMenu();
+}
+
+function moveViaContext(columnId: string) {
+	if (!contextMenu.value) return;
+	emit("move", contextMenu.value.card.id, columnId, null);
+	closeContextMenu();
+}
+
+function availableMoveColumns() {
+	const menu = contextMenu.value;
+	if (!menu) return [];
+	return props.columns.filter((candidate) => candidate.id !== menu.card.column);
+}
+
+function openMoveMenu() {
+	if (!contextMenu.value) return;
+	if (moveMenuCloseTimer !== null) {
+		window.clearTimeout(moveMenuCloseTimer);
+		moveMenuCloseTimer = null;
+	}
+	contextMenu.value.moveOpen = true;
+}
+
+function scheduleMoveMenuClose() {
+	if (!contextMenu.value) return;
+	if (moveMenuCloseTimer !== null) {
+		window.clearTimeout(moveMenuCloseTimer);
+	}
+	moveMenuCloseTimer = window.setTimeout(() => {
+		if (contextMenu.value) {
+			contextMenu.value.moveOpen = false;
+		}
+		moveMenuCloseTimer = null;
+	}, 180);
+}
+
+watch(contextMenu, (nextMenu, previousMenu) => {
+	if (!previousMenu && nextMenu) {
+		window.setTimeout(() => {
+			if (contextMenu.value) window.addEventListener("pointerdown", handlePointerDown);
+		}, 0);
+		return;
+	}
+	if (previousMenu && !nextMenu) {
+		window.removeEventListener("pointerdown", handlePointerDown);
+	}
+});
+
+onBeforeUnmount(() => {
+	window.removeEventListener("pointerdown", handlePointerDown);
+	if (moveMenuCloseTimer !== null) {
+		window.clearTimeout(moveMenuCloseTimer);
+	}
+});
 </script>
 
 <template>
@@ -130,8 +237,11 @@ function activateCard(card: TrackboiCard) {
 					role="button"
 					tabindex="0"
 					@click="activateCard(card)"
+					@dblclick.stop="openCardEditor(card)"
+					@mousedown.right.capture.prevent.stop="openContextMenu(card, $event)"
+					@contextmenu.capture.prevent.stop="openContextMenu(card, $event)"
 					@mouseenter="emit('freshSeen', card.id)"
-					@keydown.enter.prevent="activateCard(card)"
+					@keydown.enter.prevent="openCardEditor(card)"
 					@keydown.space.prevent="activateCard(card)"
 				>
 					<div
@@ -201,6 +311,70 @@ function activateCard(card: TrackboiCard) {
 					</Button>
 				</UiCard>
 				</div>
+
+				<Teleport to="body">
+					<div
+						v-if="contextMenu"
+						class="fixed z-[80] min-w-36 rounded-[7px] border border-border/75 bg-card/98 p-1 shadow-[0_18px_34px_hsl(0_0%_0%/0.16)] backdrop-blur-sm"
+						:style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
+						data-sortable-ignore
+						@pointerdown.stop
+						@click.stop
+					>
+						<button
+							type="button"
+							class="trackboi-mono-font flex w-full items-center rounded-[5px] px-2.5 py-1.5 text-left text-[11px] text-foreground hover:bg-secondary/55"
+							@click="openCardEditor(contextMenu.card); closeContextMenu()"
+						>
+							Edit
+						</button>
+						<button
+							type="button"
+							class="trackboi-mono-font flex w-full items-center rounded-[5px] px-2.5 py-1.5 text-left text-[11px] text-foreground hover:bg-secondary/55"
+							@click="emit('openInEditor', contextMenu.card); closeContextMenu()"
+						>
+							Open in editor
+						</button>
+						<div
+							class="relative"
+							@mouseenter="openMoveMenu()"
+							@mouseleave="scheduleMoveMenuClose()"
+						>
+							<button
+								type="button"
+								class="trackboi-mono-font flex w-full items-center justify-between rounded-[5px] px-2.5 py-1.5 text-left text-[11px] text-foreground hover:bg-secondary/55"
+								@click="contextMenu.moveOpen = !contextMenu.moveOpen"
+							>
+								<span>Move to</span>
+								<ChevronRight class="h-3 w-3 text-muted-foreground" />
+							</button>
+							<div
+								v-if="contextMenu.moveOpen"
+								class="absolute top-0 z-[81] min-w-32 rounded-[7px] border border-border/75 bg-card/98 p-1 shadow-[0_18px_34px_hsl(0_0%_0%/0.16)] backdrop-blur-sm"
+								:class="contextMenu.moveMenuSide === 'left' ? 'right-full mr-1.5' : 'left-full ml-1.5'"
+								@mouseenter="openMoveMenu()"
+								@mouseleave="scheduleMoveMenuClose()"
+							>
+								<button
+									v-for="targetColumn in availableMoveColumns()"
+									:key="targetColumn.id"
+									type="button"
+									class="trackboi-mono-font flex w-full items-center rounded-[5px] px-2.5 py-1.5 text-left text-[11px] text-foreground hover:bg-secondary/55"
+									@click="moveViaContext(targetColumn.id)"
+								>
+									{{ targetColumn.name }}
+								</button>
+							</div>
+						</div>
+						<button
+							type="button"
+							class="trackboi-mono-font mt-1 flex w-full items-center rounded-[5px] px-2.5 py-1.5 text-left text-[11px] text-destructive hover:bg-destructive/8"
+							@click="emit('delete', contextMenu.card); closeContextMenu()"
+						>
+							Delete
+						</button>
+					</div>
+				</Teleport>
 
 				<div
 					v-if="sortableCards.length === 0"

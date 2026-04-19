@@ -1,11 +1,12 @@
-import { DEFAULT_BOARD_ID } from "./constants";
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { writeFrontmatter } from "./frontmatter";
 import { normalizeScope } from "./git";
 import { newId } from "./id";
-import { readJson, writeJsonAtomic } from "./json";
-import { cardPath } from "./paths";
+import { cardCommentPath, cardCommentsPath, cardPath } from "./paths";
 import { rankBetween } from "./rank";
-import { deleteCardFile, now, type ProjectStore } from "./storage";
-import type { Card, CardPatch, CreateCardInput, MoveCardInput, ProjectSnapshotWithInternals } from "./types";
+import { deleteCardFile, now, readCards, type ProjectStore } from "./storage";
+import type { Card, CardComment, CardPatch, CreateCardCommentInput, CreateCardInput, MoveCardInput, ProjectSnapshotWithInternals } from "./types";
 
 /**
  * Creates a card at the end of its target column.
@@ -27,7 +28,7 @@ export function createCardInStore(
 	const timestamp = now();
 	const card: Card = {
 		id: newId("card"),
-		boardId: DEFAULT_BOARD_ID,
+		boardId: input.boardId ?? snapshot.board.id,
 		title,
 		description: input.description?.trim() ?? "",
 		parentId: input.parentId ?? null,
@@ -41,15 +42,18 @@ export function createCardInStore(
 		comments: [],
 		createdAt: timestamp,
 		updatedAt: timestamp,
+		createdBy: input.actorId ?? "person_unknown",
+		updatedBy: input.actorId ?? "person_unknown",
 	};
-	writeJsonAtomic(cardPath(store.rootPath, card.id), card);
+	writeCardMarkdown(store, card);
 	return card;
 }
 
 export function updateCardInStore(store: ProjectStore, cardId: string, patch: CardPatch): Card {
-	const filePath = cardPath(store.rootPath, cardId);
-	const next = applyCardPatch(readJson<Card>(filePath), patch);
-	writeJsonAtomic(filePath, next);
+	const current = readCards(store.rootPath).find((card) => card.id === cardId);
+	if (!current) throw new Error(`Unknown card: ${cardId}`);
+	const next = applyCardPatch(current, patch);
+	writeCardMarkdown(store, next);
 	return next;
 }
 
@@ -85,6 +89,32 @@ export function deleteCardInStore(store: ProjectStore, cardId: string): { ok: tr
 	return { ok: true };
 }
 
+export function addCardCommentInStore(
+	store: ProjectStore,
+	card: Card,
+	input: CreateCardCommentInput,
+): CardComment {
+	const timestamp = now();
+	const comment: CardComment = {
+		id: newId("comment"),
+		cardId: card.id,
+		body: input.body.trim(),
+		createdAt: timestamp,
+		updatedAt: timestamp,
+		createdBy: input.actorId ?? "person_unknown",
+		updatedBy: input.actorId ?? "person_unknown",
+	};
+	mkdirSync(cardCommentsPath(store.rootPath, card.id), { recursive: true });
+	writeCardCommentMarkdown(store, comment);
+	writeCardMarkdown(store, {
+		...card,
+		updatedAt: timestamp,
+		updatedBy: comment.updatedBy,
+		comments: [...card.comments, comment],
+	});
+	return comment;
+}
+
 /**
  * Applies a user/API patch while preserving fields not mentioned by the patch.
  */
@@ -94,6 +124,8 @@ function applyCardPatch(card: Card, patch: CardPatch): Card {
 			trackId: card.trackId ?? null,
 			fieldValues: card.fieldValues ?? {},
 			comments: card.comments ?? [],
+			createdBy: card.createdBy ?? "person_unknown",
+			updatedBy: card.updatedBy ?? card.createdBy ?? "person_unknown",
 		};
 	if (typeof patch.title === "string") next.title = patch.title.trim();
 	if (typeof patch.description === "string") next.description = patch.description.trim();
@@ -109,8 +141,42 @@ function applyCardPatch(card: Card, patch: CardPatch): Card {
 	if (Array.isArray(patch.labels)) next.labels = patch.labels.filter((label) => typeof label === "string");
 	if ("assignee" in patch) next.assignee = typeof patch.assignee === "string" ? patch.assignee : null;
 	if (patch.fieldValues) next.fieldValues = patch.fieldValues;
-	if (Array.isArray(patch.comments)) next.comments = patch.comments;
 	if (!next.title.trim()) throw new Error("Card title is required");
 	next.updatedAt = now();
+	if (typeof patch.actorId === "string" && patch.actorId) next.updatedBy = patch.actorId;
 	return next;
+}
+
+function writeCardMarkdown(store: ProjectStore, card: Card): void {
+	mkdirSync(path.dirname(cardPath(store.rootPath, card.id)), { recursive: true });
+	const payload = writeFrontmatter({
+		id: card.id,
+		boardId: card.boardId,
+		title: card.title,
+		parentId: card.parentId,
+		scope: card.scope,
+		trackId: card.trackId,
+		column: card.column,
+		rank: card.rank,
+		labels: card.labels,
+		assignee: card.assignee,
+		fieldValues: card.fieldValues,
+		createdAt: card.createdAt,
+		updatedAt: card.updatedAt,
+		createdBy: card.createdBy,
+		updatedBy: card.updatedBy,
+	}, card.description);
+	writeFileSync(cardPath(store.rootPath, card.id), payload, "utf8");
+}
+
+function writeCardCommentMarkdown(store: ProjectStore, comment: CardComment): void {
+	const payload = writeFrontmatter({
+		id: comment.id,
+		cardId: comment.cardId,
+		createdAt: comment.createdAt,
+		updatedAt: comment.updatedAt,
+		createdBy: comment.createdBy,
+		updatedBy: comment.updatedBy,
+	}, comment.body);
+	writeFileSync(cardCommentPath(store.rootPath, comment.cardId, comment.id), payload, "utf8");
 }

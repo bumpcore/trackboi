@@ -9,6 +9,21 @@ Trackboi is organized around a small set of hard boundaries:
 
 If a change makes those boundaries blur, stop and reshape it before adding more code.
 
+## Product Terms
+
+Use these words consistently:
+
+- `Workspace`: a user-registered repo/folder entry.
+- `Worktree`: a discovered workspace variant. It is not a separate user-added workspace, but it has explicit identity because filesystem-backed state can differ or lag there.
+- `Project`: the per-worktree project definition and identity. It owns project-scoped settings such as people aliases and future agent/workflow config.
+- `Board`: a first-class board inside a worktree project.
+- `Track`: a board-scoped work container for intent, files, references, and activity.
+- `Task` / `Card`: a board-scoped work item that can optionally link to a track.
+
+Hierarchy:
+
+- `workspace -> worktree -> project -> board -> track -> task`
+
 ## Layer Rules
 
 ### `core`

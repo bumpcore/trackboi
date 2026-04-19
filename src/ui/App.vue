@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import BoardSettingsModal from "@/ui/components/BoardSettingsModal.vue";
 import BoardWorkspace from "@/ui/components/BoardWorkspace.vue";
 import ConfirmDialog from "@/ui/components/ConfirmDialog.vue";
 import LeftRail from "@/ui/components/LeftRail.vue";
 import LeftWorkspacePanel from "@/ui/components/LeftWorkspacePanel.vue";
 import PanelResizer from "@/ui/components/PanelResizer.vue";
+import ProjectSettingsModal from "@/ui/components/ProjectSettingsModal.vue";
 import RightWorkspacePanel from "@/ui/components/RightWorkspacePanel.vue";
 import SettingsModal from "@/ui/components/SettingsModal.vue";
 import WorkspaceTitleBar from "@/ui/components/WorkspaceTitleBar.vue";
@@ -15,6 +17,7 @@ import { useCardWorkflow } from "@/ui/composables/useCardWorkflow";
 import { useConfirmation } from "@/ui/composables/useConfirmation";
 import { useDesktopProjectState } from "@/ui/composables/useDesktopProjectState";
 import { useFreshCardHighlights } from "@/ui/composables/useFreshCardHighlights";
+import { useGlobalAppSettings } from "@/ui/composables/useGlobalAppSettings";
 import { usePanelShortcuts } from "@/ui/composables/usePanelShortcuts";
 import { useProjectBoardSettings } from "@/ui/composables/useProjectBoardSettings";
 import { useThemeMode } from "@/ui/composables/useThemeMode";
@@ -49,11 +52,12 @@ const {
 	view,
 	worktrees,
 	selectedWorktreeId,
-	worktreeFilterId,
+	selectedBoardId,
 	loading,
 	busy,
 	error,
 	settingsOpen,
+	projectSettingsOpen,
 	storagePathDraft,
 	run,
 	setError,
@@ -66,6 +70,8 @@ const {
 	switchProject,
 	selectWorktree,
 	closeSettings,
+	openProjectSettings,
+	closeProjectSettings,
 	activeProject,
 	allEntries,
 	hasProjects,
@@ -104,12 +110,11 @@ const {
 	selectedCard,
 	draft,
 	trackId,
-	targetWorktreeId,
 	fieldValues,
-	commentAuthor,
 	commentBody,
 	subtaskTitle,
 	openCreateCard,
+	selectCard,
 	openCard,
 	submitCard,
 	addComment,
@@ -117,7 +122,6 @@ const {
 	createSubtask,
 } = useCardWorkflow({
 	snapshot,
-	selectedWorktreeId,
 	selectedTrackId,
 	run,
 	requestConfirmation,
@@ -137,37 +141,59 @@ const {
 	selectedTrack,
 	selectedTrackId,
 	selectedWorktree,
-	worktreeFilterId,
 	editingCardId: computed(() => selectedCard.value?.id ?? null),
 });
 
 const { freshCardIds, clearFreshCard } = useFreshCardHighlights(snapshot);
 
 const {
+	boardCreateNameDraft,
 	fieldNameDraft,
 	fieldTypeDraft,
 	fieldOptionsDraft,
 	boardNameDraft,
+	boards,
 	columnNameDrafts,
 	newColumnName,
+	personDisplayNameDraft,
+	personEmailsDraft,
+	personNamesDraft,
 	fieldTypeOptions,
 	customFields,
+	people,
+	selectBoard,
+	createBoard,
+	deleteBoard,
 	saveBoardName,
 	addColumn,
 	renameColumn,
 	removeColumn,
 	addCustomField,
 	removeCustomField,
+	addPersonAlias,
+	removePersonAlias,
 } = useProjectBoardSettings({
 	snapshot,
 	columnCardCounts: allColumnCardCounts,
 	run,
 	setError,
 	requestConfirmation,
+	refreshDesktopState,
 });
 
+const boardSettingsOpen = ref(false);
+const agentNameDraft = ref("");
+const agentDescriptionDraft = ref("");
+
+const {
+	appSettings,
+	detectedEditors,
+	registerAgent,
+	removeAgent,
+	updateEditorPreference,
+} = useGlobalAppSettings();
+
 const shell = useWorkspaceShellState();
-const rightViewPinned = ref(false);
 const {
 	leftPanelShortcut,
 	rightPanelShortcut,
@@ -183,13 +209,6 @@ const columnOptions = computed<SelectOption[]>(() => (
 	})) ?? []
 ));
 
-const cardTargetWorktreeOptions = computed<SelectOption[]>(() => (
-	worktrees.value.map((worktree) => ({
-		value: worktree.id,
-		label: worktree.branch ? `${worktree.name} (${worktree.branch})` : worktree.name,
-	}))
-));
-
 const trackCounts = computed<Record<string, number>>(() => {
 	const counts: Record<string, number> = {};
 	for (const track of tracks.value) counts[track.id] = 0;
@@ -202,6 +221,13 @@ const trackCounts = computed<Record<string, number>>(() => {
 const selectedCardTrack = computed(() => {
 	if (!selectedCard.value?.trackId) return null;
 	return snapshot.value?.tracks.find((track) => track.id === selectedCard.value?.trackId) ?? null;
+});
+
+const actorLabels = computed<Record<string, string>>(() => {
+	const labels: Record<string, string> = {};
+	for (const person of snapshot.value?.metadata.people ?? []) labels[person.id] = person.displayName;
+	for (const agent of appSettings.value.agents) labels[agent.id] = agent.name;
+	return labels;
 });
 
 const shellGridStyle = computed(() => ({
@@ -219,7 +245,6 @@ const rightResizerStyle = computed(() => ({
 function setRightView(view: RightPanelView) {
 	if (shell.rightCollapsed.value) shell.rightCollapsed.value = false;
 	shell.setRightView(view);
-	rightViewPinned.value = view === "activity" || view === "context" || view === "project-settings";
 }
 
 function ensureRightPanelOpen() {
@@ -229,12 +254,17 @@ function ensureRightPanelOpen() {
 function openCardPanel(columnId?: string) {
 	openCreateCard(columnId);
 	ensureRightPanelOpen();
-	rightViewPinned.value = false;
 	shell.setRightView("card");
 }
 
 function editCard(card: Parameters<typeof openCard>[0]) {
 	openCard(card);
+	ensureRightPanelOpen();
+	shell.setRightView("card");
+}
+
+function selectCardFromBoard(card: Parameters<typeof openCard>[0]) {
+	selectCard(card);
 }
 
 function openTrackPanel(trackId: string) {
@@ -252,8 +282,15 @@ function handleTrackSelection(trackId: string) {
 function createTrackFromShell() {
 	openCreateTrack();
 	ensureRightPanelOpen();
-	rightViewPinned.value = false;
 	shell.setRightView("track");
+}
+
+function openBoardSettings() {
+	boardSettingsOpen.value = true;
+}
+
+function closeBoardSettings() {
+	boardSettingsOpen.value = false;
 }
 
 usePanelShortcuts({
@@ -281,11 +318,47 @@ async function moveCard(cardId: string, toColumn: string, beforeCardId: string |
 	});
 }
 
+async function openSelectedCardInEditor(card: { id: string }) {
+	await run(async () => {
+		await desktop.openCardInEditor(card.id);
+	});
+}
+
+async function saveEditorSettings() {
+	await updateEditorPreference(appSettings.value.editor.preferredEditorId, appSettings.value.editor.customCommand);
+}
+
+async function handleRegisterAgent() {
+	const name = agentNameDraft.value.trim();
+	if (!name) return;
+	await registerAgent({
+		name,
+		description: agentDescriptionDraft.value,
+	});
+	agentNameDraft.value = "";
+	agentDescriptionDraft.value = "";
+}
+
+function handleGlobalDeleteKey(event: KeyboardEvent) {
+	if (event.key !== "Delete" || !selectedCard.value) return;
+	const target = event.target as HTMLElement | null;
+	if (target?.closest("input, textarea, [contenteditable='true'], [contenteditable='']")) return;
+	event.preventDefault();
+	void deleteCard(selectedCard.value);
+}
+
 desktop.addBoardChangedListener(() => {
 	void refreshDesktopState();
 });
 
-onMounted(loadProject);
+onMounted(() => {
+	void loadProject();
+	window.addEventListener("keydown", handleGlobalDeleteKey);
+});
+
+onBeforeUnmount(() => {
+	window.removeEventListener("keydown", handleGlobalDeleteKey);
+});
 </script>
 
 <template>
@@ -330,11 +403,12 @@ onMounted(loadProject);
 					:snapshot="snapshot"
 					:track-counts="trackCounts"
 					:tracks="tracks"
-					:worktree-filter-id="worktreeFilterId"
+					:selected-worktree-id="selectedWorktreeId"
 					:worktrees="worktrees"
 					@select-worktree="selectWorktree"
 					@select-track="handleTrackSelection"
 					@create-track="createTrackFromShell"
+					@open-project-settings="openProjectSettings"
 				/>
 			</div>
 
@@ -348,7 +422,9 @@ onMounted(loadProject);
 				:fresh-card-ids="freshCardIds"
 				:has-projects="hasProjects"
 				:loading="loading"
+				:boards="boards"
 				:scope-empty-message="scopeEmptyMessage"
+				:selected-board-id="selectedBoardId"
 				:selected-card-id="selectedCard?.id ?? null"
 				:selected-track="selectedTrack"
 				:selected-worktree="selectedWorktree"
@@ -356,10 +432,14 @@ onMounted(loadProject);
 				:track-labels="trackLabels"
 				:visible-card-count="visibleCardCount"
 				@choose-project="chooseProject"
+				@select-board="selectBoard"
+				@open-board-settings="openBoardSettings"
 				@create-column="createColumnFromBoard"
 				@create-card="openCardPanel"
+				@select-card="selectCardFromBoard"
 				@edit-card="editCard"
 				@delete-card="deleteCard"
+				@open-card-in-editor="openSelectedCardInEditor"
 				@fresh-seen="clearFreshCard"
 				@move-card="moveCard"
 			/>
@@ -367,17 +447,9 @@ onMounted(loadProject);
 			<RightWorkspacePanel
 				v-model:draft="draft"
 				v-model:track-id="trackId"
-				v-model:target-worktree-id="targetWorktreeId"
 				v-model:field-values="fieldValues"
-				v-model:comment-author="commentAuthor"
 				v-model:comment-body="commentBody"
 				v-model:subtask-title="subtaskTitle"
-				v-model:board-name-draft="boardNameDraft"
-				v-model:column-name-drafts="columnNameDrafts"
-				v-model:new-column-name="newColumnName"
-				v-model:field-name-draft="fieldNameDraft"
-				v-model:field-type-draft="fieldTypeDraft"
-				v-model:field-options-draft="fieldOptionsDraft"
 				:active-view="shell.rightView.value"
 				:busy="busy"
 				:collapsed="shell.rightCollapsed.value"
@@ -385,15 +457,12 @@ onMounted(loadProject);
 				:card-mode="cardPanelMode"
 				:card-track="selectedCardTrack"
 				:column-options="columnOptions"
-				:column-card-counts="allColumnCardCounts"
 				:comment-list="selectedCard?.comments ?? []"
 				:current-branch="currentBranch"
 				:custom-fields="customFields"
-				:field-type-options="fieldTypeOptions"
-				:project-snapshot="snapshot"
+				:actor-labels="actorLabels"
 				:subtask-progress="editingSubtaskProgress"
 				:subtasks="editingSubtasks"
-				:target-worktree-options="cardTargetWorktreeOptions"
 				:track="selectedTrack"
 				:track-mode="trackPanelMode"
 				:track-options="cardTrackOptions"
@@ -412,12 +481,6 @@ onMounted(loadProject);
 				@write-track-file="writeSelectedTrackFile"
 				@delete-track-file="deleteSelectedTrackFile"
 				@edit-track-card="editCard"
-				@save-board-name="saveBoardName"
-				@rename-column="renameColumn"
-				@remove-column="removeColumn"
-				@add-column="addColumn"
-				@add-custom-field="addCustomField"
-				@remove-custom-field="removeCustomField"
 			/>
 
 			<PanelResizer
@@ -443,8 +506,14 @@ onMounted(loadProject);
 				v-model:left-panel-shortcut="leftPanelShortcut"
 				v-model:right-panel-shortcut="rightPanelShortcut"
 				v-model:theme-mode="themeMode"
+				v-model:preferred-editor-id="appSettings.editor.preferredEditorId"
+				v-model:custom-editor-command="appSettings.editor.customCommand"
+				v-model:agent-name-draft="agentNameDraft"
+				v-model:agent-description-draft="agentDescriptionDraft"
 				:open="settingsOpen"
 				:paths="view.storageSearchPaths"
+				:agents="appSettings.agents"
+				:detected-editors="detectedEditors"
 				:busy="busy"
 				@close="closeSettings"
 				@add="addStorageSearchPath"
@@ -452,6 +521,49 @@ onMounted(loadProject);
 				@reset="resetStorageSearchPaths"
 				@reset-shortcuts="resetPanelShortcuts"
 				@reset-theme="resetThemeMode"
+				@register-agent="handleRegisterAgent"
+				@remove-agent="removeAgent"
+				@save-editor="saveEditorSettings"
+			/>
+
+			<ProjectSettingsModal
+				v-model:person-display-name-draft="personDisplayNameDraft"
+				v-model:person-emails-draft="personEmailsDraft"
+				v-model:person-names-draft="personNamesDraft"
+				:open="projectSettingsOpen"
+				:busy="busy"
+				:snapshot="snapshot"
+				:people="people"
+				@close="closeProjectSettings"
+				@add-person-alias="addPersonAlias"
+				@remove-person-alias="removePersonAlias"
+			/>
+
+			<BoardSettingsModal
+				v-model:board-create-name-draft="boardCreateNameDraft"
+				v-model:board-name-draft="boardNameDraft"
+				v-model:column-name-drafts="columnNameDrafts"
+				v-model:new-column-name="newColumnName"
+				v-model:field-name-draft="fieldNameDraft"
+				v-model:field-type-draft="fieldTypeDraft"
+				v-model:field-options-draft="fieldOptionsDraft"
+				:open="boardSettingsOpen"
+				:busy="busy"
+				:snapshot="snapshot"
+				:boards="boards"
+				:column-card-counts="allColumnCardCounts"
+				:custom-fields="customFields"
+				:field-type-options="fieldTypeOptions"
+				@close="closeBoardSettings"
+				@select-board="selectBoard"
+				@create-board="createBoard"
+				@delete-board="deleteBoard"
+				@save-board-name="saveBoardName"
+				@rename-column="renameColumn"
+				@remove-column="removeColumn"
+				@add-column="addColumn"
+				@add-custom-field="addCustomField"
+				@remove-custom-field="removeCustomField"
 			/>
 		</main>
 

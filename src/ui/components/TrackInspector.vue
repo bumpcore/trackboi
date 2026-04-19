@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
 import { FileText, Plus, Save, Trash2, X } from "lucide-vue-next";
+import { newId } from "@/core/id";
 import type {
 	Card as TrackboiCard,
 	CardComment,
@@ -60,7 +61,6 @@ const referenceDraft = reactive({
 	value: "",
 	kind: "path" as TrackReferenceKind,
 });
-const activityAuthor = ref("You");
 const activityBody = ref("");
 const fileName = ref("");
 const fileContent = ref("");
@@ -131,7 +131,7 @@ function addDecision() {
 	decisions.value = [
 		...decisions.value,
 		{
-			id: crypto.randomUUID(),
+			id: newId("decision"),
 			title: decisionDraft.title.trim(),
 			body: decisionDraft.body.trim(),
 			status: decisionDraft.status,
@@ -153,7 +153,7 @@ function addReference() {
 	references.value = [
 		...references.value,
 		{
-			id: crypto.randomUUID(),
+			id: newId("reference"),
 			kind: referenceDraft.kind,
 			label: referenceDraft.label.trim(),
 			value: referenceDraft.value.trim(),
@@ -174,11 +174,13 @@ function addActivity() {
 	activity.value = [
 		...activity.value,
 		{
-			id: crypto.randomUUID(),
-			author: activityAuthor.value.trim() || "Unknown",
+			id: newId("comment"),
+			cardId: props.track?.id ?? "track_activity",
 			body: activityBody.value.trim(),
 			createdAt: timestamp,
 			updatedAt: timestamp,
+			createdBy: props.track?.updatedBy ?? props.track?.createdBy ?? "person_unknown",
+			updatedBy: props.track?.updatedBy ?? props.track?.createdBy ?? "person_unknown",
 		},
 	];
 	activityBody.value = "";
@@ -366,7 +368,7 @@ function formatTimestamp(value?: string) {
 						class="grid gap-2 rounded-md border border-border/60 bg-background/30 p-3"
 					>
 						<div class="flex items-center justify-between gap-2">
-							<span class="text-sm font-medium text-foreground">{{ entry.author }}</span>
+							<span class="text-sm font-medium text-foreground">{{ entry.createdBy }}</span>
 							<div class="flex items-center gap-2">
 								<span class="text-xs text-muted-foreground">{{ formatTimestamp(entry.createdAt) }}</span>
 								<Button variant="ghost" size="icon" type="button" @click="removeActivity(entry.id)">
@@ -378,7 +380,6 @@ function formatTimestamp(value?: string) {
 					</article>
 				</div>
 				<div class="grid gap-2 rounded-md border border-dashed border-border/60 p-3">
-					<Input v-model="activityAuthor" autocomplete="off" placeholder="Author" />
 					<MarkdownEditor v-model="activityBody" placeholder="Add a handoff, investigation note, or update." />
 					<Button type="button" :disabled="!activityBody.trim()" @click="addActivity">
 						<Plus class="h-4 w-4" />

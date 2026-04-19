@@ -19,7 +19,7 @@ type DesktopProjectState = {
 	view: Ref<ProjectView>;
 	worktrees: Ref<WorktreeContext[]>;
 	selectedWorktreeId: Ref<string | null>;
-	worktreeFilterId: Ref<string | null>;
+	selectedBoardId: Ref<string | null>;
 	loading: Ref<boolean>;
 	busy: Ref<boolean>;
 	error: Ref<string | null>;
@@ -39,6 +39,7 @@ type DesktopProjectState = {
 	switchProject(projectId: string): Promise<void>;
 	selectWorktree(worktreeId: string): Promise<void>;
 	closeSettings(): void;
+	openProjectSettings(): void;
 	closeProjectSettings(): void;
 	allEntries: ComputedRef<ProjectEntry[]>;
 	activeProject: ComputedRef<ProjectEntry | null>;
@@ -60,7 +61,7 @@ export function useDesktopProjectState(requestConfirmation: ConfirmationRequeste
 	const view = ref<ProjectView>({ sources: [], activeProjectId: null, storageSearchPaths: [] });
 	const worktrees = ref<WorktreeContext[]>([]);
 	const selectedWorktreeId = ref<string | null>(null);
-	const worktreeFilterId = ref<string | null>(null);
+	const selectedBoardId = ref<string | null>(null);
 	const loading = ref(true);
 	const busy = ref(false);
 	const error = ref<string | null>(null);
@@ -132,24 +133,16 @@ export function useDesktopProjectState(requestConfirmation: ConfirmationRequeste
 
 	async function restoreRememberedWorktree(nextState: DesktopState): Promise<DesktopState> {
 		const projectId = nextState.view.activeProjectId;
-		if (!projectId) {
-			worktreeFilterId.value = null;
-			return nextState;
-		}
+		if (!projectId) return nextState;
 
 		const rememberedWorktreeId = readWorktreeMemory()[projectId] ?? null;
-		if (!rememberedWorktreeId) {
-			worktreeFilterId.value = null;
-			return nextState;
-		}
+		if (!rememberedWorktreeId) return nextState;
 
 		if (!nextState.worktrees.some((worktree) => worktree.id === rememberedWorktreeId)) {
 			rememberProjectWorktree(projectId, null);
-			worktreeFilterId.value = null;
 			return nextState;
 		}
 
-		worktreeFilterId.value = rememberedWorktreeId;
 		if (nextState.selectedWorktreeId === rememberedWorktreeId) return nextState;
 
 		return desktop.setSelectedWorktree(rememberedWorktreeId);
@@ -159,9 +152,7 @@ export function useDesktopProjectState(requestConfirmation: ConfirmationRequeste
 		view.value = nextState.view;
 		worktrees.value = nextState.worktrees;
 		selectedWorktreeId.value = nextState.selectedWorktreeId;
-		if (worktreeFilterId.value && !nextState.worktrees.some((worktree) => worktree.id === worktreeFilterId.value)) {
-			worktreeFilterId.value = null;
-		}
+		selectedBoardId.value = nextState.selectedBoardId;
 		snapshot.value = nextState.snapshot;
 	}
 
@@ -263,27 +254,20 @@ export function useDesktopProjectState(requestConfirmation: ConfirmationRequeste
 	}
 
 	async function selectWorktree(worktreeId: string) {
-		if (worktreeId === "__all__") {
-			worktreeFilterId.value = null;
-			rememberProjectWorktree(view.value.activeProjectId, null);
-			return;
-		}
-		if (worktreeFilterId.value === worktreeId) {
-			worktreeFilterId.value = null;
-			rememberProjectWorktree(view.value.activeProjectId, null);
-			return;
-		}
-		if (worktreeId === selectedWorktreeId.value && worktreeFilterId.value === worktreeId) return;
+		if (worktreeId === selectedWorktreeId.value) return;
 
 		await run(async () => {
 			applyDesktopState(await desktop.setSelectedWorktree(worktreeId));
-			worktreeFilterId.value = worktreeId;
 			rememberProjectWorktree(view.value.activeProjectId, worktreeId);
 		});
 	}
 
 	function closeSettings() {
 		settingsOpen.value = false;
+	}
+
+	function openProjectSettings() {
+		projectSettingsOpen.value = true;
 	}
 
 	function closeProjectSettings() {
@@ -295,7 +279,7 @@ export function useDesktopProjectState(requestConfirmation: ConfirmationRequeste
 		view,
 		worktrees,
 		selectedWorktreeId,
-		worktreeFilterId,
+		selectedBoardId,
 		loading,
 		busy,
 		error,
@@ -315,6 +299,7 @@ export function useDesktopProjectState(requestConfirmation: ConfirmationRequeste
 		switchProject,
 		selectWorktree,
 		closeSettings,
+		openProjectSettings,
 		closeProjectSettings,
 		allEntries,
 		activeProject,

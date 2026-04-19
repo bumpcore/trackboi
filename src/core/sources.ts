@@ -2,8 +2,7 @@ import { existsSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { readGitContext } from "./git";
 import { readJson } from "./json";
-import { boardPath } from "./paths";
-import { countCards, projectName, resolveProjectStorage } from "./storage";
+import { countCards, hasBoards, projectName, resolveProjectStorage } from "./storage";
 import type { Project, ProjectEntry, ProjectRegistry, ProjectSource } from "./types";
 
 type CodeWorkspaceFile = {
@@ -38,13 +37,13 @@ export function activeProjectFromRegistry(registry: ProjectRegistry): Project | 
 export function projectStatus(project: Project, registry: ProjectRegistry): ProjectEntry["status"] {
 	if (!existsSync(project.path)) return "missing";
 	const resolved = resolveProjectStorage(project, registry, false);
-	if (!resolved || !existsSync(boardPath(resolved.rootPath))) return "uninitialized";
+	if (!resolved || !hasBoards(resolved.rootPath)) return "uninitialized";
 	return "ready";
 }
 
 function projectCardCount(project: Project, registry: ProjectRegistry): number | null {
 	const resolved = resolveProjectStorage(project, registry, false);
-	if (!resolved || !existsSync(boardPath(resolved.rootPath))) return null;
+	if (!resolved || !hasBoards(resolved.rootPath)) return null;
 	return countCards(resolved.rootPath);
 }
 

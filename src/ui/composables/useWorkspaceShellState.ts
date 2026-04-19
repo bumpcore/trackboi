@@ -53,6 +53,10 @@ function normalizeLeftView(value: unknown): LeftPanelView {
 	return value === "agents" ? "agents" : "explorer";
 }
 
+function normalizeRightView(value: unknown): RightPanelView {
+	return value === "track" || value === "activity" || value === "context" ? value : "card";
+}
+
 /**
  * Persists the desktop shell layout as a global user preference and recreates
  * the concept panel behavior in the real renderer: hidden resize gutters,
@@ -141,7 +145,7 @@ export function useWorkspaceShellState(): WorkspaceShellState {
 				leftCollapsed: typeof parsed.leftCollapsed === "boolean" ? parsed.leftCollapsed : DEFAULT_PREFS.leftCollapsed,
 				rightCollapsed: typeof parsed.rightCollapsed === "boolean" ? parsed.rightCollapsed : DEFAULT_PREFS.rightCollapsed,
 				leftView: normalizeLeftView(parsed.leftView),
-				rightView: parsed.rightView ?? DEFAULT_PREFS.rightView,
+				rightView: normalizeRightView(parsed.rightView),
 			};
 		} catch {
 			return { ...DEFAULT_PREFS };
@@ -172,7 +176,7 @@ export function useWorkspaceShellState(): WorkspaceShellState {
 		leftCollapsed.value = prefs.leftCollapsed;
 		rightCollapsed.value = prefs.rightCollapsed;
 		leftView.value = normalizeLeftView(prefs.leftView);
-		rightView.value = prefs.rightView;
+		rightView.value = normalizeRightView(prefs.rightView);
 	}
 
 	applyPrefs(readPrefs());

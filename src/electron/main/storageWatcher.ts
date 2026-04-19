@@ -3,6 +3,8 @@ import { existsSync, readdirSync, type FSWatcher, watch } from "node:fs";
 type TrackboiPaths = {
 	boardsPath(rootPath: string): string;
 	cardsPath(rootPath: string): string;
+	cardDirPath(rootPath: string, cardId: string): string;
+	cardCommentsPath(rootPath: string, cardId: string): string;
 	tracksPath(rootPath: string): string;
 	trackFilesPath(rootPath: string, trackId: string): string;
 };
@@ -36,6 +38,21 @@ export function createProjectStorageWatcher(options: {
 			]) {
 				if (!existsSync(targetPath)) continue;
 				activeWatchers.push(watch(targetPath, () => queueProjectChanged(rootPath)));
+			}
+
+			const cardsRoot = options.paths.cardsPath(rootPath);
+			if (existsSync(cardsRoot)) {
+				for (const entry of readdirSync(cardsRoot, { withFileTypes: true })) {
+					if (!entry.isDirectory()) continue;
+					const cardRoot = options.paths.cardDirPath(rootPath, entry.name);
+					if (existsSync(cardRoot)) {
+						activeWatchers.push(watch(cardRoot, () => queueProjectChanged(rootPath)));
+					}
+					const commentsPath = options.paths.cardCommentsPath(rootPath, entry.name);
+					if (existsSync(commentsPath)) {
+						activeWatchers.push(watch(commentsPath, () => queueProjectChanged(rootPath)));
+					}
+				}
 			}
 
 			const tracksRoot = options.paths.tracksPath(rootPath);

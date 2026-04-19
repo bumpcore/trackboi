@@ -18,8 +18,6 @@ const props = defineProps<{
 	busy: boolean;
 	columnOptions: SelectOption[];
 	trackOptions: SelectOption[];
-	targetWorktreeOptions: SelectOption[];
-	targetWorktreeLocked: boolean;
 	customFields: CustomField[];
 	comments: CardComment[];
 	subtasks: TrackboiCard[];
@@ -39,9 +37,7 @@ const draft = defineModel<CardDraft>("draft", { required: true });
 const trackId = defineModel<string>("trackId", { required: true });
 const fieldValues = defineModel<FieldValuesDraft>("fieldValues", { required: true });
 const subtaskTitle = defineModel<string>("subtaskTitle", { required: true });
-const commentAuthor = defineModel<string>("commentAuthor", { required: true });
 const commentBody = defineModel<string>("commentBody", { required: true });
-const targetWorktreeId = defineModel<string>("targetWorktreeId", { required: true });
 
 const isOpen = computed(() => props.card != null);
 
@@ -145,7 +141,7 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 						<section class="grid gap-4 rounded-[14px] border border-border/55 bg-background/22 p-4">
 							<div>
 								<p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary/90">Placement</p>
-								<p class="mt-1 text-sm text-muted-foreground">Where the card lives and which track or worktree owns it.</p>
+								<p class="mt-1 text-sm text-muted-foreground">Where the card lives and which track owns it.</p>
 							</div>
 
 							<div class="grid gap-4 md:grid-cols-2">
@@ -160,13 +156,6 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 								</label>
 							</div>
 
-							<label
-								v-if="targetWorktreeOptions.length > 0"
-								class="grid gap-1.5 text-xs font-medium text-muted-foreground"
-							>
-								Worktree
-								<Select v-model="targetWorktreeId" :options="targetWorktreeOptions" :disabled="targetWorktreeLocked" />
-							</label>
 						</section>
 
 						<div v-if="card.conflicted && card.variants?.length" class="grid gap-3 rounded-[14px] border border-border/55 bg-background/22 p-4 text-xs">
@@ -202,7 +191,7 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 					<div>
 						<p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary/90">Fields</p>
 						<p class="mt-1 text-xs text-muted-foreground">
-							Project-defined card details.
+							Board-defined card details.
 						</p>
 					</div>
 
@@ -247,7 +236,7 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 									class="grid gap-2 rounded-[12px] border border-border/55 bg-card/55 px-3 py-3"
 								>
 									<div class="flex items-center justify-between gap-3 text-xs">
-										<span class="font-medium text-foreground">{{ comment.author }}</span>
+										<span class="font-medium text-foreground">{{ comment.createdBy }}</span>
 										<span class="font-mono text-muted-foreground">{{ formatTimestamp(comment.createdAt) }}</span>
 									</div>
 									<MarkdownContent :value="comment.body" class="text-sm text-foreground" />
@@ -256,11 +245,6 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 							<p v-else class="text-sm text-muted-foreground">No comments yet. Add a handoff note, investigation summary, or next-step context.</p>
 
 							<div class="grid gap-3 rounded-[12px] border border-dashed border-border/70 bg-background/35 p-3">
-								<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-									Author
-									<Input v-model="commentAuthor" autocomplete="off" placeholder="You or agent name" />
-								</label>
-
 								<div class="grid gap-1.5 text-xs font-medium text-muted-foreground">
 									<span>New comment</span>
 									<MarkdownEditor

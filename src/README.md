@@ -24,3 +24,22 @@ Trackboi keeps the product source boundaries intentionally small:
   - `lib/` contains pure derivation and formatting helpers
 
 Business logic should not leak into `electron` or `ui`. Those layers call `core`.
+
+## Product Model
+
+Trackboi's working hierarchy is:
+
+- `Workspace`: a user-registered repo/folder
+- `Worktree`: a discovered workspace variant with its own filesystem-backed state
+- `Project`: the per-worktree project definition and identity
+- `Board`: a first-class board inside that worktree project
+- `Track`: a board-scoped work container
+- `Task/Card`: a board-scoped work item
+
+The active worktree is the current workspace context. Switching worktrees replaces
+the effective project, board, track, and card universe instead of filtering one
+merged multi-worktree snapshot.
+
+Board custom fields are board-scoped. Project settings are reserved for
+project-wide configuration inside the active worktree, such as people aliases
+and future agent or workflow configuration.

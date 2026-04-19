@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed, useTemplateRef } from "vue";
-import { FileText, FolderCog, Layers3, Route, SquarePen } from "lucide-vue-next";
-import type { Card as TrackboiCard, CustomField, ProjectSnapshot, Track, TrackPatch } from "@/core/types";
+import { FileText, Layers3, Route, SquarePen } from "lucide-vue-next";
+import type { Card as TrackboiCard, CustomField, Track, TrackPatch } from "@/core/types";
 import Badge from "@/ui/components/Badge.vue";
 import Button from "@/ui/components/Button.vue";
 import CardEditorPanel from "@/ui/components/CardEditorPanel.vue";
 import MarkdownContent from "@/ui/components/MarkdownContent.vue";
-import ProjectSettingsPanel from "@/ui/components/ProjectSettingsPanel.vue";
 import TrackEditorPanel from "@/ui/components/TrackEditorPanel.vue";
 import Tooltip from "@/ui/components/Tooltip.vue";
 import type { SelectOption } from "@/ui/components/Select.vue";
@@ -20,15 +19,12 @@ const props = defineProps<{
 	cardMode: "closed" | "create" | "edit";
 	cardTrack: Track | null;
 	columnOptions: SelectOption[];
-	columnCardCounts: Record<string, number>;
 	commentList: TrackboiCard["comments"];
 	currentBranch: string | null;
 	customFields: CustomField[];
-	fieldTypeOptions: Array<{ value: CustomField["type"]; label: string }>;
-	projectSnapshot: ProjectSnapshot | null;
+	actorLabels: Record<string, string>;
 	subtaskProgress: ChildProgress;
 	subtasks: TrackboiCard[];
-	targetWorktreeOptions: SelectOption[];
 	track: Track | null;
 	trackMode: "create" | "edit";
 	trackOptions: SelectOption[];
@@ -39,17 +35,9 @@ const props = defineProps<{
 
 const draft = defineModel<CardDraft>("draft", { required: true });
 const trackId = defineModel<string>("trackId", { required: true });
-const targetWorktreeId = defineModel<string>("targetWorktreeId", { required: true });
 const fieldValues = defineModel<FieldValuesDraft>("fieldValues", { required: true });
-const commentAuthor = defineModel<string>("commentAuthor", { required: true });
 const commentBody = defineModel<string>("commentBody", { required: true });
 const subtaskTitle = defineModel<string>("subtaskTitle", { required: true });
-const boardNameDraft = defineModel<string>("boardNameDraft", { required: true });
-const columnNameDrafts = defineModel<Record<string, string>>("columnNameDrafts", { required: true });
-const newColumnName = defineModel<string>("newColumnName", { required: true });
-const fieldNameDraft = defineModel<string>("fieldNameDraft", { required: true });
-const fieldTypeDraft = defineModel<CustomField["type"]>("fieldTypeDraft", { required: true });
-const fieldOptionsDraft = defineModel<string>("fieldOptionsDraft", { required: true });
 
 const emit = defineEmits<{
 	selectView: [view: RightPanelView];
@@ -64,12 +52,6 @@ const emit = defineEmits<{
 	writeTrackFile: [fileName: string, content: string];
 	deleteTrackFile: [fileName: string];
 	editTrackCard: [card: TrackboiCard];
-	saveBoardName: [];
-	renameColumn: [column: ProjectSnapshot["board"]["columns"][number]];
-	removeColumn: [column: ProjectSnapshot["board"]["columns"][number]];
-	addColumn: [];
-	addCustomField: [];
-	removeCustomField: [fieldId: string];
 }>();
 
 const rightItems: Array<{ id: RightPanelView; label: string; icon: typeof SquarePen }> = [
@@ -77,11 +59,9 @@ const rightItems: Array<{ id: RightPanelView; label: string; icon: typeof Square
 	{ id: "track", label: "Track", icon: Route },
 	{ id: "activity", label: "Activity", icon: Layers3 },
 	{ id: "context", label: "Context", icon: FileText },
-	{ id: "project-settings", label: "Project Settings", icon: FolderCog },
 ];
 
 const title = computed(() => {
-	if (props.activeView === "project-settings") return "Project settings";
 	if (props.activeView === "track") {
 		return props.trackMode === "create" ? "New track" : (props.track?.title ?? "Track");
 	}
@@ -99,7 +79,6 @@ const trackEditor = useTemplateRef<InstanceType<typeof TrackEditorPanel>>("track
 const showFooterActions = computed(() => (
 	(props.activeView === "card" && (props.cardMode === "create" || props.card != null))
 	|| (props.activeView === "track" && (props.trackMode === "create" || props.track != null))
-	|| props.activeView === "project-settings"
 ));
 
 function forwardWriteTrackFile(fileName: string, content: string) {
@@ -181,9 +160,7 @@ function submitTrackFromFooter() {
 					v-if="activeView === 'card' && (cardMode === 'create' || card)"
 					v-model:draft="draft"
 					v-model:track-id="trackId"
-					v-model:target-worktree-id="targetWorktreeId"
 					v-model:field-values="fieldValues"
-					v-model:comment-author="commentAuthor"
 					v-model:comment-body="commentBody"
 					v-model:subtask-title="subtaskTitle"
 					:busy="busy"
@@ -191,9 +168,9 @@ function submitTrackFromFooter() {
 					:mode="cardMode === 'create' ? 'create' : 'edit'"
 					:column-options="columnOptions"
 					:track-options="trackOptions"
-					:target-worktree-options="targetWorktreeOptions"
 					:custom-fields="customFields"
 					:comments="commentList"
+					:actor-labels="actorLabels"
 					:subtasks="subtasks"
 					:subtask-progress="subtaskProgress"
 					@submit="emit('submitCard')"
@@ -253,7 +230,7 @@ function submitTrackFromFooter() {
 								:key="comment.id"
 								class="rounded-md border border-border/80 bg-secondary/55 px-3 py-3"
 							>
-								<div class="text-sm font-medium text-foreground">{{ comment.author }}</div>
+								<div class="text-sm font-medium text-foreground">{{ actorLabels[comment.createdBy] ?? comment.createdBy }}</div>
 								<MarkdownContent :value="comment.body" class="mt-2 text-sm text-foreground" />
 							</div>
 						</div>
@@ -263,7 +240,7 @@ function submitTrackFromFooter() {
 								:key="entry.id"
 								class="rounded-md border border-border/80 bg-secondary/55 px-3 py-3"
 							>
-								<div class="text-sm font-medium text-foreground">{{ entry.author }}</div>
+								<div class="text-sm font-medium text-foreground">{{ actorLabels[entry.createdBy] ?? entry.createdBy }}</div>
 								<MarkdownContent :value="entry.body" class="mt-2 text-sm text-foreground" />
 							</div>
 						</div>
@@ -327,26 +304,6 @@ function submitTrackFromFooter() {
 					</section>
 				</div>
 
-				<ProjectSettingsPanel
-					v-else
-					v-model:board-name-draft="boardNameDraft"
-					v-model:column-name-drafts="columnNameDrafts"
-					v-model:new-column-name="newColumnName"
-					v-model:field-name-draft="fieldNameDraft"
-					v-model:field-type-draft="fieldTypeDraft"
-					v-model:field-options-draft="fieldOptionsDraft"
-					:snapshot="projectSnapshot"
-					:custom-fields="customFields"
-					:column-card-counts="columnCardCounts"
-					:field-type-options="fieldTypeOptions"
-					:busy="busy"
-					@save-board-name="emit('saveBoardName')"
-					@rename-column="emit('renameColumn', $event)"
-					@remove-column="emit('removeColumn', $event)"
-					@add-column="emit('addColumn')"
-					@add-custom-field="emit('addCustomField')"
-					@remove-custom-field="emit('removeCustomField', $event)"
-				/>
 			</div>
 
 			<footer class="border-t border-border/70 px-5 py-3">
@@ -381,11 +338,6 @@ function submitTrackFromFooter() {
 						</Button>
 					</template>
 
-					<template v-else-if="activeView === 'project-settings'">
-						<Button type="button" :disabled="busy || !boardNameDraft.trim()" @click="emit('saveBoardName')">
-							Save Board
-						</Button>
-					</template>
 				</div>
 			</footer>
 		</div>

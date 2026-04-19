@@ -1,5 +1,6 @@
 import { ipcMain, type IpcMainInvokeEvent } from "electron";
 import type { NodeFsTrackboiActions } from "../../core";
+import type { DetectedEditor } from "../bridge";
 import { ipcChannels } from "../ipc";
 
 /**
@@ -9,8 +10,10 @@ export function registerTrackboiIpcHandlers(options: {
 	trackboi: NodeFsTrackboiActions;
 	getActiveProject(): Promise<Awaited<ReturnType<NodeFsTrackboiActions["getActiveProject"]>>>;
 	readDesktopState(): Promise<Awaited<ReturnType<NodeFsTrackboiActions["readDesktopState"]>>>;
+	listDetectedEditors(): DetectedEditor[];
+	openCardInEditor(cardId: string): Promise<{ ok: true }>;
 }): void {
-	const { trackboi, getActiveProject, readDesktopState } = options;
+	const { trackboi, getActiveProject, readDesktopState, listDetectedEditors, openCardInEditor } = options;
 
 	ipcMain.handle(ipcChannels.trackboi.getActiveProject, () => getActiveProject());
 	ipcMain.handle(ipcChannels.trackboi.listProjects, () => trackboi.listProjects());
@@ -22,12 +25,24 @@ export function registerTrackboiIpcHandlers(options: {
 	ipcMain.handle(ipcChannels.trackboi.setSelectedWorktree, (_event: IpcMainInvokeEvent, worktreeId: string | null) => (
 		trackboi.setSelectedWorktree(worktreeId)
 	));
+	ipcMain.handle(ipcChannels.trackboi.listBoards, () => trackboi.listBoards());
+	ipcMain.handle(ipcChannels.trackboi.setActiveBoard, (_event: IpcMainInvokeEvent, boardId: string) => (
+		trackboi.setActiveBoard(boardId)
+	));
+	ipcMain.handle(ipcChannels.trackboi.readAppSettings, () => trackboi.readAppSettings());
+	ipcMain.handle(ipcChannels.trackboi.updateAppSettings, (_event: IpcMainInvokeEvent, settings) => (
+		trackboi.updateAppSettings(settings)
+	));
+	ipcMain.handle(ipcChannels.trackboi.listDetectedEditors, () => listDetectedEditors());
+	ipcMain.handle(ipcChannels.trackboi.openCardInEditor, (_event: IpcMainInvokeEvent, cardId: string) => openCardInEditor(cardId));
 	ipcMain.handle(ipcChannels.trackboi.setStorageSearchPaths, (_event: IpcMainInvokeEvent, paths: string[]) => (
 		trackboi.setStorageSearchPaths(paths)
 	));
 	ipcMain.handle(ipcChannels.trackboi.setActiveWorkspaceFile, (_event: IpcMainInvokeEvent, filePath: string | null) => (
 		trackboi.setActiveWorkspaceFile(filePath)
 	));
+	ipcMain.handle(ipcChannels.trackboi.createBoard, (_event: IpcMainInvokeEvent, input) => trackboi.createBoard(input));
+	ipcMain.handle(ipcChannels.trackboi.deleteBoard, (_event: IpcMainInvokeEvent, boardId: string) => trackboi.deleteBoard(boardId));
 	ipcMain.handle(ipcChannels.trackboi.listTracks, () => trackboi.listTracks());
 	ipcMain.handle(ipcChannels.trackboi.getTrack, (_event: IpcMainInvokeEvent, trackId: string) => trackboi.getTrack(trackId));
 	ipcMain.handle(ipcChannels.trackboi.createTrack, (_event: IpcMainInvokeEvent, input) => trackboi.createTrack(input));
@@ -58,9 +73,10 @@ export function registerTrackboiIpcHandlers(options: {
 		trackboi.updateCard(cardId, patch)
 	));
 	ipcMain.handle(ipcChannels.trackboi.updateBoard, (_event: IpcMainInvokeEvent, board) => trackboi.updateBoard(board));
-	ipcMain.handle(ipcChannels.trackboi.updateCustomFields, (_event: IpcMainInvokeEvent, customFields) => (
-		trackboi.updateCustomFields(customFields)
+	ipcMain.handle(ipcChannels.trackboi.updateProjectPeople, (_event: IpcMainInvokeEvent, people) => (
+		trackboi.updateProjectPeople(people)
 	));
+	ipcMain.handle(ipcChannels.trackboi.addCardComment, (_event: IpcMainInvokeEvent, input) => trackboi.addCardComment(input));
 	ipcMain.handle(ipcChannels.trackboi.moveCard, (_event: IpcMainInvokeEvent, input) => (
 		trackboi.moveCard(input.cardId, input.toColumn, input.beforeCardId ?? null)
 	));

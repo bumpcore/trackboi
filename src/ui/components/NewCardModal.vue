@@ -11,7 +11,6 @@ defineProps<{
 	busy: boolean;
 	columnOptions: SelectOption[];
 	trackOptions: SelectOption[];
-	targetWorktreeOptions: SelectOption[];
 }>();
 
 defineEmits<{
@@ -23,7 +22,6 @@ const title = defineModel<string>("title", { required: true });
 const description = defineModel<string>("description", { required: true });
 const column = defineModel<string>("column", { required: true });
 const trackId = defineModel<string>("trackId", { required: true });
-const targetWorktreeId = defineModel<string>("targetWorktreeId", { required: true });
 </script>
 
 <template>
@@ -102,13 +100,6 @@ const targetWorktreeId = defineModel<string>("targetWorktreeId", { required: tru
 							</label>
 						</div>
 
-						<label
-							v-if="targetWorktreeOptions.length > 0"
-							class="grid gap-1.5 text-xs font-medium text-muted-foreground"
-						>
-							Worktree
-							<Select v-model="targetWorktreeId" :options="targetWorktreeOptions" />
-						</label>
 					</section>
 
 					<div class="sticky bottom-0 flex gap-2 border-t border-border/55 bg-card/96 pt-4 backdrop-blur-md">

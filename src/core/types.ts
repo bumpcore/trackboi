@@ -15,10 +15,49 @@ export type CustomField = {
 };
 
 export type Board = {
+	id: string;
 	version: 1;
 	name: string;
 	columns: Column[];
 	customFields: CustomField[];
+};
+
+export type BoardStatus = "ready" | "stale";
+
+export type BoardDescriptor = {
+	id: string;
+	name: string;
+	status: BoardStatus;
+	worktreeIds: string[];
+};
+
+export type GitIdentity = {
+	name: string;
+	email: string;
+};
+
+export type PersonAlias = {
+	id: string;
+	displayName: string;
+	gitEmails: string[];
+	gitNames: string[];
+};
+
+export type AgentRegistration = {
+	id: string;
+	name: string;
+	description: string;
+};
+
+export type EditorPreference = {
+	preferredEditorId: string;
+	customCommand: string;
+};
+
+export type AppSettings = {
+	version: 1;
+	agents: AgentRegistration[];
+	editor: EditorPreference;
 };
 
 export type ProjectMetadata = {
@@ -27,7 +66,7 @@ export type ProjectMetadata = {
 	name: string;
 	storagePath: string;
 	createdAt: string;
-	customFields: CustomField[];
+	people: PersonAlias[];
 };
 
 export type Card = {
@@ -46,6 +85,8 @@ export type Card = {
 	comments: CardComment[];
 	createdAt: string;
 	updatedAt: string;
+	createdBy: string;
+	updatedBy: string;
 	originWorktreeId?: string;
 	originStoragePath?: string;
 	worktreeIds?: string[];
@@ -55,10 +96,12 @@ export type Card = {
 
 export type CardComment = {
 	id: string;
-	author: string;
+	cardId: string;
 	body: string;
 	createdAt: string;
 	updatedAt: string;
+	createdBy: string;
+	updatedBy: string;
 };
 
 export type TrackSource =
@@ -111,6 +154,8 @@ export type Track = {
 	files: TrackFile[];
 	createdAt: string;
 	updatedAt: string;
+	createdBy?: string;
+	updatedBy?: string;
 	synthetic?: boolean;
 	originWorktreeId?: string;
 	originStoragePath?: string;
@@ -179,6 +224,8 @@ export type ProjectRegistry = {
 	storageSearchPaths: string[];
 	activeWorkspaceFile: string | null;
 	selectedWorktreeId: string | null;
+	selectedBoardId: string | null;
+	appSettings: AppSettings;
 };
 
 export type GitContext = {
@@ -207,6 +254,7 @@ export type ProjectSnapshot = {
 	metadata: ProjectMetadata;
 	git: GitContext;
 	board: Board;
+	boards: BoardDescriptor[];
 	tracks: Track[];
 	cards: Card[];
 };
@@ -216,10 +264,12 @@ export type DesktopState = {
 	view: ProjectView;
 	worktrees: WorktreeContext[];
 	selectedWorktreeId: string | null;
+	selectedBoardId: string | null;
 };
 
 export type ProjectSnapshotWithInternals = ProjectSnapshot & {
 	storageRoot: string;
+	boardRecords: Board[];
 };
 
 export type CreateCardInput = {
@@ -227,9 +277,10 @@ export type CreateCardInput = {
 	description?: string;
 	parentId?: string | null;
 	column: string;
+	boardId?: string;
 	scope?: WorkScope;
 	trackId?: string | null;
-	targetWorktreeId?: string | null;
+	actorId?: string;
 };
 
 export type MoveCardInput = {
@@ -239,19 +290,35 @@ export type MoveCardInput = {
 };
 
 export type CardPatch = Partial<
-	Pick<Card, "boardId" | "title" | "description" | "parentId" | "scope" | "trackId" | "column" | "rank" | "labels" | "assignee" | "fieldValues" | "comments">
->;
+	Pick<Card, "boardId" | "title" | "description" | "parentId" | "scope" | "trackId" | "column" | "rank" | "labels" | "assignee" | "fieldValues">
+> & {
+	actorId?: string;
+};
+
+export type CreateCardCommentInput = {
+	cardId: string;
+	body: string;
+	actorId?: string;
+};
 
 export type CreateTrackInput = {
 	title: string;
+	boardId?: string;
 	source?: TrackSource;
 	summary?: string;
 	plan?: string;
+	actorId?: string;
+};
+
+export type CreateBoardInput = {
+	name: string;
 };
 
 export type TrackPatch = Partial<
 	Pick<Track, "title" | "source" | "summary" | "plan" | "decisions" | "references" | "activity">
->;
+> & {
+	actorId?: string;
+};
 
 export type TrackFileWriteInput = {
 	trackId: string;
@@ -269,8 +336,10 @@ export type TrackFileReadResult = {
 export type RuntimePaths = {
 	boardsPath(rootPath: string): string;
 	cardsPath(rootPath: string): string;
-	boardPath(rootPath: string): string;
+	cardDirPath(rootPath: string, cardId: string): string;
+	boardPath(rootPath: string, boardId?: string): string;
 	cardPath(rootPath: string, cardId: string): string;
+	cardCommentsPath(rootPath: string, cardId: string): string;
 	tracksPath(rootPath: string): string;
 	trackPath(rootPath: string, trackId: string): string;
 	trackDirPath(rootPath: string, trackId: string): string;
@@ -290,12 +359,19 @@ export type TrackboiRuntime = {
 	prewarmProjects(): void;
 	invalidateCache(): void;
 	setSelectedWorktree(worktreeId: string | null): DesktopState;
+	listBoards(): BoardDescriptor[];
+	setActiveBoard(boardId: string): DesktopState;
+	readAppSettings(): AppSettings;
+	updateAppSettings(settings: AppSettings): AppSettings;
+	updateProjectPeople(people: PersonAlias[]): ProjectMetadata;
 	chooseProjectPath(projectPath: string): ProjectSnapshot;
 	locateProjectPath(projectId: string, projectPath: string): ProjectSnapshot;
 	removeProject(projectId: string): ProjectSnapshot | null;
 	switchProject(projectId: string): DesktopState;
 	setStorageSearchPaths(paths: string[]): ProjectView;
 	setActiveWorkspaceFile(filePath: string | null): ProjectView;
+	createBoard(input: CreateBoardInput): ProjectSnapshot;
+	deleteBoard(boardId: string): ProjectSnapshot;
 	listTracks(): Track[];
 	getTrack(trackId: string): Track;
 	createTrack(input: CreateTrackInput): Track;
@@ -305,9 +381,9 @@ export type TrackboiRuntime = {
 	writeTrackFile(input: TrackFileWriteInput): TrackFile;
 	deleteTrackFile(trackId: string, fileName: string): { ok: true };
 	createCard(input: CreateCardInput): Card;
+	addCardComment(input: CreateCardCommentInput): CardComment;
 	updateCard(cardId: string, patch: CardPatch): Card;
 	updateBoard(board: Board): Board;
-	updateCustomFields(customFields: CustomField[]): ProjectMetadata;
 	moveCard(input: MoveCardInput): Card;
 	deleteCard(cardId: string): { ok: true };
 };
@@ -319,8 +395,15 @@ export type TrackboiActions = {
 	readDesktopState(): Promise<DesktopState>;
 	prewarmProjects(): Promise<void>;
 	setSelectedWorktree(worktreeId: string | null): Promise<DesktopState>;
+	listBoards(): Promise<BoardDescriptor[]>;
+	setActiveBoard(boardId: string): Promise<DesktopState>;
+	readAppSettings(): Promise<AppSettings>;
+	updateAppSettings(settings: AppSettings): Promise<AppSettings>;
+	updateProjectPeople(people: PersonAlias[]): Promise<ProjectMetadata>;
 	setStorageSearchPaths(paths: string[]): Promise<ProjectView>;
 	setActiveWorkspaceFile(filePath: string | null): Promise<ProjectView>;
+	createBoard(input: CreateBoardInput): Promise<ProjectSnapshot>;
+	deleteBoard(boardId: string): Promise<ProjectSnapshot>;
 	listTracks(): Promise<Track[]>;
 	getTrack(trackId: string): Promise<Track>;
 	createTrack(input: CreateTrackInput): Promise<Track>;
@@ -335,9 +418,9 @@ export type TrackboiActions = {
 	removeProject(projectId: string): Promise<ProjectSnapshot | null>;
 	switchProject(projectId: string): Promise<DesktopState>;
 	createCard(input: CreateCardInput): Promise<Card>;
+	addCardComment(input: CreateCardCommentInput): Promise<CardComment>;
 	updateCard(cardId: string, patch: CardPatch): Promise<Card>;
 	updateBoard(board: Board): Promise<Board>;
-	updateCustomFields(customFields: CustomField[]): Promise<ProjectMetadata>;
 	moveCard(cardId: string, toColumn: string, beforeCardId: string | null): Promise<Card>;
 	deleteCard(cardId: string): Promise<{ ok: true }>;
 };

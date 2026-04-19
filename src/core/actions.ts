@@ -1,13 +1,17 @@
 import { createRuntime, stripInternalSnapshotFields, type RuntimeOptions } from "./runtime";
 import type {
+	AppSettings,
 	Board,
 	Card,
+	CardComment,
 	CardPatch,
-	CreateTrackInput,
+	CreateCardCommentInput,
 	CreateCardInput,
-	CustomField,
+	CreateBoardInput,
+	CreateTrackInput,
 	DesktopState,
 	MoveCardInput,
+	PersonAlias,
 	ProjectMetadata,
 	ProjectRegistry,
 	ProjectSnapshot,
@@ -113,12 +117,36 @@ class NodeFsTrackboiActionsImpl implements NodeFsTrackboiActions {
 		return this.runtime.setSelectedWorktree(worktreeId);
 	}
 
+	async listBoards() {
+		return this.runtime.listBoards();
+	}
+
+	async setActiveBoard(boardId: string): Promise<DesktopState> {
+		return this.runtime.setActiveBoard(boardId);
+	}
+
+	async readAppSettings(): Promise<AppSettings> {
+		return this.runtime.readAppSettings();
+	}
+
+	async updateAppSettings(settings: AppSettings): Promise<AppSettings> {
+		return this.runtime.updateAppSettings(settings);
+	}
+
 	async setStorageSearchPaths(paths: string[]): Promise<ProjectView> {
 		return this.runtime.setStorageSearchPaths(paths);
 	}
 
 	async setActiveWorkspaceFile(filePath: string | null): Promise<ProjectView> {
 		return this.runtime.setActiveWorkspaceFile(filePath);
+	}
+
+	async createBoard(input: CreateBoardInput): Promise<ProjectSnapshot> {
+		return this.runtime.createBoard(input);
+	}
+
+	async deleteBoard(boardId: string): Promise<ProjectSnapshot> {
+		return this.runtime.deleteBoard(boardId);
 	}
 
 	async listTracks(): Promise<Track[]> {
@@ -186,6 +214,10 @@ class NodeFsTrackboiActionsImpl implements NodeFsTrackboiActions {
 		return this.runtime.createCard(input);
 	}
 
+	async addCardComment(input: CreateCardCommentInput): Promise<CardComment> {
+		return this.runtime.addCardComment(input);
+	}
+
 	async updateCard(cardId: string, patch: CardPatch): Promise<Card> {
 		return this.runtime.updateCard(cardId, patch);
 	}
@@ -194,8 +226,8 @@ class NodeFsTrackboiActionsImpl implements NodeFsTrackboiActions {
 		return this.runtime.updateBoard(board);
 	}
 
-	async updateCustomFields(customFields: CustomField[]): Promise<ProjectMetadata> {
-		return this.runtime.updateCustomFields(customFields);
+	async updateProjectPeople(people: PersonAlias[]): Promise<ProjectMetadata> {
+		return this.runtime.updateProjectPeople(people);
 	}
 
 	async moveCard(cardId: string, toColumn: string, beforeCardId: string | null): Promise<Card> {

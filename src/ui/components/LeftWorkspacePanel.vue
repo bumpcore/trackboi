@@ -14,7 +14,7 @@ const props = defineProps<{
 	snapshot: ProjectSnapshot | null;
 	trackCounts: Record<string, number>;
 	tracks: Track[];
-	worktreeFilterId: string | null;
+	selectedWorktreeId: string | null;
 	worktrees: WorktreeContext[];
 }>();
 
@@ -22,6 +22,7 @@ const emit = defineEmits<{
 	selectWorktree: [worktreeId: string];
 	selectTrack: [trackId: string];
 	createTrack: [];
+	openProjectSettings: [];
 }>();
 
 const shouldShowWorktrees = computed(() => props.worktrees.length > 1);
@@ -102,13 +103,13 @@ function trackSourceLabel(track: Track) {
 							<button
 								type="button"
 								class="shell-sidebar-item w-full !items-start"
-								:class="{ 'is-active': worktreeFilterId === worktree.id }"
+								:class="{ 'is-active': selectedWorktreeId === worktree.id }"
 								@click="emit('selectWorktree', worktree.id)"
 							>
 								<span class="mt-1 inline-flex h-2 w-2 rounded-full bg-primary/90" />
 								<div class="min-w-0 flex-1">
 									<div class="truncate text-foreground">{{ worktree.name }}</div>
-									<div class="font-mono text-[10px] text-muted-foreground">{{ worktree.branch ?? worktree.path }}</div>
+									<div class="font-mono text-[10px] text-muted-foreground">switch workspace context · {{ worktree.branch ?? worktree.path }}</div>
 								</div>
 							</button>
 						</Tooltip>
@@ -139,8 +140,17 @@ function trackSourceLabel(track: Track) {
 		</div>
 
 		<footer class="border-t border-border/70 px-4 py-3">
-			<div class="font-mono text-[10px] text-muted-foreground">
-				{{ snapshot?.metadata.storagePath ?? ".trackboi" }}
+			<div class="flex items-center justify-between gap-3">
+				<div class="font-mono text-[10px] text-muted-foreground">
+					{{ snapshot?.metadata.storagePath ?? ".trackboi" }}
+				</div>
+				<button
+					type="button"
+					class="trackboi-mono-font text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+					@click="emit('openProjectSettings')"
+				>
+					Project settings
+				</button>
 			</div>
 		</footer>
 	</aside>

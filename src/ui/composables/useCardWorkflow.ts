@@ -4,7 +4,6 @@ import type { CardDraft, Confirmation } from "@/ui/viewTypes";
 import { NO_TRACK_SELECT_VALUE } from "@/ui/composables/useTrackWorkflow";
 import type {
 	Card as TrackboiCard,
-	CardComment,
 	FieldValue,
 	ProjectSnapshot,
 } from "@/core/types";
@@ -18,12 +17,11 @@ type CardWorkflow = {
 	selectedCard: Ref<TrackboiCard | null>;
 	draft: Ref<CardDraft>;
 	trackId: Ref<string>;
-	targetWorktreeId: Ref<string>;
 	fieldValues: Ref<Record<string, FieldValue>>;
-	commentAuthor: Ref<string>;
 	commentBody: Ref<string>;
 	subtaskTitle: Ref<string>;
 	openCreateCard(columnId?: string): void;
+	selectCard(card: TrackboiCard): void;
 	openCard(card: TrackboiCard): void;
 	closeCardPanel(): void;
 	submitCard(): Promise<void>;
@@ -39,7 +37,6 @@ type CardWorkflow = {
  */
 export function useCardWorkflow(options: {
 	snapshot: Ref<ProjectSnapshot | null>;
-	selectedWorktreeId: Ref<string | null>;
 	selectedTrackId: Ref<string | null>;
 	run(action: () => Promise<void>): Promise<void>;
 	requestConfirmation: ConfirmationRequester;
@@ -52,9 +49,7 @@ export function useCardWorkflow(options: {
 		column: "todo",
 	});
 	const trackId = ref(NO_TRACK_SELECT_VALUE);
-	const targetWorktreeId = ref("");
 	const fieldValues = ref<Record<string, FieldValue>>({});
-	const commentAuthor = ref("You");
 	const commentBody = ref("");
 	const subtaskTitle = ref("");
 
@@ -65,7 +60,6 @@ export function useCardWorkflow(options: {
 			column: columnId ?? options.snapshot.value?.board.columns[0]?.id ?? "todo",
 		};
 		trackId.value = options.selectedTrackId.value ?? NO_TRACK_SELECT_VALUE;
-		targetWorktreeId.value = options.selectedWorktreeId.value ?? "";
 		fieldValues.value = {};
 		commentBody.value = "";
 		subtaskTitle.value = "";
@@ -89,7 +83,6 @@ export function useCardWorkflow(options: {
 				column: selectedCard.value.column,
 			};
 			trackId.value = selectedCard.value.trackId ?? NO_TRACK_SELECT_VALUE;
-			targetWorktreeId.value = selectedCard.value.originWorktreeId ?? options.selectedWorktreeId.value ?? "";
 			fieldValues.value = { ...selectedCard.value.fieldValues };
 		},
 		{ immediate: true },
@@ -101,6 +94,13 @@ export function useCardWorkflow(options: {
 		resetDraft(columnId);
 	}
 
+	function selectCard(card: TrackboiCard) {
+		selectedCard.value = card;
+		if (panelMode.value === "edit") {
+			openCard(card);
+		}
+	}
+
 	function openCard(card: TrackboiCard) {
 		panelMode.value = "edit";
 		selectedCard.value = card;
@@ -110,7 +110,6 @@ export function useCardWorkflow(options: {
 			column: card.column,
 		};
 		trackId.value = card.trackId ?? NO_TRACK_SELECT_VALUE;
-		targetWorktreeId.value = card.originWorktreeId ?? options.selectedWorktreeId.value ?? "";
 		fieldValues.value = { ...card.fieldValues };
 		commentBody.value = "";
 		subtaskTitle.value = "";
@@ -134,7 +133,6 @@ export function useCardWorkflow(options: {
 					description: draft.value.description,
 					column: draft.value.column,
 					trackId: trackId.value === NO_TRACK_SELECT_VALUE ? null : trackId.value,
-					targetWorktreeId: targetWorktreeId.value || null,
 				});
 				resetDraft(draft.value.column);
 				panelMode.value = "closed";
@@ -162,18 +160,11 @@ export function useCardWorkflow(options: {
 		if (!selectedCard.value) return;
 		const body = commentBody.value.trim();
 		if (!body) return;
-		const timestamp = new Date().toISOString();
-		const comment: CardComment = {
-			id: crypto.randomUUID(),
-			author: commentAuthor.value.trim() || "Unknown",
-			body,
-			createdAt: timestamp,
-			updatedAt: timestamp,
-		};
 
 		await options.run(async () => {
-			await desktop.updateCard(selectedCard.value!.id, {
-				comments: [...(selectedCard.value?.comments ?? []), comment],
+			await desktop.addCardComment({
+				cardId: selectedCard.value!.id,
+				body,
 			});
 			commentBody.value = "";
 		});
@@ -206,7 +197,6 @@ export function useCardWorkflow(options: {
 				parentId: parent.id,
 				column: parent.column,
 				trackId: parent.trackId,
-				targetWorktreeId: parent.originWorktreeId ?? options.selectedWorktreeId.value ?? null,
 			});
 			subtaskTitle.value = "";
 		});
@@ -217,12 +207,11 @@ export function useCardWorkflow(options: {
 		selectedCard,
 		draft,
 		trackId,
-		targetWorktreeId,
 		fieldValues,
-		commentAuthor,
 		commentBody,
 		subtaskTitle,
 		openCreateCard,
+		selectCard,
 		openCard,
 		closeCardPanel,
 		submitCard,

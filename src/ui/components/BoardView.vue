@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from "vue";
 import { AlertTriangle, FolderOpen, GitBranch, Layers, Plus, RefreshCw, Route, Settings, Trash2, X } from "lucide-vue-next";
 import type { Card as TrackboiCard, CustomField, ProjectEntry, ProjectSnapshot, WorktreeContext } from "@/core/types";
 import Badge from "@/ui/components/Badge.vue";
@@ -12,7 +11,7 @@ import Tooltip from "@/ui/components/Tooltip.vue";
 import { projectColorStyle } from "@/ui/lib/projectColor";
 import type { BoardScopeMode, ChildProgress } from "@/ui/viewTypes";
 
-const props = defineProps<{
+defineProps<{
 	activeProject: ProjectEntry | null;
 	activeWorkspaceFile: string | null;
 	boardScopeOptions: SelectOption[];
@@ -28,7 +27,6 @@ const props = defineProps<{
 	trackFilterOptions: SelectOption[];
 	trackFilterValue: string;
 	trackLabels: Record<string, string>;
-	worktreeFilterId: string | null;
 	selectedWorktreeId: string | null;
 	scopeEmptyMessage: string | null;
 	snapshot: ProjectSnapshot | null;
@@ -73,10 +71,6 @@ function forwardTrackSelection(trackId: string | undefined) {
 function clearTrackSelection() {
 	emit("selectTrack", "__all__");
 }
-
-const worktreeFilterValue = computed(() => (
-	props.worktreeFilterId ?? "__all__"
-));
 
 function projectInitial(name: string | undefined) {
 	return (name ?? "Trackboi").slice(0, 1).toUpperCase();
@@ -153,7 +147,7 @@ function workspaceFileLabel(filePath: string) {
 					<Badge variant="secondary">{{ visibleCardCount }} shown</Badge>
 					<Select
 						v-if="worktreeOptions.length > 1"
-						:model-value="worktreeFilterValue"
+						:model-value="selectedWorktreeId ?? undefined"
 						:options="worktreeOptions"
 						class="w-44"
 						placeholder="Worktree"
@@ -256,11 +250,12 @@ function workspaceFileLabel(filePath: string) {
 					v-for="column in snapshot.board.columns"
 					:key="column.id"
 					:column="column"
-						:cards="cardsByColumn[column.id] ?? []"
-						:child-progress="childProgress"
-						:custom-fields="customFields"
-						:track-labels="trackLabels"
-						@move="forwardMove"
+					:columns="snapshot.board.columns"
+					:cards="cardsByColumn[column.id] ?? []"
+					:child-progress="childProgress"
+					:custom-fields="customFields"
+					:track-labels="trackLabels"
+					@move="forwardMove"
 					@create="emit('createCard', $event)"
 					@edit="emit('editCard', $event)"
 					@delete="emit('deleteCard', $event)"

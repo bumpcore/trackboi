@@ -19,9 +19,9 @@ const props = defineProps<{
 	mode: "create" | "edit";
 	columnOptions: SelectOption[];
 	trackOptions: SelectOption[];
-	targetWorktreeOptions: SelectOption[];
 	customFields: CustomField[];
 	comments: CardComment[];
+	actorLabels: Record<string, string>;
 	subtasks: TrackboiCard[];
 	subtaskProgress: ChildProgress;
 }>();
@@ -30,9 +30,7 @@ const draft = defineModel<CardDraft>("draft", { required: true });
 const trackId = defineModel<string>("trackId", { required: true });
 const fieldValues = defineModel<FieldValuesDraft>("fieldValues", { required: true });
 const subtaskTitle = defineModel<string>("subtaskTitle", { required: true });
-const commentAuthor = defineModel<string>("commentAuthor", { required: true });
 const commentBody = defineModel<string>("commentBody", { required: true });
-const targetWorktreeId = defineModel<string>("targetWorktreeId", { required: true });
 
 const emit = defineEmits<{
 	submit: [];
@@ -84,6 +82,10 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 		[field.id]: value,
 	};
 }
+
+function actorLabel(actorId: string) {
+	return props.actorLabels[actorId] ?? actorId;
+}
 </script>
 
 <template>
@@ -118,19 +120,15 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 					<Select v-model="trackId" :options="trackOptions" />
 				</label>
 			</div>
-			<label v-if="targetWorktreeOptions.length > 0" class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-				Worktree
-				<Select v-model="targetWorktreeId" :options="targetWorktreeOptions" />
-			</label>
 		</section>
 
 		<section v-if="customFields.length > 0" class="shell-section">
 			<div class="flex items-center justify-between gap-3">
 				<div>
 					<p class="shell-section-title">Fields</p>
-					<p class="mt-1 text-xs text-muted-foreground">Project-defined metadata for this task.</p>
+					<p class="mt-1 text-xs text-muted-foreground">Board-defined metadata for this task.</p>
 				</div>
-				<span class="font-mono text-[10px] text-muted-foreground">project-defined</span>
+				<span class="font-mono text-[10px] text-muted-foreground">board-defined</span>
 			</div>
 
 			<label
@@ -204,7 +202,7 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 					class="rounded-md border border-border/80 bg-secondary/55 px-3 py-3"
 				>
 					<div class="flex items-center justify-between gap-3 text-xs">
-						<span class="font-medium text-foreground">{{ comment.author }}</span>
+						<span class="font-medium text-foreground">{{ actorLabel(comment.createdBy) }}</span>
 						<span class="font-mono text-muted-foreground">{{ formatTimestamp(comment.createdAt) }}</span>
 					</div>
 					<MarkdownContent :value="comment.body" class="mt-2 text-sm text-foreground" />
@@ -213,11 +211,7 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 			<p v-else class="text-sm text-muted-foreground">No comments yet.</p>
 
 			<div class="rounded-md border border-dashed border-border/75 bg-background/20 p-3">
-				<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-					Author
-					<Input v-model="commentAuthor" autocomplete="off" placeholder="You or agent name" />
-				</label>
-				<div class="mt-3 grid gap-1.5 text-xs font-medium text-muted-foreground">
+				<div class="grid gap-1.5 text-xs font-medium text-muted-foreground">
 					<span>New comment</span>
 					<MarkdownEditor v-model="commentBody" placeholder="Capture findings, blockers, or the next handoff." />
 				</div>
@@ -245,8 +239,16 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 					<span class="text-foreground">{{ formatTimestamp(card.createdAt) }}</span>
 				</div>
 				<div class="flex items-center justify-between gap-3">
+					<span>Created by</span>
+					<span class="text-foreground">{{ actorLabel(card.createdBy) }}</span>
+				</div>
+				<div class="flex items-center justify-between gap-3">
 					<span>Updated</span>
 					<span class="text-foreground">{{ formatTimestamp(card.updatedAt) }}</span>
+				</div>
+				<div class="flex items-center justify-between gap-3">
+					<span>Updated by</span>
+					<span class="text-foreground">{{ actorLabel(card.updatedBy) }}</span>
 				</div>
 			</div>
 		</section>

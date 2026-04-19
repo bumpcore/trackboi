@@ -7,6 +7,7 @@ import type { Card, NodeFsTrackboiActions, ProjectEntry, ProjectSnapshot, Projec
 export type ToolHandler = () => unknown | Promise<unknown>;
 
 export const projectIdSchema = z.string().optional().describe("Project id. Defaults to the agent's active project.");
+export const boardIdSchema = z.string().optional().describe("Board id. Defaults to the agent's active board for that project.");
 export const columnSchema = z.string().min(1).describe("Board column id.");
 export const cardIdSchema = z.string().min(1).describe("Card id.");
 export const scopeSchema = z.discriminatedUnion("kind", [
@@ -76,6 +77,10 @@ export async function getCard(
 export type McpProjectContext = {
 	currentProjectId(): Promise<string | null>;
 	setCurrentProjectId(projectId: string): Promise<ProjectEntry>;
+	currentBoardId(projectId?: string): Promise<string | null>;
+	setCurrentBoardId(projectId: string, boardId: string | null): Promise<void>;
+	currentAgentId(): Promise<string | null>;
+	setCurrentAgentId(agentId: string | null): Promise<void>;
 	listView(): Promise<ProjectView & {
 		agentActiveProjectId: string | null;
 		desktopActiveProjectId: string | null;
@@ -87,6 +92,8 @@ export async function createMcpProjectContext(
 	cwd: string = process.cwd(),
 ): Promise<McpProjectContext> {
 	let activeProjectId = pickAgentProjectId(await trackboi.listView(), cwd);
+	const activeBoardIdsByProject = new Map<string, string | null>();
+	let activeAgentId: string | null = trackboi.readRegistry().appSettings.agents[0]?.id ?? null;
 
 	async function currentProjectId(): Promise<string | null> {
 		const view = await trackboi.listView();
@@ -108,16 +115,47 @@ export async function createMcpProjectContext(
 			activeProjectId = entry.projectId;
 			return entry;
 		},
+		async currentBoardId(projectId) {
+			const resolvedProjectId = projectId ?? await currentProjectId();
+			if (!resolvedProjectId) return null;
+			return activeBoardIdsByProject.get(resolvedProjectId) ?? null;
+		},
+		async setCurrentBoardId(projectId, boardId) {
+			activeBoardIdsByProject.set(projectId, boardId);
+		},
+		async currentAgentId() {
+			const agents = trackboi.readRegistry().appSettings.agents;
+			if (activeAgentId && agents.some((agent) => agent.id === activeAgentId)) return activeAgentId;
+			activeAgentId = agents[0]?.id ?? null;
+			return activeAgentId;
+		},
+		async setCurrentAgentId(agentId) {
+			activeAgentId = agentId;
+		},
 		async listView() {
 			const view = await trackboi.listView();
+			const agentActiveProjectId = await currentProjectId();
 			return {
 				...view,
-				agentActiveProjectId: await currentProjectId(),
+				agentActiveProjectId,
 				desktopActiveProjectId: view.activeProjectId,
-				activeProjectId: await currentProjectId(),
+				activeProjectId: agentActiveProjectId ?? view.activeProjectId,
 			};
 		},
 	};
+}
+
+export async function requireAgentId(
+	trackboi: NodeFsTrackboiActions,
+	context: McpProjectContext,
+): Promise<string> {
+	const agentId = await context.currentAgentId();
+	if (!agentId) {
+		const agents = trackboi.readRegistry().appSettings.agents;
+		if (agents.length === 0) throw new Error("Register an agent first");
+		throw new Error("Set an active agent before running MCP mutations");
+	}
+	return agentId;
 }
 
 /**
@@ -135,13 +173,17 @@ export async function withProject<T>(
 	const registry = trackboi.readRegistry();
 	const previousActiveProjectId = registry.activeProjectId;
 	const previousSelectedWorktreeId = registry.selectedWorktreeId;
+	const previousSelectedBoardId = registry.selectedBoardId;
 	await trackboi.switchProject(resolvedProjectId);
+	const nextBoardId = await context.currentBoardId(resolvedProjectId);
+	if (nextBoardId) await trackboi.setActiveBoard(nextBoardId);
 	try {
 		return await action();
 	} finally {
 		const nextRegistry = trackboi.readRegistry();
 		nextRegistry.activeProjectId = previousActiveProjectId;
 		nextRegistry.selectedWorktreeId = previousSelectedWorktreeId;
+		nextRegistry.selectedBoardId = previousSelectedBoardId;
 		trackboi.writeRegistry(nextRegistry);
 	}
 }

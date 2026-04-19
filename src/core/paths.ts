@@ -9,16 +9,28 @@ export function boardsPath(rootPath: string): string {
 	return path.join(rootPath, "boards");
 }
 
-export function boardPath(rootPath: string): string {
-	return path.join(boardsPath(rootPath), `${DEFAULT_BOARD_ID}.json`);
+export function boardPath(rootPath: string, boardId = DEFAULT_BOARD_ID): string {
+	return path.join(boardsPath(rootPath), `${boardId}.json`);
 }
 
 export function cardsPath(rootPath: string): string {
 	return path.join(rootPath, "cards");
 }
 
+export function cardDirPath(rootPath: string, cardId: string): string {
+	return path.join(cardsPath(rootPath), cardId);
+}
+
 export function cardPath(rootPath: string, cardId: string): string {
-	return path.join(cardsPath(rootPath), `${cardId}.json`);
+	return path.join(cardDirPath(rootPath, cardId), "index.md");
+}
+
+export function cardCommentsPath(rootPath: string, cardId: string): string {
+	return path.join(cardDirPath(rootPath, cardId), "comments");
+}
+
+export function cardCommentPath(rootPath: string, cardId: string, commentId: string): string {
+	return path.join(cardCommentsPath(rootPath, cardId), `${commentId}.md`);
 }
 
 export function tracksPath(rootPath: string): string {
@@ -48,8 +60,11 @@ export function projectMetadataPath(rootPath: string): string {
 export const runtimePaths = {
 	boardsPath,
 	cardsPath,
+	cardDirPath,
 	boardPath,
 	cardPath,
+	cardCommentsPath,
+	cardCommentPath,
 	tracksPath,
 	trackPath,
 	trackDirPath,

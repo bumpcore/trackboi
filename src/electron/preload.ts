@@ -21,12 +21,20 @@ const trackboiApi: TrackboiBridgeApi = {
 	setSelectedWorktree: (worktreeId) => (
 		ipcRenderer.invoke(ipcChannels.trackboi.setSelectedWorktree, worktreeId)
 	),
+	listBoards: () => ipcRenderer.invoke(ipcChannels.trackboi.listBoards),
+	setActiveBoard: (boardId) => ipcRenderer.invoke(ipcChannels.trackboi.setActiveBoard, boardId),
+	readAppSettings: () => ipcRenderer.invoke(ipcChannels.trackboi.readAppSettings),
+	updateAppSettings: (settings) => ipcRenderer.invoke(ipcChannels.trackboi.updateAppSettings, settings),
+	listDetectedEditors: () => ipcRenderer.invoke(ipcChannels.trackboi.listDetectedEditors),
+	openCardInEditor: (cardId) => ipcRenderer.invoke(ipcChannels.trackboi.openCardInEditor, cardId),
 	setStorageSearchPaths: (paths) => (
 		ipcRenderer.invoke(ipcChannels.trackboi.setStorageSearchPaths, paths)
 	),
 	setActiveWorkspaceFile: (filePath) => (
 		ipcRenderer.invoke(ipcChannels.trackboi.setActiveWorkspaceFile, filePath)
 	),
+	createBoard: (input) => ipcRenderer.invoke(ipcChannels.trackboi.createBoard, input),
+	deleteBoard: (boardId) => ipcRenderer.invoke(ipcChannels.trackboi.deleteBoard, boardId),
 	listTracks: () => ipcRenderer.invoke(ipcChannels.trackboi.listTracks),
 	getTrack: (trackId) => ipcRenderer.invoke(ipcChannels.trackboi.getTrack, trackId),
 	createTrack: (input) => ipcRenderer.invoke(ipcChannels.trackboi.createTrack, input),
@@ -55,9 +63,10 @@ const trackboiApi: TrackboiBridgeApi = {
 		ipcRenderer.invoke(ipcChannels.trackboi.updateCard, cardId, patch)
 	),
 	updateBoard: (board) => ipcRenderer.invoke(ipcChannels.trackboi.updateBoard, board),
-	updateCustomFields: (customFields) => (
-		ipcRenderer.invoke(ipcChannels.trackboi.updateCustomFields, customFields)
+	updateProjectPeople: (people) => (
+		ipcRenderer.invoke(ipcChannels.trackboi.updateProjectPeople, people)
 	),
+	addCardComment: (input) => ipcRenderer.invoke(ipcChannels.trackboi.addCardComment, input),
 	moveCard: (cardId, toColumn, beforeCardId) => (
 		ipcRenderer.invoke(
 			ipcChannels.trackboi.moveCard,

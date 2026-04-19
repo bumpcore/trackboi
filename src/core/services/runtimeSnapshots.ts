@@ -1,19 +1,18 @@
 import { existsSync } from "node:fs";
 import { readGitContext } from "../git";
 import { jsonEquals, readJson, writeJsonAtomic } from "../json";
-import { boardPath, projectMetadataPath } from "../paths";
+import { projectMetadataPath } from "../paths";
 import {
 	ensureProjectFiles,
-	normalizeBoard,
 	normalizeProjectMetadata,
 	openStore,
 	projectFromMetadata,
+	readBoards,
 	readCards,
 	type ProjectStore,
 } from "../storage";
 import { readTracks } from "../tracks";
 import type {
-	Board,
 	Project,
 	ProjectMetadata,
 	ProjectRegistry,
@@ -58,15 +57,23 @@ export function readSnapshotForProjectPath(options: {
 	if (cached) return cached;
 
 	const metadata = readNormalizedMetadata(store, project);
-	const { board, metadata: normalizedMetadata } = readNormalizedBoard(store, project, metadata);
+	const boardRecords = readBoards(store.rootPath, project);
+	const primaryBoard = boardRecords[0];
 	const snapshot = {
 		project: projectFromMetadata(store),
-		metadata: normalizedMetadata,
+		metadata,
 		git: readGitContext(project.path),
-		board,
+		board: primaryBoard,
+		boards: boardRecords.map((board) => ({
+			id: board.id,
+			name: board.name,
+			status: "ready" as const,
+			worktreeIds: [],
+		})),
 		tracks: readTracks(store.rootPath),
 		cards: readCards(store.rootPath),
 		storageRoot: store.rootPath,
+		boardRecords,
 	};
 	snapshotCache.set(store.rootPath, snapshot);
 	return snapshot;
@@ -84,24 +91,4 @@ function readNormalizedMetadata(
 	}
 
 	return metadata;
-}
-
-function readNormalizedBoard(
-	store: ProjectStore,
-	project: Project,
-	metadata: ProjectMetadata,
-): { board: Board; metadata: ProjectMetadata } {
-	const filePath = boardPath(store.rootPath);
-	const rawBoard = readJson<Board>(filePath);
-	const board = normalizeBoard(rawBoard, project);
-	if (!jsonEquals(rawBoard, board)) {
-		writeJsonAtomic(filePath, board);
-	}
-	if (metadata.customFields.length > 0 || board.customFields.length === 0) {
-		return { board, metadata };
-	}
-
-	const nextMetadata = { ...metadata, customFields: board.customFields };
-	writeJsonAtomic(projectMetadataPath(store.rootPath), nextMetadata);
-	return { board, metadata: nextMetadata };
 }

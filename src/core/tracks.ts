@@ -39,7 +39,7 @@ export function createTrackInStore(store: ProjectStore, input: CreateTrackInput)
 	const timestamp = now();
 	const track: Track = {
 		id: newId("track"),
-		boardId: DEFAULT_BOARD_ID,
+		boardId: input.boardId ?? DEFAULT_BOARD_ID,
 		title,
 		slug: slugifyTrackTitle(title),
 		source: normalizeTrackSource(input.source),
@@ -51,6 +51,8 @@ export function createTrackInStore(store: ProjectStore, input: CreateTrackInput)
 		files: [],
 		createdAt: timestamp,
 		updatedAt: timestamp,
+		createdBy: input.actorId ?? "person_unknown",
+		updatedBy: input.actorId ?? "person_unknown",
 	};
 	writeJsonAtomic(trackPath(store.rootPath, track.id), track);
 	return track;
@@ -69,6 +71,8 @@ export function updateTrackInStore(store: ProjectStore, trackId: string, patch: 
 		references: Array.isArray(patch.references) ? patch.references : current.references,
 		activity: Array.isArray(patch.activity) ? patch.activity : current.activity,
 		updatedAt: now(),
+		createdBy: current.createdBy ?? "person_unknown",
+		updatedBy: patch.actorId ?? current.updatedBy ?? current.createdBy ?? "person_unknown",
 	};
 	if (!next.title) throw new Error("Track title is required");
 	writeJsonAtomic(filePath, next);
@@ -198,6 +202,8 @@ function normalizeTrack(track: Track): Track {
 		files: [],
 		createdAt: typeof track.createdAt === "string" ? track.createdAt : now(),
 		updatedAt: typeof track.updatedAt === "string" ? track.updatedAt : now(),
+		createdBy: typeof track.createdBy === "string" ? track.createdBy : "person_unknown",
+		updatedBy: typeof track.updatedBy === "string" ? track.updatedBy : (typeof track.createdBy === "string" ? track.createdBy : "person_unknown"),
 	};
 }
 

@@ -27,7 +27,6 @@ export function useBoardPresentationState(options: {
 	selectedTrack: ComputedRef<Track | null>;
 	selectedTrackId: Ref<string | null>;
 	selectedWorktree: ComputedRef<WorktreeContext | null>;
-	worktreeFilterId: Ref<string | null>;
 	editingCardId: ComputedRef<string | null>;
 }): BoardPresentationState {
 	const boardScopeOptions = computed(() => [
@@ -47,9 +46,9 @@ export function useBoardPresentationState(options: {
 	const boardPresentation = computed(() => buildBoardPresentation({
 		cards: options.snapshot.value?.cards ?? [],
 		columns: options.snapshot.value?.board.columns ?? [],
+		selectedBoardId: options.snapshot.value?.board.id ?? null,
 		boardScopeMode: options.boardScopeMode.value,
 		selectedTrackId: options.selectedTrackId.value,
-		worktreeFilterId: options.worktreeFilterId.value,
 		editingCardId: options.editingCardId.value,
 	}));
 	const cardsByColumn = computed(() => boardPresentation.value.cardsByColumn);
@@ -64,8 +63,8 @@ export function useBoardPresentationState(options: {
 	const visibleCardCount = computed(() => boardPresentation.value.visibleCardCount);
 	const scopeEmptyMessage = computed(() => {
 		if (!options.snapshot.value || visibleCardCount.value > 0) return null;
-		if (options.worktreeFilterId.value && options.selectedWorktree.value) {
-			return `No cards for ${options.selectedWorktree.value.name} yet.`;
+		if (options.selectedWorktree.value) {
+			return `No cards in ${options.selectedWorktree.value.name} yet.`;
 		}
 		if (options.boardScopeMode.value === "global") {
 			return "No global project cards yet.";

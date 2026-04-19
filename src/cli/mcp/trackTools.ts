@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as z from "zod/v4";
 import type { NodeFsTrackboiActions, TrackPatch } from "../../core";
-import { type McpProjectContext, projectIdSchema, toolResult, withProject } from "./helpers";
+import { boardIdSchema, type McpProjectContext, projectIdSchema, requireAgentId, toolResult, withProject } from "./helpers";
 
 const trackSourceSchema = z.discriminatedUnion("kind", [
 	z.object({ kind: z.literal("manual") }),
@@ -23,10 +23,12 @@ const trackReferenceSchema = z.object({
 });
 const trackActivitySchema = z.object({
 	id: z.string().min(1),
-	author: z.string(),
+	cardId: z.string().min(1),
 	body: z.string(),
 	createdAt: z.string(),
 	updatedAt: z.string(),
+	createdBy: z.string().min(1),
+	updatedBy: z.string().min(1),
 });
 
 /**
@@ -39,8 +41,12 @@ export function registerTrackTools(server: McpServer, trackboi: NodeFsTrackboiAc
 		description: "List track contexts for the active project.",
 		inputSchema: {
 			projectId: projectIdSchema,
+			boardId: boardIdSchema,
 		},
-	}, ({ projectId }) => toolResult(() => withProject(trackboi, context, projectId, () => trackboi.listTracks())));
+	}, ({ projectId, boardId }) => toolResult(() => withProject(trackboi, context, projectId, async () => {
+		if (boardId) await trackboi.setActiveBoard(boardId);
+		return trackboi.listTracks();
+	})));
 
 	server.registerTool("get_track", {
 		title: "Get track",
@@ -56,13 +62,21 @@ export function registerTrackTools(server: McpServer, trackboi: NodeFsTrackboiAc
 		description: "Create a new track for the active board.",
 		inputSchema: {
 			projectId: projectIdSchema,
+			boardId: boardIdSchema,
 			title: z.string().min(1),
 			source: trackSourceSchema.optional(),
 			summary: z.string().optional(),
 			plan: z.string().optional(),
 		},
-	}, ({ projectId, title, source, summary, plan }) => toolResult(() => withProject(trackboi, context, projectId, () => (
-		trackboi.createTrack({ title, source, summary, plan })
+	}, ({ projectId, boardId, title, source, summary, plan }) => toolResult(() => withProject(trackboi, context, projectId, async () => (
+		trackboi.createTrack({
+			title,
+			boardId,
+			source,
+			summary,
+			plan,
+			actorId: await requireAgentId(trackboi, context),
+		})
 	))));
 
 	server.registerTool("update_track", {
@@ -89,6 +103,7 @@ export function registerTrackTools(server: McpServer, trackboi: NodeFsTrackboiAc
 			if (decisions !== undefined) patch.decisions = decisions;
 			if (references !== undefined) patch.references = references;
 			if (activity !== undefined) patch.activity = activity;
+			patch.actorId = await requireAgentId(trackboi, context);
 			return trackboi.updateTrack(trackId, patch);
 		}))
 	));
@@ -100,7 +115,10 @@ export function registerTrackTools(server: McpServer, trackboi: NodeFsTrackboiAc
 			projectId: projectIdSchema,
 			trackId: z.string().min(1),
 		},
-	}, ({ projectId, trackId }) => toolResult(() => withProject(trackboi, context, projectId, () => trackboi.deleteTrack(trackId))));
+	}, ({ projectId, trackId }) => toolResult(() => withProject(trackboi, context, projectId, async () => {
+		await requireAgentId(trackboi, context);
+		return trackboi.deleteTrack(trackId);
+	})));
 
 	server.registerTool("write_track_file", {
 		title: "Write track file",
@@ -112,9 +130,10 @@ export function registerTrackTools(server: McpServer, trackboi: NodeFsTrackboiAc
 			content: z.string(),
 			contentType: z.string().optional(),
 		},
-	}, ({ projectId, trackId, name, content, contentType }) => toolResult(() => withProject(trackboi, context, projectId, () => (
-		trackboi.writeTrackFile({ trackId, name, content, contentType })
-	))));
+	}, ({ projectId, trackId, name, content, contentType }) => toolResult(() => withProject(trackboi, context, projectId, async () => {
+		await requireAgentId(trackboi, context);
+		return trackboi.writeTrackFile({ trackId, name, content, contentType });
+	})));
 
 	server.registerTool("delete_track_file", {
 		title: "Delete track file",
@@ -124,7 +143,8 @@ export function registerTrackTools(server: McpServer, trackboi: NodeFsTrackboiAc
 			trackId: z.string().min(1),
 			name: z.string().min(1),
 		},
-	}, ({ projectId, trackId, name }) => toolResult(() => withProject(trackboi, context, projectId, () => (
-		trackboi.deleteTrackFile(trackId, name)
-	))));
+	}, ({ projectId, trackId, name }) => toolResult(() => withProject(trackboi, context, projectId, async () => {
+		await requireAgentId(trackboi, context);
+		return trackboi.deleteTrackFile(trackId, name);
+	})));
 }

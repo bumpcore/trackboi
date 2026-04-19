@@ -43,6 +43,7 @@ function createTrackboiActions(overrides: Partial<NodeFsTrackboiActions> = {}): 
 		listProjects: async () => registry,
 		listView: async () => ({ ...view, activeProjectId: registry.activeProjectId }),
 		readDesktopState: async () => ({ snapshot: null, view, worktrees: [], selectedWorktreeId: registry.selectedWorktreeId }),
+		prewarmProjects: async () => {},
 		setSelectedWorktree: async () => ({ snapshot: null, view, worktrees: [], selectedWorktreeId: registry.selectedWorktreeId }),
 		setStorageSearchPaths: async () => view,
 		setActiveWorkspaceFile: async () => view,

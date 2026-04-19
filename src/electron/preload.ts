@@ -17,6 +17,7 @@ const trackboiApi: TrackboiBridgeApi = {
 	listProjects: () => ipcRenderer.invoke(ipcChannels.trackboi.listProjects),
 	listView: () => ipcRenderer.invoke(ipcChannels.trackboi.listView),
 	readDesktopState: () => ipcRenderer.invoke(ipcChannels.trackboi.readDesktopState),
+	prewarmProjects: () => ipcRenderer.invoke(ipcChannels.trackboi.prewarmProjects),
 	setSelectedWorktree: (worktreeId) => (
 		ipcRenderer.invoke(ipcChannels.trackboi.setSelectedWorktree, worktreeId)
 	),

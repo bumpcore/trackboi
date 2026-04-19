@@ -5,6 +5,7 @@ import type { Card as TrackboiCard, CustomField, ProjectEntry, ProjectSnapshot, 
 import BoardColumn from "@/ui/components/BoardColumn.vue";
 import Button from "@/ui/components/Button.vue";
 import UiCard from "@/ui/components/Card.vue";
+import Tooltip from "@/ui/components/Tooltip.vue";
 import type { ChildProgress } from "@/ui/viewTypes";
 
 const props = defineProps<{
@@ -57,39 +58,25 @@ function forwardMove(cardId: string, toColumn: string, beforeCardId: string | nu
 			<div class="flex flex-wrap items-start justify-between gap-4">
 				<div class="min-w-0 flex-1">
 					<div class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Board</div>
-					<h1 class="mt-1 truncate text-[22px] font-semibold tracking-tight text-foreground">
+					<h1 class="truncate text-[22px] font-semibold tracking-tight text-foreground">
 						{{ activeProject?.name ?? snapshot?.project.name ?? "Trackboi" }} / {{ snapshot?.board.name ?? "Delivery" }}
 					</h1>
-					<div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-						<span class="inline-flex rounded-[4px] border border-border/70 bg-secondary/85 px-2 py-1 font-mono text-foreground">
-							{{ visibleCardCount }} shown
-						</span>
-						<span
-							v-if="snapshot"
-							class="inline-flex rounded-[4px] border border-border/70 bg-secondary/85 px-2 py-1 font-mono text-foreground"
-						>
-							{{ snapshot.cards.filter((card) => !card.parentId && card.column === 'doing').length }} in progress
-						</span>
-						<span
-							v-if="snapshot"
-							class="inline-flex rounded-[4px] border border-border/70 bg-secondary/85 px-2 py-1 font-mono text-foreground"
-						>
-							storage: {{ snapshot.metadata.storagePath }}
-						</span>
-					</div>
-					<div class="mt-2 truncate font-mono text-[11px] text-muted-foreground">{{ boardSubtitle }}</div>
+					<p class="mt-2 truncate trackboi-mono-font text-[11px] text-muted-foreground">
+						{{ boardSubtitle }}
+					</p>
 				</div>
 
 				<div class="flex shrink-0 items-center gap-2">
-					<Button
-						v-if="snapshot"
-						type="button"
-						:disabled="busy"
-						@click="emit('createCard')"
-					>
-						<Plus class="h-4 w-4" />
-						New Card
-					</Button>
+					<Tooltip v-if="snapshot" content="New card" side="left">
+						<Button
+							type="button"
+							size="icon"
+							:disabled="busy"
+							@click="emit('createCard')"
+						>
+							<Plus class="h-4 w-4" />
+						</Button>
+					</Tooltip>
 				</div>
 			</div>
 		</header>

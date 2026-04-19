@@ -287,12 +287,13 @@ export type TrackboiRuntime = {
 	activeSnapshot(): ProjectSnapshot | null;
 	activeSnapshotWithInternals(): ProjectSnapshotWithInternals | null;
 	readDesktopState(): DesktopState;
+	prewarmProjects(): void;
 	invalidateCache(): void;
 	setSelectedWorktree(worktreeId: string | null): DesktopState;
 	chooseProjectPath(projectPath: string): ProjectSnapshot;
 	locateProjectPath(projectId: string, projectPath: string): ProjectSnapshot;
 	removeProject(projectId: string): ProjectSnapshot | null;
-	switchProject(projectId: string): ProjectSnapshot | null;
+	switchProject(projectId: string): DesktopState;
 	setStorageSearchPaths(paths: string[]): ProjectView;
 	setActiveWorkspaceFile(filePath: string | null): ProjectView;
 	listTracks(): Track[];
@@ -316,6 +317,7 @@ export type TrackboiActions = {
 	listProjects(): Promise<ProjectRegistry>;
 	listView(): Promise<ProjectView>;
 	readDesktopState(): Promise<DesktopState>;
+	prewarmProjects(): Promise<void>;
 	setSelectedWorktree(worktreeId: string | null): Promise<DesktopState>;
 	setStorageSearchPaths(paths: string[]): Promise<ProjectView>;
 	setActiveWorkspaceFile(filePath: string | null): Promise<ProjectView>;

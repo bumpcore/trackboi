@@ -37,7 +37,54 @@ describe("runtime performance", () => {
 		expect(visibleCards).toBeGreaterThan(0);
 		expect(elapsed).toBeLessThan(180);
 	});
+
+	test("project switching reuses warmed caches instead of rebuilding both projects cold", () => {
+		const fixture = createPerformanceFixture();
+		fixture.seedStore(fixture.mainRepo, ".trackboi", 1200, "main");
+		fixture.seedStore(fixture.secondaryRepo, ".trackboi", 1200, "secondary");
+
+		const cold = benchmarkProjectSwitches(fixture, false);
+		const warm = benchmarkProjectSwitches(fixture, true);
+
+		console.info(`runtime switch benchmark: cold=${cold.elapsed.toFixed(2)}ms warm=${warm.elapsed.toFixed(2)}ms`);
+
+		expect(cold.visibleCards).toBeGreaterThan(0);
+		expect(warm.visibleCards).toBeGreaterThan(0);
+		expect(warm.elapsed).toBeLessThan(cold.elapsed);
+	});
 });
+
+function benchmarkProjectSwitches(
+	fixture: ReturnType<typeof createPerformanceFixture>,
+	prewarm: boolean,
+): { elapsed: number; visibleCards: number } {
+	const runtime = fixture.runtime();
+	runtime.chooseProjectPath(fixture.mainRepo);
+	runtime.chooseProjectPath(fixture.secondaryRepo);
+	if (prewarm) runtime.prewarmProjects();
+
+	const view = runtime.listView();
+	const mainProjectId = view.sources.flatMap((source) => source.entries)
+		.find((entry) => entry.path === fixture.mainRepo)?.projectId;
+	const secondaryProjectId = view.sources.flatMap((source) => source.entries)
+		.find((entry) => entry.path === fixture.secondaryRepo)?.projectId;
+
+	if (!mainProjectId || !secondaryProjectId) {
+		throw new Error("Expected both benchmark projects to be visible");
+	}
+
+	const startedAt = performance.now();
+	let visibleCards = 0;
+
+	for (let index = 0; index < 16; index += 1) {
+		visibleCards += runtime.switchProject(index % 2 === 0 ? mainProjectId : secondaryProjectId).snapshot?.cards.length ?? 0;
+	}
+
+	return {
+		elapsed: performance.now() - startedAt,
+		visibleCards,
+	};
+}
 
 function createPerformanceFixture() {
 	const root = mkdtempSync(path.join(os.tmpdir(), "trackboi-runtime-perf-"));
@@ -53,13 +100,21 @@ function createPerformanceFixture() {
 
 	const onboardingWorktree = path.join(root, "onboarding");
 	const checkoutWorktree = path.join(root, "checkout-mcp");
+	const secondaryRepo = path.join(root, "secondary");
 	runGit(mainRepo, ["worktree", "add", "-b", "feature/onboarding", onboardingWorktree]);
 	runGit(mainRepo, ["worktree", "add", "-b", "spike/checkout-mcp", checkoutWorktree]);
+	runGit(root, ["init", "--initial-branch=main", secondaryRepo]);
+	writeFileSync(path.join(secondaryRepo, "README.md"), "# Secondary perf fixture\n");
+	runGit(secondaryRepo, ["config", "user.name", "Trackboi Tests"]);
+	runGit(secondaryRepo, ["config", "user.email", "tests@trackboi.local"]);
+	runGit(secondaryRepo, ["add", "."]);
+	runGit(secondaryRepo, ["commit", "-m", "Initial secondary fixture"]);
 
 	return {
 		mainRepo,
 		onboardingWorktree,
 		checkoutWorktree,
+		secondaryRepo,
 		runtime: () => createRuntime({ configPath: path.join(root, "config.json"), legacyConfigPaths: [] }),
 		seedStore(projectPath: string, storagePath: string, cardCount: number, prefix: string) {
 			const storageRoot = path.join(projectPath, storagePath);

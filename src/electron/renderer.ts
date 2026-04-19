@@ -15,6 +15,25 @@ import { windowShell } from "./window";
 
 type BoardChangedListener = (snapshot: ProjectSnapshot | null) => void;
 
+function serializeCustomField(field: CustomField): CustomField {
+	return field.options
+		? { ...field, options: [...field.options] }
+		: { ...field };
+}
+
+/**
+ * Electron IPC expects plain cloneable data. Board settings often originate
+ * from Vue-managed snapshots, so flatten them before crossing the bridge.
+ */
+function serializeBoard(board: Board): Board {
+	return {
+		version: board.version,
+		name: board.name,
+		columns: board.columns.map((column) => ({ ...column })),
+		customFields: board.customFields.map(serializeCustomField),
+	};
+}
+
 /**
  * Creates the renderer-side desktop facade by composing the IPC-backed Trackboi
  * actions transport with the dedicated shell window transport.
@@ -26,9 +45,30 @@ export function createDesktopFacade(
 	const listeners = new Set<BoardChangedListener>();
 	let projectChangeListenerStarted = false;
 	let projectChangeRefreshQueued = false;
+	let projectPrewarmQueued = false;
+	let projectPrewarmInFlight = false;
 
 	function notifyListeners(snapshot: ProjectSnapshot | null): void {
 		for (const listener of listeners) listener(snapshot);
+	}
+
+	/**
+	 * Hydrates non-active project caches after the current interaction settles so
+	 * later project switches can reuse warm snapshot/worktree state.
+	 */
+	function scheduleProjectPrewarm(delayMs = 140): void {
+		if (projectPrewarmQueued || projectPrewarmInFlight) return;
+		projectPrewarmQueued = true;
+		globalThis.setTimeout(() => {
+			projectPrewarmQueued = false;
+			if (projectPrewarmInFlight) return;
+			projectPrewarmInFlight = true;
+			void trackboiApi.prewarmProjects()
+				.catch(() => undefined)
+				.finally(() => {
+					projectPrewarmInFlight = false;
+				});
+		}, delayMs);
 	}
 
 	async function notifyBoardChanged() {
@@ -64,6 +104,7 @@ export function createDesktopFacade(
 	async function refreshAfterProjectSelection<T>(action: () => Promise<T>, snapshotSelector: (result: T) => ProjectSnapshot | null): Promise<T> {
 		const result = await action();
 		notifyListeners(snapshotSelector(result));
+		scheduleProjectPrewarm();
 		return result;
 	}
 
@@ -78,10 +119,14 @@ export function createDesktopFacade(
 		return trackboiApi.listView();
 	},
 	async readDesktopState(): Promise<DesktopState> {
-		return trackboiApi.readDesktopState();
+		const nextState = await trackboiApi.readDesktopState();
+		scheduleProjectPrewarm();
+		return nextState;
 	},
 	async setSelectedWorktree(worktreeId: string | null): Promise<DesktopState> {
-		return trackboiApi.setSelectedWorktree(worktreeId);
+		const nextState = await trackboiApi.setSelectedWorktree(worktreeId);
+		scheduleProjectPrewarm();
+		return nextState;
 	},
 	async setStorageSearchPaths(paths: string[]) {
 		return trackboiApi.setStorageSearchPaths(paths);
@@ -143,10 +188,10 @@ export function createDesktopFacade(
 		return refreshAfterMutation(() => trackboiApi.updateCard(cardId, patch));
 	},
 	async updateBoard(board: Board) {
-		return refreshAfterMutation(() => trackboiApi.updateBoard(board));
+		return refreshAfterMutation(() => trackboiApi.updateBoard(serializeBoard(board)));
 	},
 	async updateCustomFields(customFields: CustomField[]) {
-		return refreshAfterMutation(() => trackboiApi.updateCustomFields(customFields));
+		return refreshAfterMutation(() => trackboiApi.updateCustomFields(customFields.map(serializeCustomField)));
 	},
 	async moveCard(cardId: string, toColumn: string, beforeCardId: string | null) {
 		return refreshAfterMutation(() => trackboiApi.moveCard(cardId, toColumn, beforeCardId));

@@ -45,6 +45,7 @@ useSortable(listElement, sortableCards, {
 	group: "trackboi-cards",
 	animation: 140,
 	dataIdAttr: "data-card-id",
+	draggable: "[data-card-id]",
 	ghostClass: "card-ghost",
 	dragClass: "card-dragging",
 	filter: "[data-sortable-ignore]",
@@ -116,49 +117,36 @@ function activateCard(card: TrackboiCard) {
 			</div>
 		</header>
 
-		<div ref="listElement" class="app-scroll flex min-h-0 flex-col gap-2.5 overflow-y-auto p-3">
-			<div
-				v-if="sortableCards.length === 0"
-				class="grid min-h-28 shrink-0 place-items-center rounded-[8px] border border-dashed border-border/55 bg-background/16 px-6 text-center transition hover:border-primary/35 hover:bg-secondary/25"
-				data-sortable-ignore
-			>
-				<div>
-					<CircleDashed class="mx-auto h-4 w-4 text-muted-foreground" />
-					<p class="mt-2 text-xs font-medium text-muted-foreground">Drop cards here</p>
-					<Button class="mt-3" variant="ghost" size="sm" type="button" @click="emit('create', column.id)">
-						<Plus class="h-3.5 w-3.5" />
-						Add card
-					</Button>
-				</div>
-			</div>
-
-			<UiCard
-				v-for="card in sortableCards"
-				:key="card.id"
-				class="board-card group relative grid w-full min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3 overflow-hidden p-3 transition"
-				:data-card-id="card.id"
-				:data-fresh="props.freshCardIds?.has(card.id) ?? false"
-				:data-selected="props.selectedCardId === card.id"
-				role="button"
-				tabindex="0"
-				@click="activateCard(card)"
-				@mouseenter="emit('freshSeen', card.id)"
-				@keydown.enter.prevent="activateCard(card)"
-				@keydown.space.prevent="activateCard(card)"
-			>
-				<div
-					class="min-w-0 max-w-full bg-transparent text-left"
+		<div class="app-scroll column-card-list min-h-0 overflow-y-auto">
+			<div class="relative min-h-full">
+				<div ref="listElement" class="flex min-h-full flex-col gap-2.5 px-2.5 py-3">
+				<UiCard
+					v-for="card in sortableCards"
+					:key="card.id"
+					class="board-card group relative grid w-full min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3 overflow-hidden p-3 transition"
+					:data-card-id="card.id"
+					:data-fresh="props.freshCardIds?.has(card.id) ?? false"
+					:data-selected="props.selectedCardId === card.id"
+					role="button"
+					tabindex="0"
+					@click="activateCard(card)"
+					@mouseenter="emit('freshSeen', card.id)"
+					@keydown.enter.prevent="activateCard(card)"
+					@keydown.space.prevent="activateCard(card)"
 				>
-					<MarkdownInline
-						:value="card.title"
-						class="block [overflow-wrap:anywhere] text-[13px] font-semibold leading-5 text-foreground"
-					/>
-					<MarkdownContent
-						v-if="card.description"
-						:value="card.description"
-						preview
-						class="mt-1.5 text-[12px] leading-5 text-muted-foreground"
-					/>
+					<div
+						class="min-w-0 max-w-full bg-transparent text-left"
+					>
+						<MarkdownInline
+							:value="card.title"
+							class="block [overflow-wrap:anywhere] text-[13px] font-semibold leading-5 text-foreground"
+						/>
+						<MarkdownContent
+							v-if="card.description"
+							:value="card.description"
+							preview
+							class="mt-1.5 text-[12px] leading-5 text-muted-foreground"
+						/>
 						<div class="mt-2 flex max-w-full flex-wrap gap-1.5">
 							<Badge
 								v-if="card.trackId && props.trackLabels[card.trackId]"
@@ -200,18 +188,37 @@ function activateCard(card: TrackboiCard) {
 							<span class="truncate">{{ entry.value }}</span>
 						</Badge>
 					</div>
+					</div>
+					<Button
+						class="mt-0.5 rounded-[6px] border border-transparent opacity-0 transition group-hover:border-border/55 group-hover:bg-background/72 group-hover:opacity-100"
+						variant="ghost"
+						size="icon"
+						type="button"
+						data-sortable-ignore
+						@click.stop="emit('delete', card)"
+					>
+						<Trash2 class="h-4 w-4" />
+					</Button>
+				</UiCard>
 				</div>
-				<Button
-					class="mt-0.5 rounded-[6px] border border-transparent opacity-0 transition group-hover:border-border/55 group-hover:bg-background/72 group-hover:opacity-100"
-					variant="ghost"
-					size="icon"
-					type="button"
+
+				<div
+					v-if="sortableCards.length === 0"
+					class="pointer-events-none absolute inset-x-2.5 inset-y-3 grid place-items-center"
 					data-sortable-ignore
-					@click.stop="emit('delete', card)"
 				>
-					<Trash2 class="h-4 w-4" />
-				</Button>
-			</UiCard>
+					<div class="grid min-h-28 w-full place-items-center rounded-[8px] border border-dashed border-border/55 bg-background/16 px-6 text-center transition hover:border-primary/35 hover:bg-secondary/25">
+						<div class="pointer-events-auto">
+							<CircleDashed class="mx-auto h-4 w-4 text-muted-foreground" />
+							<p class="mt-2 text-xs font-medium text-muted-foreground">Drop cards here</p>
+							<Button class="mt-3" variant="ghost" size="sm" type="button" @click="emit('create', column.id)">
+								<Plus class="h-3.5 w-3.5" />
+								Add card
+							</Button>
+						</div>
+					</div>
+				</div>
+			</div>
 		</div>
 	</section>
 </template>

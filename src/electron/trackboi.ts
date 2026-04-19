@@ -12,6 +12,7 @@ export function createIpcTrackboiActions(api: TrackboiBridgeApi): IpcTrackboiAct
 		listProjects: () => api.listProjects(),
 		listView: () => api.listView(),
 		readDesktopState: () => api.readDesktopState(),
+		prewarmProjects: () => api.prewarmProjects(),
 		setSelectedWorktree: (worktreeId) => api.setSelectedWorktree(worktreeId),
 		setStorageSearchPaths: (paths) => api.setStorageSearchPaths(paths),
 		setActiveWorkspaceFile: (filePath) => api.setActiveWorkspaceFile(filePath),

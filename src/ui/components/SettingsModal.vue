@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import { Keyboard, ListPlus, RotateCcw, Search, Trash2, X } from "lucide-vue-next";
+import { Keyboard, ListPlus, Monitor, Moon, RotateCcw, Search, Sun, Trash2, X } from "lucide-vue-next";
 import Button from "@/ui/components/Button.vue";
 import Input from "@/ui/components/Input.vue";
 import { shortcutFromKeyboardEvent } from "@/ui/lib/keyboardShortcuts";
+import type { ThemeMode } from "@/ui/composables/useAppPreferences";
 
 const props = defineProps<{
 	open: boolean;
@@ -14,6 +15,7 @@ const props = defineProps<{
 const draft = defineModel<string>("draft", { required: true });
 const leftPanelShortcut = defineModel<string>("leftPanelShortcut", { required: true });
 const rightPanelShortcut = defineModel<string>("rightPanelShortcut", { required: true });
+const themeMode = defineModel<ThemeMode>("themeMode", { required: true });
 
 const emit = defineEmits<{
 	close: [];
@@ -21,9 +23,10 @@ const emit = defineEmits<{
 	remove: [path: string];
 	reset: [];
 	resetShortcuts: [];
+	resetTheme: [];
 }>();
 
-type SettingsSection = "storage" | "shortcuts";
+type SettingsSection = "storage" | "appearance" | "shortcuts";
 
 const activeSection = ref<SettingsSection>("storage");
 const captureArmed = ref<"left" | "right" | null>(null);
@@ -37,6 +40,12 @@ watch(
 		}
 	},
 );
+
+const themeOptions: Array<{ value: ThemeMode; label: string; description: string; icon: typeof Sun }> = [
+	{ value: "dark", label: "Dark", description: "Keep the cockpit-style dark workspace.", icon: Moon },
+	{ value: "light", label: "Light", description: "Use a brighter canvas with the same warm accent direction.", icon: Sun },
+	{ value: "system", label: "System", description: "Follow the desktop color-scheme preference automatically.", icon: Monitor },
+];
 
 function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 	event.preventDefault();
@@ -90,6 +99,18 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 							</div>
 
 							<div>
+								<p class="px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Appearance</p>
+								<button
+									type="button"
+									class="mt-2 flex w-full items-center gap-2 rounded-md bg-card/55 px-3 py-2 text-left text-sm font-medium text-foreground"
+									@click="activeSection = 'appearance'"
+								>
+									<Sun class="h-4 w-4 text-muted-foreground" />
+									Theme
+								</button>
+							</div>
+
+							<div>
 								<p class="px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Workspace</p>
 								<button
 									type="button"
@@ -109,13 +130,21 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 						<div>
 							<p class="text-xs font-semibold uppercase tracking-wide text-primary">General</p>
 							<h2 class="mt-1 text-xl font-semibold tracking-tight">
-								{{ activeSection === "storage" ? "Storage lookup" : "Panel shortcuts" }}
+								{{
+									activeSection === "storage"
+										? "Storage lookup"
+										: activeSection === "appearance"
+											? "Theme"
+											: "Panel shortcuts"
+								}}
 							</h2>
 							<p class="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
 								{{
 									activeSection === "storage"
 										? "Trackboi searches these repo-relative locations in order and opens the first store it finds."
-										: "Configure the global shortcuts that collapse or reopen the desktop side panels."
+										: activeSection === "appearance"
+											? "Choose how Trackboi paints the desktop shell and code surfaces."
+											: "Configure the global shortcuts that collapse or reopen the desktop side panels."
 								}}
 							</p>
 						</div>
@@ -176,6 +205,43 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 									</Button>
 								</div>
 							</form>
+						</section>
+					</section>
+
+					<section v-else-if="activeSection === 'appearance'" class="grid gap-4">
+						<section class="grid gap-4 rounded-lg bg-background/12 p-4">
+							<div>
+								<h3 class="text-sm font-semibold text-foreground">Theme mode</h3>
+								<p class="mt-1 text-sm leading-6 text-muted-foreground">
+									Switch between the dark workspace, a lighter drafting surface, or your system preference.
+								</p>
+							</div>
+
+							<div class="grid gap-2">
+								<button
+									v-for="option in themeOptions"
+									:key="option.value"
+									type="button"
+									class="flex items-start gap-3 rounded-md border px-3 py-3 text-left transition-colors"
+									:class="themeMode === option.value
+										? 'border-primary/35 bg-primary/10 text-foreground'
+										: 'border-border/70 bg-secondary/55 text-foreground hover:border-border/90 hover:bg-secondary/78'"
+									@click="themeMode = option.value"
+								>
+									<component :is="option.icon" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+									<div class="min-w-0">
+										<div class="trackboi-mono-font text-[12px] text-foreground">{{ option.label }}</div>
+										<p class="mt-1 text-sm leading-6 text-muted-foreground">{{ option.description }}</p>
+									</div>
+								</button>
+							</div>
+
+							<div class="flex flex-wrap gap-2">
+								<Button variant="outline" type="button" @click="emit('resetTheme')">
+									<RotateCcw class="h-4 w-4" />
+									Restore default
+								</Button>
+							</div>
 						</section>
 					</section>
 

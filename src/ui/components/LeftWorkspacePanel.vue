@@ -43,7 +43,7 @@ function trackSourceLabel(track: Track) {
 					<div class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Workspace</div>
 					<div class="mt-1 text-sm font-medium text-foreground">{{ snapshot?.project.name ?? "Trackboi" }}</div>
 					<div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-						<span class="inline-flex h-2 w-2 rounded-full bg-[#5aa29b]" />
+						<span class="inline-flex h-2 w-2 rounded-full" style="background: hsl(var(--signal-attached));" />
 						<span>MCP attached</span>
 					</div>
 				</section>
@@ -119,7 +119,7 @@ function trackSourceLabel(track: Track) {
 			<div v-else class="grid content-start gap-3 px-3 py-3">
 				<div class="rounded-md border border-border/75 bg-secondary/55 px-3 py-3">
 					<div class="flex items-center gap-2 text-sm font-medium text-foreground">
-						<Bot class="h-4 w-4 text-[#5aa29b]" />
+						<Bot class="h-4 w-4" style="color: hsl(var(--signal-attached));" />
 						Agent context
 					</div>
 					<p class="mt-2 text-[12px] leading-5 text-muted-foreground">

@@ -28,7 +28,7 @@ import {
 } from "./tracks";
 import { aggregateSnapshot as aggregateRuntimeSnapshot, stripInternalSnapshotFields, withSelectedWorktree } from "./services/runtimeAggregation";
 import { readSnapshotForProjectPath } from "./services/runtimeSnapshots";
-import type { CachedDesktopState, WorktreeStore } from "./services/runtimeTypes";
+import type { CachedDesktopState, DesktopStateCache, WorktreeStore } from "./services/runtimeTypes";
 import {
 	createSelectedWorktreeStore as promoteWorktreeStore,
 	discoverWorktrees as discoverProjectWorktrees,
@@ -70,12 +70,12 @@ export type RuntimeOptions = RegistryOptions;
  */
 export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 	const registry = createRegistryStore(options);
-	let desktopCache: CachedDesktopState | null = null;
+	const desktopStateCache: DesktopStateCache = new Map();
 	const snapshotCache = new Map<string, ProjectSnapshotWithInternals>();
 	const worktreeCache = new Map<string, WorktreeStore[]>();
 
 	function invalidateCache(): void {
-		desktopCache = null;
+		desktopStateCache.clear();
 		snapshotCache.clear();
 		worktreeCache.clear();
 	}
@@ -139,6 +139,28 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		return pickSelectedWorktree(worktrees, registry.readRegistry().selectedWorktreeId);
 	}
 
+	function visibleProjects(): Project[] {
+		const seen = new Set<string>();
+
+		return listView().sources
+			.flatMap((source) => source.entries)
+			.filter((entry) => {
+				if (seen.has(entry.projectId)) return false;
+				seen.add(entry.projectId);
+				return true;
+			})
+			.map((entry) => ({
+				id: entry.projectId,
+				name: entry.name,
+				path: entry.path,
+				storagePath: entry.storagePath,
+			}));
+	}
+
+	function resolveVisibleProject(projectId: string): Project | null {
+		return visibleProjects().find((project) => project.id === projectId) ?? null;
+	}
+
 	function toStoredCardPatch(
 		patch: CardPatch,
 		trackId: string | null,
@@ -177,21 +199,23 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		}
 
 		const cacheKey = projectCacheKey(project);
-		if (desktopCache && desktopCache.projectKey === cacheKey) {
+		const cached = desktopStateCache.get(cacheKey);
+		if (cached) {
 			return {
-				...desktopCache,
+				...cached,
 				view,
 			};
 		}
 
 		const aggregated = aggregateSnapshot(project, create);
-		desktopCache = {
+		const nextCachedState = {
 			projectKey: cacheKey,
 			snapshotBase: aggregated.snapshotBase,
 			view,
 			worktrees: aggregated.worktrees,
 		};
-		return desktopCache;
+		desktopStateCache.set(cacheKey, nextCachedState);
+		return nextCachedState;
 	}
 
 	function toDesktopState(cached: CachedDesktopState): DesktopState {
@@ -225,6 +249,27 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 
 	function readDesktopState(): DesktopState {
 		return toDesktopState(getCachedDesktopState(true));
+	}
+
+	/**
+	 * Warms visible project snapshots in the background so later project switches
+	 * can reuse already-aggregated board/worktree state.
+	 */
+	function prewarmProjects(): void {
+		const view = listView();
+		for (const project of visibleProjects()) {
+			if (!existsSync(project.path)) continue;
+			const cacheKey = projectCacheKey(project);
+			if (desktopStateCache.has(cacheKey)) continue;
+
+			const aggregated = aggregateSnapshot(project, false);
+			desktopStateCache.set(cacheKey, {
+				projectKey: cacheKey,
+				snapshotBase: aggregated.snapshotBase,
+				view,
+				worktrees: aggregated.worktrees,
+			});
+		}
 	}
 
 	function setSelectedWorktree(worktreeId: string | null): DesktopState {
@@ -261,8 +306,10 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			current.selectedWorktreeId = selected.id;
 			registry.writeRegistry(current);
 		}
-		if (desktopCache) {
-			desktopCache.worktrees = desktopCache.worktrees.map((candidate) => candidate.id === selected?.id ? selected : candidate);
+		const cacheKey = projectCacheKey(project);
+		const cached = desktopStateCache.get(cacheKey);
+		if (cached) {
+			cached.worktrees = cached.worktrees.map((candidate) => candidate.id === selected?.id ? selected : candidate);
 		}
 		return selected;
 	}
@@ -523,17 +570,14 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		return activeSnapshot();
 	}
 
-	function switchProject(projectId: string): ProjectSnapshot | null {
+	function switchProject(projectId: string): DesktopState {
 		const current = registry.readRegistry();
-		const entry = listView().sources
-			.flatMap((source) => source.entries)
-			.find((candidate) => candidate.projectId === projectId);
-		if (!entry) throw new Error(`Unknown project: ${projectId}`);
+		const project = resolveVisibleProject(projectId);
+		if (!project) throw new Error(`Unknown project: ${projectId}`);
 		current.activeProjectId = projectId;
-		current.selectedWorktreeId = entry.path;
+		current.selectedWorktreeId = project.path;
 		registry.writeRegistry(current);
-		invalidateCache();
-		return activeSnapshot();
+		return toDesktopState(getCachedDesktopState(true));
 	}
 
 	function setStorageSearchPaths(paths: string[]): ProjectView {
@@ -655,6 +699,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		activeSnapshot,
 		activeSnapshotWithInternals,
 		readDesktopState,
+		prewarmProjects,
 		invalidateCache,
 		setSelectedWorktree,
 		chooseProjectPath,

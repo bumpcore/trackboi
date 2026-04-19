@@ -29,6 +29,13 @@ export type CachedDesktopState = {
 };
 
 /**
+ * Groups cached desktop-state bundles by project so selection changes can swap
+ * between already-aggregated snapshots instead of rebuilding each project from
+ * disk on every project switch.
+ */
+export type DesktopStateCache = Map<string, CachedDesktopState>;
+
+/**
  * Captures one card as it appears in one worktree-backed store before runtime
  * aggregation merges variants into the board-level snapshot.
  */

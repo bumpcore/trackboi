@@ -18,7 +18,9 @@ describe("markdown rendering", () => {
 		expect(html).toContain("<h2>Section</h2>");
 		expect(html).toContain("<ul>");
 		expect(html).toContain("<blockquote>");
-		expect(html).toContain('class="shiki github-dark"');
+		expect(html).toContain('class="shiki shiki-themes github-light github-dark"');
+		expect(html).toContain("--shiki-light");
+		expect(html).toContain("--shiki-dark");
 		expect(html).toContain("<pre");
 		expect(html).toContain("<code>");
 		expect(html).not.toContain("<script>");

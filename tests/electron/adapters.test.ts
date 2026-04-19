@@ -10,6 +10,7 @@ function createTrackboiBridge(overrides: Partial<TrackboiBridgeApi> = {}): Track
 		listProjects: async () => ({ projects: [], activeProjectId: null, storageSearchPaths: [], activeWorkspaceFile: null, selectedWorktreeId: null }),
 		listView: async () => ({ sources: [], activeProjectId: null, storageSearchPaths: [] }),
 		readDesktopState: async () => ({ snapshot: null, view: { sources: [], activeProjectId: null, storageSearchPaths: [] }, worktrees: [], selectedWorktreeId: null }),
+		prewarmProjects: async () => {},
 		setSelectedWorktree: async () => ({ snapshot: null, view: { sources: [], activeProjectId: null, storageSearchPaths: [] }, worktrees: [], selectedWorktreeId: null }),
 		setStorageSearchPaths: async () => ({ sources: [], activeProjectId: null, storageSearchPaths: [] }),
 		setActiveWorkspaceFile: async () => ({ sources: [], activeProjectId: null, storageSearchPaths: [] }),
@@ -179,6 +180,16 @@ describe("electron adapters", () => {
 		trackboi.onProjectChanged(listener);
 		expect(onProjectChanged).toHaveBeenCalledTimes(1);
 		expect(listener).toHaveBeenCalledWith({ rootPath: "/tmp/project" });
+	});
+
+	test("desktop facade schedules background project prewarming after desktop reads", async () => {
+		const prewarmProjects = mock(async () => {});
+		const desktop = createDesktopFacade(createTrackboiBridge({ prewarmProjects }), createWindowBridge());
+
+		await desktop.readDesktopState();
+		await new Promise((resolve) => setTimeout(resolve, 170));
+
+		expect(prewarmProjects).toHaveBeenCalledTimes(1);
 	});
 
 	test("desktop facade delegates track mutations and notifies listeners", async () => {

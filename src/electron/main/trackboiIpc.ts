@@ -18,6 +18,7 @@ export function registerTrackboiIpcHandlers(options: {
 	// The desktop shell boots and refreshes through readDesktopState(), so this
 	// IPC path must also arm the filesystem watcher for external MCP writes.
 	ipcMain.handle(ipcChannels.trackboi.readDesktopState, () => readDesktopState());
+	ipcMain.handle(ipcChannels.trackboi.prewarmProjects, () => trackboi.prewarmProjects());
 	ipcMain.handle(ipcChannels.trackboi.setSelectedWorktree, (_event: IpcMainInvokeEvent, worktreeId: string | null) => (
 		trackboi.setSelectedWorktree(worktreeId)
 	));

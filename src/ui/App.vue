@@ -17,6 +17,7 @@ import { useDesktopProjectState } from "@/ui/composables/useDesktopProjectState"
 import { useFreshCardHighlights } from "@/ui/composables/useFreshCardHighlights";
 import { usePanelShortcuts } from "@/ui/composables/usePanelShortcuts";
 import { useProjectBoardSettings } from "@/ui/composables/useProjectBoardSettings";
+import { useThemeMode } from "@/ui/composables/useThemeMode";
 import { useTrackWorkflow } from "@/ui/composables/useTrackWorkflow";
 import { useWindowChrome } from "@/ui/composables/useWindowChrome";
 import { useWorkspaceShellState } from "@/ui/composables/useWorkspaceShellState";
@@ -170,7 +171,9 @@ const rightViewPinned = ref(false);
 const {
 	leftPanelShortcut,
 	rightPanelShortcut,
+	themeMode,
 	resetPanelShortcuts,
+	resetThemeMode,
 } = useAppPreferences();
 
 const columnOptions = computed<SelectOption[]>(() => (
@@ -232,18 +235,10 @@ function openCardPanel(columnId?: string) {
 
 function editCard(card: Parameters<typeof openCard>[0]) {
 	openCard(card);
-	ensureRightPanelOpen();
-	if (!rightViewPinned.value || shell.rightView.value === "project-settings") {
-		shell.setRightView("card");
-	}
 }
 
 function openTrackPanel(trackId: string) {
 	selectTrack(trackId);
-	ensureRightPanelOpen();
-	if (!rightViewPinned.value || shell.rightView.value === "project-settings") {
-		shell.setRightView("track");
-	}
 }
 
 function handleTrackSelection(trackId: string) {
@@ -267,6 +262,8 @@ usePanelShortcuts({
 	toggleLeftPanel: shell.toggleLeftCollapsed,
 	toggleRightPanel: shell.toggleRightCollapsed,
 });
+
+useThemeMode(themeMode);
 
 async function switchProjectFromRail(projectId: string) {
 	shell.setLeftView("explorer");
@@ -445,6 +442,7 @@ onMounted(loadProject);
 				v-model:draft="storagePathDraft"
 				v-model:left-panel-shortcut="leftPanelShortcut"
 				v-model:right-panel-shortcut="rightPanelShortcut"
+				v-model:theme-mode="themeMode"
 				:open="settingsOpen"
 				:paths="view.storageSearchPaths"
 				:busy="busy"
@@ -453,6 +451,7 @@ onMounted(loadProject);
 				@remove="removeStorageSearchPath"
 				@reset="resetStorageSearchPaths"
 				@reset-shortcuts="resetPanelShortcuts"
+				@reset-theme="resetThemeMode"
 			/>
 		</main>
 

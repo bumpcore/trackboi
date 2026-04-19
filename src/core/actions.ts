@@ -105,6 +105,10 @@ class NodeFsTrackboiActionsImpl implements NodeFsTrackboiActions {
 		return this.runtime.readDesktopState();
 	}
 
+	async prewarmProjects(): Promise<void> {
+		this.runtime.prewarmProjects();
+	}
+
 	async setSelectedWorktree(worktreeId: string | null): Promise<DesktopState> {
 		return this.runtime.setSelectedWorktree(worktreeId);
 	}
@@ -175,8 +179,7 @@ class NodeFsTrackboiActionsImpl implements NodeFsTrackboiActions {
 	}
 
 	async switchProject(projectId: string): Promise<DesktopState> {
-		this.runtime.switchProject(projectId);
-		return this.runtime.readDesktopState();
+		return this.runtime.switchProject(projectId);
 	}
 
 	async createCard(input: CreateCardInput): Promise<Card> {

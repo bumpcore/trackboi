@@ -11,6 +11,7 @@ export const ipcChannels = {
 		listProjects: "trackboi:list-projects",
 		listView: "trackboi:list-view",
 		readDesktopState: "trackboi:read-desktop-state",
+		prewarmProjects: "trackboi:prewarm-projects",
 		setSelectedWorktree: "trackboi:set-selected-worktree",
 		setStorageSearchPaths: "trackboi:set-storage-search-paths",
 		setActiveWorkspaceFile: "trackboi:set-active-workspace-file",

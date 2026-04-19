@@ -12,7 +12,7 @@ const inlineMarkdown = new MarkdownIt("zero", baseOptions)
 	.disable(["image"]);
 
 const highlighter = await createHighlighter({
-	themes: ["github-dark"],
+	themes: ["github-dark", "github-light"],
 	langs: [
 		"plaintext",
 		"text",
@@ -46,7 +46,11 @@ const blockMarkdown = new MarkdownIt("commonmark", {
 
 		return highlighter.codeToHtml(code, {
 			lang: normalizedLanguage,
-			theme: "github-dark",
+			themes: {
+				light: "github-light",
+				dark: "github-dark",
+			},
+			defaultColor: false,
 		});
 	},
 }).disable(["hr", "image", "html_block", "html_inline"]);

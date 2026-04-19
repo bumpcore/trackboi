@@ -1,11 +1,12 @@
+import path from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import * as z from "zod/v4";
-import type { Card, NodeFsTrackboiActions, ProjectSnapshot } from "../../core";
+import type { Card, NodeFsTrackboiActions, ProjectEntry, ProjectSnapshot, ProjectView } from "../../core";
 
 export type ToolHandler = () => unknown | Promise<unknown>;
 
-export const projectIdSchema = z.string().optional().describe("Project id. Defaults to Trackboi's active project.");
+export const projectIdSchema = z.string().optional().describe("Project id. Defaults to the agent's active project.");
 export const columnSchema = z.string().min(1).describe("Board column id.");
 export const cardIdSchema = z.string().min(1).describe("Card id.");
 export const scopeSchema = z.discriminatedUnion("kind", [
@@ -43,8 +44,12 @@ export function toolResult(handler: ToolHandler): Promise<CallToolResult> {
  * Resolves the active snapshot or fails with a user-facing message when no
  * project is active yet.
  */
-export async function requireSnapshot(trackboi: NodeFsTrackboiActions): Promise<ProjectSnapshot> {
-	const snapshot = await trackboi.getActiveProject();
+export async function requireSnapshot(
+	trackboi: NodeFsTrackboiActions,
+	context: McpProjectContext,
+	projectId?: string,
+): Promise<ProjectSnapshot> {
+	const snapshot = await withProject(trackboi, context, projectId, () => trackboi.getActiveProject());
 	if (!snapshot) throw new Error("Choose a project first");
 	return snapshot;
 }
@@ -53,32 +58,113 @@ export async function requireSnapshot(trackboi: NodeFsTrackboiActions): Promise<
  * Loads one card from the active snapshot. MCP tools use this helper so every
  * “card not found” path produces the same error message.
  */
-export async function getCard(trackboi: NodeFsTrackboiActions, cardId: string): Promise<Card> {
-	const card = (await requireSnapshot(trackboi)).cards.find((candidate) => candidate.id === cardId);
+export async function getCard(
+	trackboi: NodeFsTrackboiActions,
+	context: McpProjectContext,
+	cardId: string,
+	projectId?: string,
+): Promise<Card> {
+	const card = (await requireSnapshot(trackboi, context, projectId)).cards.find((candidate) => candidate.id === cardId);
 	if (!card) throw new Error(`Unknown card: ${cardId}`);
 	return card;
 }
 
 /**
- * Temporarily switches Trackboi's active project for a tool call, then restores
- * the previous active project after the action finishes.
+ * Tracks the MCP server's own project context so agents do not inherit the
+ * desktop UI's selected project.
+ */
+export type McpProjectContext = {
+	currentProjectId(): Promise<string | null>;
+	setCurrentProjectId(projectId: string): Promise<ProjectEntry>;
+	listView(): Promise<ProjectView & {
+		agentActiveProjectId: string | null;
+		desktopActiveProjectId: string | null;
+	}>;
+};
+
+export async function createMcpProjectContext(
+	trackboi: NodeFsTrackboiActions,
+	cwd: string = process.cwd(),
+): Promise<McpProjectContext> {
+	let activeProjectId = pickAgentProjectId(await trackboi.listView(), cwd);
+
+	async function currentProjectId(): Promise<string | null> {
+		const view = await trackboi.listView();
+		const projectId = activeProjectId && listEntries(view).some((entry) => entry.projectId === activeProjectId)
+			? activeProjectId
+			: pickAgentProjectId(view, cwd);
+		activeProjectId = projectId;
+		return projectId;
+	}
+
+	return {
+		async currentProjectId() {
+			return currentProjectId();
+		},
+		async setCurrentProjectId(projectId: string) {
+			const view = await trackboi.listView();
+			const entry = listEntries(view).find((candidate) => candidate.projectId === projectId);
+			if (!entry) throw new Error(`Unknown project: ${projectId}`);
+			activeProjectId = entry.projectId;
+			return entry;
+		},
+		async listView() {
+			const view = await trackboi.listView();
+			return {
+				...view,
+				agentActiveProjectId: await currentProjectId(),
+				desktopActiveProjectId: view.activeProjectId,
+				activeProjectId: await currentProjectId(),
+			};
+		},
+	};
+}
+
+/**
+ * Temporarily switches core into the agent-selected project for a tool call,
+ * then restores the desktop-facing registry selection afterwards.
  */
 export async function withProject<T>(
 	trackboi: NodeFsTrackboiActions,
+	context: McpProjectContext,
 	projectId: string | undefined,
 	action: () => T | Promise<T>,
 ): Promise<T> {
-	if (!projectId) return action();
+	const resolvedProjectId = projectId ?? await context.currentProjectId();
+	if (!resolvedProjectId) return action();
 	const registry = trackboi.readRegistry();
 	const previousActiveProjectId = registry.activeProjectId;
-	await trackboi.switchProject(projectId);
+	const previousSelectedWorktreeId = registry.selectedWorktreeId;
+	await trackboi.switchProject(resolvedProjectId);
 	try {
 		return await action();
 	} finally {
 		const nextRegistry = trackboi.readRegistry();
 		nextRegistry.activeProjectId = previousActiveProjectId;
+		nextRegistry.selectedWorktreeId = previousSelectedWorktreeId;
 		trackboi.writeRegistry(nextRegistry);
 	}
+}
+
+export function pickAgentProjectId(view: ProjectView, cwd: string): string | null {
+	const entries = listEntries(view);
+	const normalizedCwd = normalizePath(cwd);
+	const matchingEntry = entries
+		.filter((entry) => pathContains(normalizedCwd, normalizePath(entry.path)))
+		.sort((left, right) => right.path.length - left.path.length)[0];
+	return matchingEntry?.projectId ?? view.activeProjectId;
+}
+
+function listEntries(view: ProjectView): ProjectEntry[] {
+	return view.sources.flatMap((source) => source.entries);
+}
+
+function normalizePath(value: string): string {
+	return path.resolve(value);
+}
+
+function pathContains(subjectPath: string, candidatePath: string): boolean {
+	return subjectPath === candidatePath || subjectPath.startsWith(`${candidatePath}${path.sep}`);
 }
 
 function jsonResult(value: unknown): CallToolResult {

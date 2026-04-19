@@ -6,13 +6,17 @@ dist/
 dist-node/
 build/
 artifacts/
+release/
 
 # Local agent/editor state
 .codex
 .vscode/
 .idea/
+.tmp/
+playgrounds/
 
 # Local Trackboi data
+.trackboi/
 .etc/.trackboi/
 .etc/trackboi/
 

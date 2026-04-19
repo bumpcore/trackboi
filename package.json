@@ -7,6 +7,10 @@
 		"trackboi": "bin/trackboi"
 	},
 	"description": "A local-first Kanban desktop app with an MCP server.",
+	"author": {
+		"name": "Trackboi",
+		"email": "noreply@trackboi.local"
+	},
 	"scripts": {
 		"dev": "concurrently -k \"bun run dev:ui\" \"bun run dev:electron-main\" \"bun run dev:electron-preload\" \"bun run dev:desktop\"",
 		"dev:ui": "vite --host 127.0.0.1",
@@ -23,11 +27,36 @@
 		"build:node": "bun run build:cli && bun run build:electron",
 		"build:cli": "esbuild src/cli/entry.ts --bundle --platform=node --format=cjs --outfile=dist-node/cli/main.cjs",
 		"build:electron": "esbuild src/electron/main.ts --bundle --platform=node --format=cjs --outfile=dist-node/electron/main.cjs --external:electron && esbuild src/electron/preload.ts --bundle --platform=node --format=cjs --outfile=dist-node/electron/preload.cjs --external:electron",
+		"dist": "bun run build && electron-builder --linux --publish never",
 		"start": "env -u ELECTRON_RUN_AS_NODE electron dist-node/electron/main.cjs",
 		"cli": "./bin/trackboi",
 		"mcp": "./bin/trackboi mcp",
 		"mcp:dev": "bun src/cli/entry.ts mcp",
 		"mcp:inspect": "bunx @modelcontextprotocol/inspector bun src/cli/entry.ts mcp"
+	},
+	"build": {
+		"appId": "dev.trackboi.desktop",
+		"productName": "Trackboi",
+		"directories": {
+			"output": "release"
+		},
+		"files": [
+			"dist/**",
+			"dist-node/**",
+			"bin/**",
+			"package.json"
+		],
+		"extraMetadata": {
+			"main": "dist-node/electron/main.cjs"
+		},
+		"linux": {
+			"category": "Development",
+			"maintainer": "Trackboi <noreply@trackboi.local>",
+			"target": [
+				"AppImage",
+				"rpm"
+			]
+		}
 	},
 	"dependencies": {
 		"@fontsource/inter": "^5.2.8",
@@ -55,6 +84,7 @@
 		"@types/sortablejs": "^1.15.9",
 		"@vitejs/plugin-vue": "^5.2.1",
 		"concurrently": "^9.2.1",
+		"electron-builder": "^26.0.12",
 		"esbuild": "^0.28.0",
 		"electron": "^41.2.1",
 		"typescript": "^5.7.2",

@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { NodeFsTrackboiActions } from "../core";
+import { createMcpProjectContext } from "./mcp/helpers";
 import { registerBoardTools, registerProjectTools } from "./mcp/projectTools";
 import { registerCardTools } from "./mcp/cardTools";
 import { registerTrackTools } from "./mcp/trackTools";
@@ -16,11 +17,12 @@ export async function runMcpServer(trackboi: NodeFsTrackboiActions): Promise<voi
 		name: "trackboi",
 		version: "0.1.0",
 	});
+	const projectContext = await createMcpProjectContext(trackboi);
 
-	registerProjectTools(server, trackboi);
-	registerBoardTools(server, trackboi);
-	registerCardTools(server, trackboi);
-	registerTrackTools(server, trackboi);
+	registerProjectTools(server, trackboi, projectContext);
+	registerBoardTools(server, trackboi, projectContext);
+	registerCardTools(server, trackboi, projectContext);
+	registerTrackTools(server, trackboi, projectContext);
 
 	const transport = new StdioServerTransport();
 	const closed = new Promise<void>((resolve) => {

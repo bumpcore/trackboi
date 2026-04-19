@@ -15,6 +15,7 @@ const props = defineProps<{
 	cards: TrackboiCard[];
 	childProgress: Record<string, { total: number; done: number }>;
 	customFields: CustomField[];
+	freshCardIds?: Set<string>;
 	selectedCardId?: string | null;
 	trackLabels: Record<string, string>;
 }>();
@@ -24,6 +25,7 @@ const emit = defineEmits<{
 	create: [columnId: string];
 	edit: [card: TrackboiCard];
 	delete: [card: TrackboiCard];
+	freshSeen: [cardId: string];
 }>();
 
 const listElement = ref<HTMLElement | null>(null);
@@ -135,10 +137,12 @@ function activateCard(card: TrackboiCard) {
 				:key="card.id"
 				class="board-card group relative grid w-full min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3 overflow-hidden p-3 transition"
 				:data-card-id="card.id"
+				:data-fresh="props.freshCardIds?.has(card.id) ?? false"
 				:data-selected="props.selectedCardId === card.id"
 				role="button"
 				tabindex="0"
 				@click="activateCard(card)"
+				@mouseenter="emit('freshSeen', card.id)"
 				@keydown.enter.prevent="activateCard(card)"
 				@keydown.space.prevent="activateCard(card)"
 			>

@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as z from "zod/v4";
 import type { NodeFsTrackboiActions, TrackPatch } from "../../core";
-import { projectIdSchema, toolResult, withProject } from "./helpers";
+import { type McpProjectContext, projectIdSchema, toolResult, withProject } from "./helpers";
 
 const trackSourceSchema = z.discriminatedUnion("kind", [
 	z.object({ kind: z.literal("manual") }),
@@ -33,14 +33,14 @@ const trackActivitySchema = z.object({
  * Registers MCP tools for first-class track management and track-file
  * operations.
  */
-export function registerTrackTools(server: McpServer, trackboi: NodeFsTrackboiActions): void {
+export function registerTrackTools(server: McpServer, trackboi: NodeFsTrackboiActions, context: McpProjectContext): void {
 	server.registerTool("list_tracks", {
 		title: "List tracks",
 		description: "List track contexts for the active project.",
 		inputSchema: {
 			projectId: projectIdSchema,
 		},
-	}, ({ projectId }) => toolResult(() => withProject(trackboi, projectId, () => trackboi.listTracks())));
+	}, ({ projectId }) => toolResult(() => withProject(trackboi, context, projectId, () => trackboi.listTracks())));
 
 	server.registerTool("get_track", {
 		title: "Get track",
@@ -49,7 +49,7 @@ export function registerTrackTools(server: McpServer, trackboi: NodeFsTrackboiAc
 			projectId: projectIdSchema,
 			trackId: z.string().min(1),
 		},
-	}, ({ projectId, trackId }) => toolResult(() => withProject(trackboi, projectId, () => trackboi.getTrack(trackId))));
+	}, ({ projectId, trackId }) => toolResult(() => withProject(trackboi, context, projectId, () => trackboi.getTrack(trackId))));
 
 	server.registerTool("create_track", {
 		title: "Create track",
@@ -61,7 +61,7 @@ export function registerTrackTools(server: McpServer, trackboi: NodeFsTrackboiAc
 			summary: z.string().optional(),
 			plan: z.string().optional(),
 		},
-	}, ({ projectId, title, source, summary, plan }) => toolResult(() => withProject(trackboi, projectId, () => (
+	}, ({ projectId, title, source, summary, plan }) => toolResult(() => withProject(trackboi, context, projectId, () => (
 		trackboi.createTrack({ title, source, summary, plan })
 	))));
 
@@ -80,7 +80,7 @@ export function registerTrackTools(server: McpServer, trackboi: NodeFsTrackboiAc
 			activity: z.array(trackActivitySchema).optional(),
 		},
 	}, ({ projectId, trackId, title, source, summary, plan, decisions, references, activity }) => (
-		toolResult(() => withProject(trackboi, projectId, async () => {
+		toolResult(() => withProject(trackboi, context, projectId, async () => {
 			const patch: TrackPatch = {};
 			if (title !== undefined) patch.title = title;
 			if (source !== undefined) patch.source = source;
@@ -100,7 +100,7 @@ export function registerTrackTools(server: McpServer, trackboi: NodeFsTrackboiAc
 			projectId: projectIdSchema,
 			trackId: z.string().min(1),
 		},
-	}, ({ projectId, trackId }) => toolResult(() => withProject(trackboi, projectId, () => trackboi.deleteTrack(trackId))));
+	}, ({ projectId, trackId }) => toolResult(() => withProject(trackboi, context, projectId, () => trackboi.deleteTrack(trackId))));
 
 	server.registerTool("write_track_file", {
 		title: "Write track file",
@@ -112,7 +112,7 @@ export function registerTrackTools(server: McpServer, trackboi: NodeFsTrackboiAc
 			content: z.string(),
 			contentType: z.string().optional(),
 		},
-	}, ({ projectId, trackId, name, content, contentType }) => toolResult(() => withProject(trackboi, projectId, () => (
+	}, ({ projectId, trackId, name, content, contentType }) => toolResult(() => withProject(trackboi, context, projectId, () => (
 		trackboi.writeTrackFile({ trackId, name, content, contentType })
 	))));
 
@@ -124,7 +124,7 @@ export function registerTrackTools(server: McpServer, trackboi: NodeFsTrackboiAc
 			trackId: z.string().min(1),
 			name: z.string().min(1),
 		},
-	}, ({ projectId, trackId, name }) => toolResult(() => withProject(trackboi, projectId, () => (
+	}, ({ projectId, trackId, name }) => toolResult(() => withProject(trackboi, context, projectId, () => (
 		trackboi.deleteTrackFile(trackId, name)
 	))));
 }

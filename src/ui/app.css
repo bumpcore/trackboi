@@ -439,6 +439,30 @@ body.trackboi-resizing * {
 		0 14px 24px hsl(0 0% 0% / 0.18);
 }
 
+.board-card[data-fresh="true"] {
+	border-color: hsl(var(--primary) / 0.38);
+	background: hsl(var(--primary) / 0.075);
+	box-shadow:
+		0 0 0 1px hsl(var(--primary) / 0.24),
+		inset 0 1px 0 hsl(var(--primary) / 0.1);
+}
+
+.board-card[data-fresh="true"]::after {
+	content: "";
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	height: 7px;
+	width: 7px;
+	border-radius: 9999px;
+	background: hsl(var(--primary) / 0.9);
+	box-shadow: 0 0 0 2px hsl(var(--card) / 0.9);
+}
+
+.board-card[data-fresh="true"]:hover {
+	background: hsl(var(--primary) / 0.075);
+}
+
 .board-card[data-selected="true"] {
 	border-color: hsl(var(--primary) / 0.38);
 	background: hsl(var(--primary) / 0.075);

@@ -13,6 +13,7 @@ import { useBoardPresentationState } from "@/ui/composables/useBoardPresentation
 import { useCardWorkflow } from "@/ui/composables/useCardWorkflow";
 import { useConfirmation } from "@/ui/composables/useConfirmation";
 import { useDesktopProjectState } from "@/ui/composables/useDesktopProjectState";
+import { useFreshCardHighlights } from "@/ui/composables/useFreshCardHighlights";
 import { useProjectBoardSettings } from "@/ui/composables/useProjectBoardSettings";
 import { useTrackWorkflow } from "@/ui/composables/useTrackWorkflow";
 import { useWindowChrome } from "@/ui/composables/useWindowChrome";
@@ -136,6 +137,8 @@ const {
 	worktreeFilterId,
 	editingCardId: computed(() => selectedCard.value?.id ?? null),
 });
+
+const { freshCardIds, clearFreshCard } = useFreshCardHighlights(snapshot);
 
 const {
 	fieldNameDraft,
@@ -331,6 +334,7 @@ onMounted(loadProject);
 				:child-progress="childProgress"
 				:custom-fields="customFields"
 				:error="error"
+				:fresh-card-ids="freshCardIds"
 				:has-projects="hasProjects"
 				:loading="loading"
 				:scope-empty-message="scopeEmptyMessage"
@@ -345,6 +349,7 @@ onMounted(loadProject);
 				@create-card="openCardPanel"
 				@edit-card="editCard"
 				@delete-card="deleteCard"
+				@fresh-seen="clearFreshCard"
 				@move-card="moveCard"
 			/>
 

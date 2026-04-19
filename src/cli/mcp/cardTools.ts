@@ -1,12 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as z from "zod/v4";
 import type { CardPatch, NodeFsTrackboiActions } from "../../core";
-import { cardIdSchema, columnSchema, getCard, projectIdSchema, scopeSchema, toolResult, withProject } from "./helpers";
+import { type McpProjectContext, cardIdSchema, columnSchema, getCard, projectIdSchema, scopeSchema, toolResult, withProject } from "./helpers";
 
 /**
  * Registers MCP tools for card reads and card mutations.
  */
-export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiActions): void {
+export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiActions, context: McpProjectContext): void {
 	server.registerTool("list_cards", {
 		title: "List cards",
 		description: "List cards for a project. Optionally filter by column or top-level cards only.",
@@ -15,7 +15,7 @@ export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiAct
 			column: z.string().optional(),
 			parentId: z.string().nullable().optional().describe("Use null for top-level cards only."),
 		},
-	}, ({ projectId, column, parentId }) => toolResult(() => withProject(trackboi, projectId, async () => {
+	}, ({ projectId, column, parentId }) => toolResult(() => withProject(trackboi, context, projectId, async () => {
 		const snapshot = await trackboi.getActiveProject();
 		if (!snapshot) throw new Error("Choose a project first");
 		return snapshot.cards.filter((card) => (
@@ -31,7 +31,7 @@ export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiAct
 			projectId: projectIdSchema,
 			cardId: cardIdSchema,
 		},
-	}, ({ projectId, cardId }) => toolResult(() => withProject(trackboi, projectId, () => getCard(trackboi, cardId))));
+	}, ({ projectId, cardId }) => toolResult(() => getCard(trackboi, context, cardId, projectId)));
 
 	server.registerTool("create_card", {
 		title: "Create card",
@@ -47,7 +47,7 @@ export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiAct
 			targetWorktreeId: z.string().optional().describe("Optional worktree id to store the new card in."),
 		},
 	}, ({ projectId, title, description, parentId, column, scope, trackId, targetWorktreeId }) => toolResult(() => (
-		withProject(trackboi, projectId, () => trackboi.createCard({
+		withProject(trackboi, context, projectId, () => trackboi.createCard({
 			title,
 			description,
 			parentId,
@@ -74,7 +74,7 @@ export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiAct
 			assignee: z.string().nullable().optional(),
 		},
 	}, ({ projectId, cardId, title, description, parentId, column, scope, trackId, labels, assignee }) => (
-		toolResult(() => withProject(trackboi, projectId, async () => {
+		toolResult(() => withProject(trackboi, context, projectId, async () => {
 			const patch: CardPatch = {};
 			if (title !== undefined) patch.title = title;
 			if (description !== undefined) patch.description = description;
@@ -98,7 +98,7 @@ export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiAct
 			beforeCardId: z.string().nullable().optional(),
 		},
 	}, ({ projectId, cardId, toColumn, beforeCardId }) => toolResult(() => (
-		withProject(trackboi, projectId, () => trackboi.moveCard(cardId, toColumn, beforeCardId ?? null))
+		withProject(trackboi, context, projectId, () => trackboi.moveCard(cardId, toColumn, beforeCardId ?? null))
 	)));
 
 	server.registerTool("delete_card", {
@@ -109,6 +109,6 @@ export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiAct
 			cardId: cardIdSchema,
 		},
 	}, ({ projectId, cardId }) => toolResult(() => (
-		withProject(trackboi, projectId, () => trackboi.deleteCard(cardId))
+		withProject(trackboi, context, projectId, () => trackboi.deleteCard(cardId))
 	)));
 }

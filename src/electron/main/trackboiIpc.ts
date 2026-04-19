@@ -8,13 +8,16 @@ import { ipcChannels } from "../ipc";
 export function registerTrackboiIpcHandlers(options: {
 	trackboi: NodeFsTrackboiActions;
 	getActiveProject(): Promise<Awaited<ReturnType<NodeFsTrackboiActions["getActiveProject"]>>>;
+	readDesktopState(): Promise<Awaited<ReturnType<NodeFsTrackboiActions["readDesktopState"]>>>;
 }): void {
-	const { trackboi, getActiveProject } = options;
+	const { trackboi, getActiveProject, readDesktopState } = options;
 
 	ipcMain.handle(ipcChannels.trackboi.getActiveProject, () => getActiveProject());
 	ipcMain.handle(ipcChannels.trackboi.listProjects, () => trackboi.listProjects());
 	ipcMain.handle(ipcChannels.trackboi.listView, () => trackboi.listView());
-	ipcMain.handle(ipcChannels.trackboi.readDesktopState, () => trackboi.readDesktopState());
+	// The desktop shell boots and refreshes through readDesktopState(), so this
+	// IPC path must also arm the filesystem watcher for external MCP writes.
+	ipcMain.handle(ipcChannels.trackboi.readDesktopState, () => readDesktopState());
 	ipcMain.handle(ipcChannels.trackboi.setSelectedWorktree, (_event: IpcMainInvokeEvent, worktreeId: string | null) => (
 		trackboi.setSelectedWorktree(worktreeId)
 	));

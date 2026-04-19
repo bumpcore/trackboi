@@ -14,6 +14,7 @@ const props = defineProps<{
 	childProgress: Record<string, ChildProgress>;
 	customFields: CustomField[];
 	error: string | null;
+	freshCardIds: Set<string>;
 	hasProjects: boolean;
 	loading: boolean;
 	scopeEmptyMessage: string | null;
@@ -31,6 +32,7 @@ const emit = defineEmits<{
 	createColumn: [];
 	editCard: [card: TrackboiCard];
 	deleteCard: [card: TrackboiCard];
+	freshSeen: [cardId: string];
 	moveCard: [cardId: string, toColumn: string, beforeCardId: string | null];
 }>();
 
@@ -127,12 +129,14 @@ function forwardMove(cardId: string, toColumn: string, beforeCardId: string | nu
 							:cards="cardsByColumn[column.id] ?? []"
 							:child-progress="childProgress"
 							:custom-fields="customFields"
+							:fresh-card-ids="freshCardIds"
 							:selected-card-id="selectedCardId ?? null"
 							:track-labels="trackLabels"
 							@move="forwardMove"
 							@create="emit('createCard', $event)"
 							@edit="emit('editCard', $event)"
 							@delete="emit('deleteCard', $event)"
+							@fresh-seen="emit('freshSeen', $event)"
 						/>
 
 						<button

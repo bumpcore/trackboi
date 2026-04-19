@@ -48,11 +48,19 @@ if (cliArgs.length > 0) {
 
 async function getActiveProject() {
 	const snapshot = await trackboi.getActiveProject();
-	const desktopState = await trackboi.readDesktopState();
+	const desktopState = await readDesktopState();
 	storageWatcher.refresh(desktopState.worktrees
 		.map((worktree) => worktree.storageRoot)
 		.filter((rootPath): rootPath is string => typeof rootPath === "string" && rootPath.length > 0));
 	return snapshot;
+}
+
+async function readDesktopState() {
+	const desktopState = await trackboi.readDesktopState();
+	storageWatcher.refresh(desktopState.worktrees
+		.map((worktree) => worktree.storageRoot)
+		.filter((rootPath): rootPath is string => typeof rootPath === "string" && rootPath.length > 0));
+	return desktopState;
 }
 
 async function chooseDirectory(): Promise<string | null> {
@@ -75,7 +83,7 @@ async function chooseWorkspaceFile(): Promise<string | null> {
 
 function registerIpc(): void {
 	registerWindowIpcHandlers();
-	registerTrackboiIpcHandlers({ trackboi, getActiveProject });
+	registerTrackboiIpcHandlers({ trackboi, getActiveProject, readDesktopState });
 }
 
 function createWindow(): void {

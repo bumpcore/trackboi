@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, useTemplateRef } from "vue";
-import { ChevronsRight, FileText, FolderCog, Layers3, Route, SquarePen } from "lucide-vue-next";
+import { FileText, FolderCog, Layers3, Route, SquarePen } from "lucide-vue-next";
 import type { Card as TrackboiCard, CustomField, ProjectSnapshot, Track, TrackPatch } from "@/core/types";
 import Badge from "@/ui/components/Badge.vue";
 import Button from "@/ui/components/Button.vue";
@@ -53,7 +53,6 @@ const fieldOptionsDraft = defineModel<string>("fieldOptionsDraft", { required: t
 
 const emit = defineEmits<{
 	selectView: [view: RightPanelView];
-	toggleCollapsed: [];
 	submitCard: [];
 	deleteCard: [card: TrackboiCard];
 	addCardComment: [];
@@ -116,10 +115,6 @@ function submitTrackFromFooter() {
 	<aside class="grid h-full min-h-0 bg-card/95" :class="collapsed ? 'grid-cols-[44px]' : 'grid-cols-[minmax(0,1fr)]'">
 		<div v-if="collapsed" class="border-l border-border/70 bg-card/95">
 			<div class="flex h-full flex-col items-center gap-2 py-3">
-				<Button variant="ghost" size="icon" type="button" @click="emit('toggleCollapsed')">
-					⇤
-				</Button>
-				<div class="my-1 h-px w-5 bg-border/80" />
 				<button
 					v-for="item in rightItems"
 					:key="item.id"
@@ -137,15 +132,6 @@ function submitTrackFromFooter() {
 			<header class="border-b border-border/70 px-5 py-4">
 				<div class="mb-3 flex items-center gap-3">
 					<div class="flex flex-wrap items-center gap-1">
-						<Tooltip content="Collapse panel" side="bottom">
-							<button
-								type="button"
-								class="shell-rail-button"
-								@click="emit('toggleCollapsed')"
-							>
-								<ChevronsRight class="h-4 w-4" />
-							</button>
-						</Tooltip>
 						<Tooltip
 							v-for="item in rightItems"
 							:key="item.id"

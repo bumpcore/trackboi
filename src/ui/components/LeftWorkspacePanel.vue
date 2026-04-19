@@ -22,7 +22,6 @@ const emit = defineEmits<{
 	selectWorktree: [worktreeId: string];
 	selectTrack: [trackId: string];
 	createTrack: [];
-	toggleCollapsed: [];
 }>();
 
 const shouldShowWorktrees = computed(() => props.worktrees.length > 1);
@@ -37,24 +36,7 @@ function trackSourceLabel(track: Track) {
 </script>
 
 <template>
-	<aside class="grid h-full min-h-0 grid-rows-[44px_minmax(0,1fr)_auto] bg-card/95">
-		<header class="flex items-center justify-between border-b border-border/70 px-4">
-			<div class="min-w-0">
-				<div class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-					{{ activeView }}
-				</div>
-				<div class="mt-0.5 text-sm font-medium text-foreground">
-					{{
-						activeView === "explorer" ? "Workspace scope"
-							: "Agent context"
-					}}
-				</div>
-			</div>
-			<div class="flex items-center gap-2">
-				<Button variant="outline" size="sm" type="button" @click="emit('toggleCollapsed')">Hide</Button>
-			</div>
-		</header>
-
+	<aside class="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] bg-card/95">
 		<div class="app-scroll min-h-0 overflow-y-auto overflow-x-hidden">
 			<div v-if="activeView === 'explorer'" class="grid content-start">
 				<section class="border-b border-border/70 px-4 py-4">

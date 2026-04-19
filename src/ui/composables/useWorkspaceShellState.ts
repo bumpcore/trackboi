@@ -19,6 +19,8 @@ const RIGHT_DEFAULT_WIDTH = DEFAULT_PREFS.rightWidth;
 const RIGHT_COLLAPSE_THRESHOLD = 280;
 const RIGHT_REOPEN_THRESHOLD = 324;
 const COLLAPSED_RIGHT_WIDTH = 44;
+const LEFT_RAIL_WIDTH = 56;
+const MAIN_WORKSPACE_TARGET_MIN_WIDTH = 920;
 
 type ResizeSide = "left" | "right";
 
@@ -42,6 +44,11 @@ type WorkspaceShellState = {
 	startResize(side: ResizeSide, event: PointerEvent): void;
 };
 
+type ResolvedPanelWidths = {
+	left: number;
+	right: number;
+};
+
 function normalizeLeftView(value: unknown): LeftPanelView {
 	return value === "agents" ? "agents" : "explorer";
 }
@@ -60,9 +67,64 @@ export function useWorkspaceShellState(): WorkspaceShellState {
 	const rightView = ref<RightPanelView>(DEFAULT_PREFS.rightView);
 	const leftResizeClass = ref("");
 	const rightResizeClass = ref("");
+	const viewportWidth = ref(typeof window === "undefined" ? 1440 : window.innerWidth);
 
-	const leftPanelWidth = computed(() => leftCollapsed.value ? 0 : leftWidth.value);
-	const rightPanelWidth = computed(() => rightCollapsed.value ? COLLAPSED_RIGHT_WIDTH : rightWidth.value);
+	/**
+	 * Fits the preferred side-panel widths into the live viewport while
+	 * preserving a usable center workspace. The side panels keep their preferred
+	 * widths whenever there is enough room, and only give width back when the
+	 * combined layout would otherwise starve the board.
+	 */
+	function resolvePanelWidths(): ResolvedPanelWidths {
+		const leftBase = leftCollapsed.value ? 0 : LEFT_MIN_WIDTH;
+		const rightBase = rightCollapsed.value ? COLLAPSED_RIGHT_WIDTH : RIGHT_MIN_WIDTH;
+		const leftPreferred = leftCollapsed.value ? 0 : leftWidth.value;
+		const rightPreferred = rightCollapsed.value ? COLLAPSED_RIGHT_WIDTH : rightWidth.value;
+		const shellWidth = Math.max(0, viewportWidth.value - LEFT_RAIL_WIDTH);
+		const maxPossibleCenter = Math.max(0, shellWidth - leftBase - rightBase);
+		const minCenterWidth = Math.min(MAIN_WORKSPACE_TARGET_MIN_WIDTH, maxPossibleCenter);
+		const availablePanelWidth = Math.max(leftBase + rightBase, shellWidth - minCenterWidth);
+
+		let nextLeft = leftPreferred;
+		let nextRight = rightPreferred;
+		const preferredTotal = nextLeft + nextRight;
+
+		if (preferredTotal <= availablePanelWidth) {
+			return { left: nextLeft, right: nextRight };
+		}
+
+		const overflow = preferredTotal - availablePanelWidth;
+		const leftFlex = Math.max(0, nextLeft - leftBase);
+		const rightFlex = Math.max(0, nextRight - rightBase);
+		const totalFlex = leftFlex + rightFlex;
+
+		if (totalFlex <= 0) {
+			return { left: leftBase, right: rightBase };
+		}
+
+		const leftShare = overflow * (leftFlex / totalFlex);
+		const rightShare = overflow * (rightFlex / totalFlex);
+
+		nextLeft = Math.max(leftBase, nextLeft - leftShare);
+		nextRight = Math.max(rightBase, nextRight - rightShare);
+
+		const remainingOverflow = Math.max(0, (nextLeft + nextRight) - availablePanelWidth);
+		if (remainingOverflow > 0) {
+			const rightSpare = Math.max(0, nextRight - rightBase);
+			const rightTrim = Math.min(rightSpare, remainingOverflow);
+			nextRight -= rightTrim;
+			nextLeft = Math.max(leftBase, nextLeft - Math.max(0, remainingOverflow - rightTrim));
+		}
+
+		return {
+			left: Math.round(nextLeft),
+			right: Math.round(nextRight),
+		};
+	}
+
+	const resolvedPanelWidths = computed(resolvePanelWidths);
+	const leftPanelWidth = computed(() => resolvedPanelWidths.value.left);
+	const rightPanelWidth = computed(() => resolvedPanelWidths.value.right);
 
 	let activeCleanup: (() => void) | null = null;
 	const storageKey = "trackboi:shell:v3:global";
@@ -97,6 +159,11 @@ export function useWorkspaceShellState(): WorkspaceShellState {
 			rightView: rightView.value,
 		};
 		window.localStorage.setItem(storageKey, JSON.stringify(prefs));
+	}
+
+	function syncViewportWidth() {
+		if (typeof window === "undefined") return;
+		viewportWidth.value = window.innerWidth;
 	}
 
 	function applyPrefs(prefs: WorkspaceShellPrefs) {
@@ -154,8 +221,8 @@ export function useWorkspaceShellState(): WorkspaceShellState {
 		const startRightWidth = rightWidth.value;
 		const startLeftCollapsed = leftCollapsed.value;
 		const startRightCollapsed = rightCollapsed.value;
-		const startLeftVisualWidth = startLeftCollapsed ? 0 : startLeftWidth;
-		const startRightVisualWidth = startRightCollapsed ? COLLAPSED_RIGHT_WIDTH : startRightWidth;
+		const startLeftVisualWidth = leftPanelWidth.value;
+		const startRightVisualWidth = rightPanelWidth.value;
 
 		if (side === "left") leftResizeClass.value = "resizing";
 		if (side === "right") rightResizeClass.value = "resizing";
@@ -233,7 +300,12 @@ export function useWorkspaceShellState(): WorkspaceShellState {
 
 	onBeforeUnmount(() => {
 		activeCleanup?.();
+		if (typeof window !== "undefined") window.removeEventListener("resize", syncViewportWidth);
 	});
+
+	if (typeof window !== "undefined") {
+		window.addEventListener("resize", syncViewportWidth);
+	}
 
 	return {
 		leftWidth,

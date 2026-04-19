@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Bot, CircleHelp, FolderOpen, Plus, Settings } from "lucide-vue-next";
+import { Bot, CircleHelp, Plus, Settings } from "lucide-vue-next";
 import Button from "@/ui/components/Button.vue";
 import Tooltip from "@/ui/components/Tooltip.vue";
 import type { ProjectEntry } from "@/core/types";
@@ -19,11 +19,6 @@ const emit = defineEmits<{
 	addProject: [];
 	settings: [];
 }>();
-
-const items: Array<{ id: LeftPanelView; label: string; icon: typeof FolderOpen }> = [
-	{ id: "explorer", label: "Explorer", icon: FolderOpen },
-	{ id: "agents", label: "Agents", icon: Bot },
-];
 
 const railProjects = computed(() => props.projects.slice(0, 6));
 
@@ -45,22 +40,6 @@ function projectMonogram(name: string) {
 			</div>
 
 			<div class="mt-1 flex flex-col gap-2">
-				<Tooltip
-					v-for="item in items"
-					:key="item.id"
-					:content="item.label"
-					side="right"
-				>
-					<button
-						type="button"
-						class="shell-rail-button"
-						:class="{ 'is-active': activeView === item.id }"
-						@click="emit('select', item.id)"
-					>
-						<component :is="item.icon" class="h-4 w-4" />
-					</button>
-				</Tooltip>
-
 				<Tooltip
 					v-for="project in railProjects"
 					:key="project.projectId"
@@ -90,6 +69,17 @@ function projectMonogram(name: string) {
 			</div>
 
 			<div class="my-1 h-px w-5 bg-border/80" />
+
+			<Tooltip content="Agents" side="right">
+				<button
+					type="button"
+					class="shell-rail-button"
+					:class="{ 'is-active': activeView === 'agents' }"
+					@click="emit('select', 'agents')"
+				>
+					<Bot class="h-4 w-4" />
+				</button>
+			</Tooltip>
 
 			<div class="mt-auto flex flex-col gap-2">
 				<Tooltip content="Help" side="right">

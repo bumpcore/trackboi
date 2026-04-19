@@ -221,8 +221,13 @@ body.trackboi-resizing * {
 }
 
 .shell-panel-resizer {
-	position: relative;
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 10px;
+	transform: translateX(-50%);
 	cursor: col-resize;
+	pointer-events: auto;
 }
 
 .shell-panel-resizer::after {

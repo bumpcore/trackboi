@@ -54,10 +54,10 @@ function forwardMove(cardId: string, toColumn: string, beforeCardId: string | nu
 <template>
 	<main class="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background">
 		<header class="border-b border-border/65 px-5 py-4">
-			<div class="flex items-start justify-between gap-4">
-				<div>
+			<div class="flex flex-wrap items-start justify-between gap-4">
+				<div class="min-w-0 flex-1">
 					<div class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Board</div>
-					<h1 class="mt-1 text-[22px] font-semibold tracking-tight text-foreground">
+					<h1 class="mt-1 truncate text-[22px] font-semibold tracking-tight text-foreground">
 						{{ activeProject?.name ?? snapshot?.project.name ?? "Trackboi" }} / {{ snapshot?.board.name ?? "Delivery" }}
 					</h1>
 					<div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
@@ -77,10 +77,10 @@ function forwardMove(cardId: string, toColumn: string, beforeCardId: string | nu
 							storage: {{ snapshot.metadata.storagePath }}
 						</span>
 					</div>
-					<div class="mt-2 font-mono text-[11px] text-muted-foreground">{{ boardSubtitle }}</div>
+					<div class="mt-2 truncate font-mono text-[11px] text-muted-foreground">{{ boardSubtitle }}</div>
 				</div>
 
-				<div class="flex items-center gap-2">
+				<div class="flex shrink-0 items-center gap-2">
 					<Button
 						v-if="snapshot"
 						type="button"

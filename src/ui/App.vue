@@ -10,10 +10,12 @@ import SettingsModal from "@/ui/components/SettingsModal.vue";
 import WorkspaceTitleBar from "@/ui/components/WorkspaceTitleBar.vue";
 import { desktop } from "@/electron/renderer";
 import { useBoardPresentationState } from "@/ui/composables/useBoardPresentationState";
+import { useAppPreferences } from "@/ui/composables/useAppPreferences";
 import { useCardWorkflow } from "@/ui/composables/useCardWorkflow";
 import { useConfirmation } from "@/ui/composables/useConfirmation";
 import { useDesktopProjectState } from "@/ui/composables/useDesktopProjectState";
 import { useFreshCardHighlights } from "@/ui/composables/useFreshCardHighlights";
+import { usePanelShortcuts } from "@/ui/composables/usePanelShortcuts";
 import { useProjectBoardSettings } from "@/ui/composables/useProjectBoardSettings";
 import { useTrackWorkflow } from "@/ui/composables/useTrackWorkflow";
 import { useWindowChrome } from "@/ui/composables/useWindowChrome";
@@ -165,6 +167,11 @@ const {
 
 const shell = useWorkspaceShellState();
 const rightViewPinned = ref(false);
+const {
+	leftPanelShortcut,
+	rightPanelShortcut,
+	resetPanelShortcuts,
+} = useAppPreferences();
 
 const columnOptions = computed<SelectOption[]>(() => (
 	snapshot.value?.board.columns.map((column) => ({
@@ -195,7 +202,15 @@ const selectedCardTrack = computed(() => {
 });
 
 const shellGridStyle = computed(() => ({
-	gridTemplateColumns: `56px ${shell.leftPanelWidth.value}px 4px minmax(0,1fr) 4px ${shell.rightPanelWidth.value}px`,
+	gridTemplateColumns: `56px ${shell.leftPanelWidth.value}px minmax(0,1fr) ${shell.rightPanelWidth.value}px`,
+}));
+
+const leftResizerStyle = computed(() => ({
+	left: `${56 + shell.leftPanelWidth.value}px`,
+}));
+
+const rightResizerStyle = computed(() => ({
+	left: `calc(100% - ${shell.rightPanelWidth.value}px)`,
 }));
 
 function setRightView(view: RightPanelView) {
@@ -246,6 +261,13 @@ function createTrackFromShell() {
 	shell.setRightView("track");
 }
 
+usePanelShortcuts({
+	leftShortcut: leftPanelShortcut,
+	rightShortcut: rightPanelShortcut,
+	toggleLeftPanel: shell.toggleLeftCollapsed,
+	toggleRightPanel: shell.toggleRightCollapsed,
+});
+
 async function switchProjectFromRail(projectId: string) {
 	shell.setLeftView("explorer");
 	await switchProject(projectId);
@@ -290,7 +312,7 @@ onMounted(loadProject);
 			@close="closeWindow"
 		/>
 
-		<main class="grid min-h-0 overflow-hidden" :style="shellGridStyle">
+		<main class="relative grid min-h-0 overflow-hidden" :style="shellGridStyle">
 			<LeftRail
 				:active-view="shell.leftView.value"
 				:active-project-id="view.activeProjectId"
@@ -316,16 +338,8 @@ onMounted(loadProject);
 					@select-worktree="selectWorktree"
 					@select-track="handleTrackSelection"
 					@create-track="createTrackFromShell"
-					@toggle-collapsed="shell.toggleLeftCollapsed"
 				/>
 			</div>
-
-			<PanelResizer
-				side="left"
-				:active-class="shell.leftResizeClass.value"
-				@resize="shell.startResize"
-				@reset="shell.resetLeftWidth"
-			/>
 
 			<BoardWorkspace
 				:active-project="activeProject"
@@ -351,13 +365,6 @@ onMounted(loadProject);
 				@delete-card="deleteCard"
 				@fresh-seen="clearFreshCard"
 				@move-card="moveCard"
-			/>
-
-			<PanelResizer
-				side="right"
-				:active-class="shell.rightResizeClass.value"
-				@resize="shell.startResize"
-				@reset="shell.resetRightWidth"
 			/>
 
 			<RightWorkspacePanel
@@ -397,7 +404,6 @@ onMounted(loadProject);
 				:track-file-content="selectedTrackFileContent"
 				:linked-track-cards="linkedTrackCards"
 				@select-view="setRightView"
-				@toggle-collapsed="shell.toggleRightCollapsed"
 				@submit-card="submitCard"
 				@delete-card="deleteCard"
 				@add-card-comment="addComment"
@@ -417,8 +423,28 @@ onMounted(loadProject);
 				@remove-custom-field="removeCustomField"
 			/>
 
+			<PanelResizer
+				side="left"
+				class="absolute inset-y-0 z-20"
+				:style="leftResizerStyle"
+				:active-class="shell.leftResizeClass.value"
+				@resize="shell.startResize"
+				@reset="shell.resetLeftWidth"
+			/>
+
+			<PanelResizer
+				side="right"
+				class="absolute inset-y-0 z-20"
+				:style="rightResizerStyle"
+				:active-class="shell.rightResizeClass.value"
+				@resize="shell.startResize"
+				@reset="shell.resetRightWidth"
+			/>
+
 			<SettingsModal
 				v-model:draft="storagePathDraft"
+				v-model:left-panel-shortcut="leftPanelShortcut"
+				v-model:right-panel-shortcut="rightPanelShortcut"
 				:open="settingsOpen"
 				:paths="view.storageSearchPaths"
 				:busy="busy"
@@ -426,6 +452,7 @@ onMounted(loadProject);
 				@add="addStorageSearchPath"
 				@remove="removeStorageSearchPath"
 				@reset="resetStorageSearchPaths"
+				@reset-shortcuts="resetPanelShortcuts"
 			/>
 		</main>
 

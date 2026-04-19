@@ -24,6 +24,7 @@ export type WorktreeStore = WorktreeContext & {
 export type CachedDesktopState = {
 	projectKey: string;
 	selectedBoardId: string | null;
+	selectedWorktreeId: string | null;
 	snapshotBase: ProjectSnapshotWithInternals | null;
 	view: ProjectView;
 	worktrees: WorktreeStore[];

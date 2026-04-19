@@ -91,6 +91,7 @@ function forwardBoardSelection(boardId: string | undefined) {
 						:model-value="selectedBoardId ?? snapshot.board.id"
 						:options="boardOptions"
 						class="w-[220px]"
+						data-testid="board-switcher"
 						@update:model-value="forwardBoardSelection"
 					/>
 					<Tooltip v-if="snapshot" content="Board settings" side="left">
@@ -99,6 +100,7 @@ function forwardBoardSelection(boardId: string | undefined) {
 							size="icon"
 							variant="outline"
 							:disabled="busy"
+							data-testid="board-settings-button"
 							@click="emit('openBoardSettings')"
 						>
 							<Settings2 class="h-4 w-4" />
@@ -109,6 +111,7 @@ function forwardBoardSelection(boardId: string | undefined) {
 							type="button"
 							size="icon"
 							:disabled="busy"
+							data-testid="board-new-card"
 							@click="emit('createCard')"
 						>
 							<Plus class="h-4 w-4" />
@@ -169,6 +172,7 @@ function forwardBoardSelection(boardId: string | undefined) {
 						<button
 							type="button"
 							class="group flex h-full min-h-0 flex-col items-center justify-center rounded-[6px] border border-dashed border-border/70 bg-secondary/[0.18] px-6 py-6 text-center transition-colors hover:border-primary/30 hover:bg-secondary/[0.26] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+							data-testid="board-add-column"
 							@click="emit('createColumn')"
 						>
 							<span

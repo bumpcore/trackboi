@@ -143,6 +143,21 @@ function serializeTrackPatch(patch: TrackPatch): TrackPatch {
 	};
 }
 
+function serializeAppSettings(settings: AppSettings): AppSettings {
+	return {
+		version: settings.version,
+		agents: settings.agents.map((agent) => ({
+			id: agent.id,
+			name: agent.name,
+			description: agent.description,
+		})),
+		editor: {
+			preferredEditorId: settings.editor.preferredEditorId,
+			customCommand: settings.editor.customCommand,
+		},
+	};
+}
+
 /**
  * Electron IPC expects plain cloneable data. Board settings often originate
  * from Vue-managed snapshots, so flatten them before crossing the bridge.
@@ -263,7 +278,7 @@ export function createDesktopFacade(
 		return trackboiApi.readAppSettings();
 	},
 	async updateAppSettings(settings: AppSettings) {
-		return trackboiApi.updateAppSettings(settings);
+		return trackboiApi.updateAppSettings(serializeAppSettings(settings));
 	},
 	async listDetectedEditors() {
 		return trackboiApi.listDetectedEditors();

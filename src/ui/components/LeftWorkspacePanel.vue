@@ -37,10 +37,10 @@ function trackSourceLabel(track: Track) {
 </script>
 
 <template>
-	<aside class="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] bg-card/95">
+	<aside class="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] bg-card/95" data-testid="left-workspace-panel">
 		<div class="app-scroll min-h-0 overflow-y-auto overflow-x-hidden">
 			<div v-if="activeView === 'explorer'" class="grid content-start">
-				<section class="border-b border-border/70 px-4 py-4">
+				<section class="border-b border-border/70 px-4 py-4" data-testid="workspace-summary">
 					<div class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Workspace</div>
 					<div class="mt-1 text-sm font-medium text-foreground">{{ snapshot?.project.name ?? "Trackboi" }}</div>
 					<div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
@@ -49,10 +49,10 @@ function trackSourceLabel(track: Track) {
 					</div>
 				</section>
 
-				<section class="border-b border-border/70 px-4 py-3">
+				<section class="border-b border-border/70 px-4 py-3" data-testid="track-list">
 					<div class="mb-2 flex items-center justify-between gap-3">
 						<div class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Tracks</div>
-						<Button variant="outline" size="sm" type="button" :disabled="busy" @click="emit('createTrack')">
+						<Button variant="outline" size="sm" type="button" data-testid="create-track-button" :disabled="busy" @click="emit('createTrack')">
 							<Plus class="h-4 w-4" />
 							New
 						</Button>
@@ -62,6 +62,7 @@ function trackSourceLabel(track: Track) {
 							type="button"
 							class="shell-sidebar-item w-full"
 							:class="{ 'is-active': selectedTrackId == null }"
+							data-testid="track-all-work"
 							@click="emit('selectTrack', '__all__')"
 						>
 							<span class="inline-flex h-2 w-2 rounded-full bg-foreground" />
@@ -78,6 +79,7 @@ function trackSourceLabel(track: Track) {
 							type="button"
 							class="shell-sidebar-item w-full !items-start"
 							:class="{ 'is-active': selectedTrackId === track.id }"
+							:data-testid="`track-${track.id}`"
 							@click="emit('selectTrack', track.id)"
 						>
 							<span class="mt-1 inline-flex h-2 w-2 rounded-full bg-primary/90" />
@@ -90,7 +92,7 @@ function trackSourceLabel(track: Track) {
 					</div>
 				</section>
 
-				<section v-if="shouldShowWorktrees" class="px-3 py-3">
+				<section v-if="shouldShowWorktrees" class="px-3 py-3" data-testid="worktree-list">
 					<div class="mb-2 px-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Worktrees</div>
 					<div class="space-y-1.5">
 						<Tooltip
@@ -104,6 +106,7 @@ function trackSourceLabel(track: Track) {
 								type="button"
 								class="shell-sidebar-item w-full !items-start"
 								:class="{ 'is-active': selectedWorktreeId === worktree.id }"
+								:data-testid="`worktree-${worktree.id}`"
 								@click="emit('selectWorktree', worktree.id)"
 							>
 								<span class="mt-1 inline-flex h-2 w-2 rounded-full bg-primary/90" />
@@ -147,6 +150,7 @@ function trackSourceLabel(track: Track) {
 				<button
 					type="button"
 					class="trackboi-mono-font text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+					data-testid="project-settings-button"
 					@click="emit('openProjectSettings')"
 				>
 					Project settings

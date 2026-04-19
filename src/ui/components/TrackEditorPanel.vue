@@ -94,14 +94,14 @@ function cloneActivity(values: CardComment[]): CardComment[] {
 
 watch(
 	() => [props.track, props.mode, props.currentBranch] as const,
-	([track, mode, currentBranch]) => {
+	([track]) => {
 		title.value = track?.title ?? "";
 		summary.value = track?.summary ?? "";
 		plan.value = track?.plan ?? "";
-		sourceKind.value = track?.source.kind ?? (currentBranch ? "branch" : "manual");
+		sourceKind.value = track?.source.kind ?? "manual";
 		sourceRef.value = track?.source.kind === "branch"
 			? track.source.ref
-			: (mode === "create" ? (currentBranch ?? "") : "");
+			: "";
 		decisions.value = cloneDecisions(track?.decisions ?? []);
 		references.value = cloneReferences(track?.references ?? []);
 		activity.value = cloneActivity(track?.activity ?? []);
@@ -109,6 +109,18 @@ watch(
 		fileContent.value = "";
 	},
 	{ immediate: true },
+);
+
+watch(
+	() => sourceKind.value,
+	(nextSourceKind) => {
+		if (nextSourceKind === "branch" && !sourceRef.value && props.currentBranch) {
+			sourceRef.value = props.currentBranch;
+		}
+		if (nextSourceKind === "manual") {
+			sourceRef.value = "";
+		}
+	},
 );
 
 watch(
@@ -198,7 +210,7 @@ defineExpose({
 </script>
 
 <template>
-	<div class="grid content-start gap-5">
+	<div class="grid content-start gap-5" data-testid="track-editor">
 		<section class="shell-section">
 			<div>
 				<p class="shell-section-title">Track</p>

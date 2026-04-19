@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useSortable } from "@vueuse/integrations/useSortable";
-import { onBeforeUnmount, ref, watch } from "vue";
+import Sortable, { type SortableEvent } from "sortablejs";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { ChevronRight, CircleDashed, Plus, Trash2 } from "lucide-vue-next";
 import Badge from "@/ui/components/Badge.vue";
 import Button from "@/ui/components/Button.vue";
@@ -32,7 +32,6 @@ const emit = defineEmits<{
 }>();
 
 const listElement = ref<HTMLElement | null>(null);
-const sortableCards = ref<TrackboiCard[]>([]);
 const contextMenu = ref<{
 	card: TrackboiCard;
 	x: number;
@@ -43,45 +42,209 @@ const contextMenu = ref<{
 const CONTEXT_MENU_WIDTH = 208;
 const CONTEXT_MENU_HEIGHT = 180;
 const CONTEXT_MENU_MARGIN = 8;
+const hasCards = computed(() => props.cards.length > 0);
+const hideEmptyState = ref(false);
+let sortableInstance: Sortable | null = null;
 let suppressActivation = false;
 let activationResetTimer: number | null = null;
 let moveMenuCloseTimer: number | null = null;
+let emptyStateResetTimer: number | null = null;
+let dragPointer: { x: number; y: number } | null = null;
 
-watch(
-	() => props.cards,
-	(cards) => {
-		sortableCards.value = [...cards];
-	},
-	{ immediate: true },
-);
+const showEmptyState = computed(() => !hasCards.value && !hideEmptyState.value);
 
-useSortable(listElement, sortableCards, {
-	group: "trackboi-cards",
-	animation: 140,
-	dataIdAttr: "data-card-id",
-	draggable: "[data-card-id]",
-	ghostClass: "card-ghost",
-	dragClass: "card-dragging",
-	filter: "[data-sortable-ignore]",
-	onStart() {
-		suppressActivation = true;
-		if (activationResetTimer !== null) {
-			window.clearTimeout(activationResetTimer);
-			activationResetTimer = null;
+function cleanupLaneArtifacts() {
+	const list = listElement.value;
+	if (!list) return;
+
+	const validIds = new Set(props.cards.map((card) => card.id));
+	const seenIds = new Set<string>();
+
+	for (const element of Array.from(list.querySelectorAll<HTMLElement>("[data-card-id]"))) {
+		const cardId = element.dataset.cardId;
+		const isDirectChild = element.parentElement === list;
+
+		if (!cardId || !isDirectChild || !validIds.has(cardId) || seenIds.has(cardId)) {
+			element.remove();
+			continue;
 		}
-	},
-	onEnd(event) {
-		const cardId = (event.item as HTMLElement | null)?.dataset.cardId;
-		activationResetTimer = window.setTimeout(() => {
-			suppressActivation = false;
-			activationResetTimer = null;
-		}, 120);
-		if (!cardId || event.to !== listElement.value) return;
 
-		const nextSibling = event.item.nextElementSibling as HTMLElement | null;
-		emit("move", cardId, props.column.id, nextSibling?.dataset.cardId ?? null);
-	},
-});
+		seenIds.add(cardId);
+		element.classList.remove("sortable-chosen", "sortable-drag", "sortable-fallback", "card-dragging");
+	}
+}
+
+function cleanupGlobalDragArtifacts() {
+	for (const element of Array.from(document.body.querySelectorAll<HTMLElement>(".sortable-fallback, .card-fallback"))) {
+		element.remove();
+	}
+}
+
+function clearActivationResetTimer() {
+	if (activationResetTimer !== null) {
+		window.clearTimeout(activationResetTimer);
+		activationResetTimer = null;
+	}
+}
+
+function clearEmptyStateResetTimer() {
+	if (emptyStateResetTimer !== null) {
+		window.clearTimeout(emptyStateResetTimer);
+		emptyStateResetTimer = null;
+	}
+}
+
+function updateDragPointer(event: Event) {
+	if (!(event instanceof MouseEvent)) return;
+	dragPointer = { x: event.clientX, y: event.clientY };
+}
+
+function hideEmptyStateOptimistically() {
+	hideEmptyState.value = true;
+	clearEmptyStateResetTimer();
+	// Snapshot refreshes are async, so hide the empty affordance immediately
+	// after a drop instead of letting it linger and fight the pointer.
+	emptyStateResetTimer = window.setTimeout(() => {
+		hideEmptyState.value = false;
+		emptyStateResetTimer = null;
+	}, 1600);
+}
+
+function beginDrag() {
+	suppressActivation = true;
+	dragPointer = null;
+	clearActivationResetTimer();
+	closeContextMenu();
+	window.addEventListener("pointermove", updateDragPointer, true);
+	window.addEventListener("mousemove", updateDragPointer, true);
+}
+
+function endDrag() {
+	clearActivationResetTimer();
+	activationResetTimer = window.setTimeout(() => {
+		suppressActivation = false;
+		activationResetTimer = null;
+	}, 120);
+	cleanupGlobalDragArtifacts();
+	dragPointer = null;
+	window.removeEventListener("pointermove", updateDragPointer, true);
+	window.removeEventListener("mousemove", updateDragPointer, true);
+}
+
+function nextCardIdAfter(item: HTMLElement): string | null {
+	let sibling = item.nextElementSibling as HTMLElement | null;
+	while (sibling) {
+		if (sibling.dataset.cardId) return sibling.dataset.cardId;
+		sibling = sibling.nextElementSibling as HTMLElement | null;
+	}
+	return null;
+}
+
+function emitMoveFromItem(item: HTMLElement | null) {
+	const cardId = item?.dataset.cardId;
+	if (!cardId) return;
+	const columnId = item.closest<HTMLElement>("[data-column-id]")?.dataset.columnId;
+	if (!columnId) return;
+	emit("move", cardId, columnId, nextCardIdAfter(item));
+}
+
+function cardElementsForList(list: HTMLElement, draggedCardId?: string) {
+	const elements: HTMLElement[] = [];
+	for (const child of Array.from(list.children)) {
+		if (!(child instanceof HTMLElement)) continue;
+		const cardId = child.dataset.cardId;
+		if (!cardId || cardId === draggedCardId) continue;
+		elements.push(child);
+	}
+	return elements;
+}
+
+function listAtPointer(clientX: number, clientY: number) {
+	const element = document.elementFromPoint(clientX, clientY);
+	if (!element) return null;
+	return (
+		element.closest<HTMLElement>("[data-column-list]")
+		?? element.closest<HTMLElement>("[data-column-id]")?.querySelector<HTMLElement>("[data-column-list]")
+		?? null
+	);
+}
+
+function beforeCardIdAtPointer(list: HTMLElement, clientY: number, draggedCardId?: string) {
+	for (const element of cardElementsForList(list, draggedCardId)) {
+		const cardId = element.dataset.cardId;
+		if (!cardId) continue;
+		const rect = element.getBoundingClientRect();
+		if (clientY <= rect.top + rect.height / 2) {
+			return cardId;
+		}
+	}
+	return null;
+}
+
+function emitMoveFromDrop(event: SortableEvent) {
+	const item = event.item as HTMLElement | null;
+	const cardId = item?.dataset.cardId;
+	if (!cardId) return;
+
+	const originalEvent = (event as SortableEvent & { originalEvent?: Event }).originalEvent;
+	const pointer = dragPointer ?? (originalEvent instanceof MouseEvent ? { x: originalEvent.clientX, y: originalEvent.clientY } : null);
+	const targetList = pointer
+		? listAtPointer(pointer.x, pointer.y) ?? (event.to as HTMLElement | null)
+		: (event.to as HTMLElement | null);
+	const columnId = targetList?.closest<HTMLElement>("[data-column-id]")?.dataset.columnId;
+	if (!targetList || !columnId) {
+		emitMoveFromItem(item);
+		return;
+	}
+
+	const beforeCardId = pointer
+		? beforeCardIdAtPointer(targetList, pointer.y, cardId)
+		: nextCardIdAfter(item);
+	emit("move", cardId, columnId, beforeCardId);
+}
+
+function mountSortable() {
+	if (!listElement.value) return;
+	sortableInstance?.destroy();
+	sortableInstance = Sortable.create(listElement.value, {
+		group: "trackboi-cards",
+		animation: 140,
+		direction: "vertical",
+		dataIdAttr: "data-card-id",
+		draggable: "[data-card-id]",
+		forceFallback: true,
+		fallbackOnBody: true,
+		fallbackTolerance: 3,
+		fallbackClass: "card-fallback",
+		ghostClass: "card-ghost",
+		dragClass: "card-dragging",
+		emptyInsertThreshold: 220,
+		filter: "[data-sortable-ignore]",
+		preventOnFilter: false,
+		onStart() {
+			beginDrag();
+		},
+		onMove(_event, originalEvent) {
+			updateDragPointer(originalEvent);
+			if (!(originalEvent instanceof MouseEvent)) return true;
+			const hoveredList = listAtPointer(originalEvent.clientX, originalEvent.clientY);
+			if (!hoveredList) return true;
+			const hoveredColumnId = hoveredList.closest<HTMLElement>("[data-column-id]")?.dataset.columnId;
+			const targetColumnId = (_event.to as HTMLElement | null)?.closest<HTMLElement>("[data-column-id]")?.dataset.columnId;
+			if (hoveredColumnId && targetColumnId && hoveredColumnId !== targetColumnId) {
+				return false;
+			}
+			return true;
+		},
+		onAdd() {
+			hideEmptyStateOptimistically();
+		},
+		onEnd(event) {
+			emitMoveFromDrop(event);
+			endDrag();
+		},
+	});
+}
 
 function fieldDisplayValue(field: CustomField, value: FieldValue | undefined) {
 	if (value == null || value === "" || value === false) return null;
@@ -187,8 +350,49 @@ watch(contextMenu, (nextMenu, previousMenu) => {
 	}
 });
 
+watch(listElement, () => {
+	void nextTick(() => {
+		mountSortable();
+		cleanupLaneArtifacts();
+	});
+});
+
+watch(
+	() => props.cards.map((card) => card.id).join("|"),
+	() => {
+		void nextTick(() => {
+			cleanupLaneArtifacts();
+		});
+	},
+);
+
+watch(hasCards, (nextHasCards) => {
+	if (nextHasCards) {
+		hideEmptyState.value = false;
+		clearEmptyStateResetTimer();
+		return;
+	}
+
+	if (!hideEmptyState.value) return;
+	clearEmptyStateResetTimer();
+	emptyStateResetTimer = window.setTimeout(() => {
+		hideEmptyState.value = false;
+		emptyStateResetTimer = null;
+	}, 1600);
+});
+
+onMounted(() => {
+	mountSortable();
+});
+
 onBeforeUnmount(() => {
 	window.removeEventListener("pointerdown", handlePointerDown);
+	window.removeEventListener("pointermove", updateDragPointer, true);
+	window.removeEventListener("mousemove", updateDragPointer, true);
+	sortableInstance?.destroy();
+	clearActivationResetTimer();
+	clearEmptyStateResetTimer();
+	cleanupGlobalDragArtifacts();
 	if (moveMenuCloseTimer !== null) {
 		window.clearTimeout(moveMenuCloseTimer);
 	}
@@ -199,6 +403,7 @@ onBeforeUnmount(() => {
 	<section
 		class="column-shell grid h-full min-h-0 w-[356px] min-w-[356px] max-w-[356px] grid-rows-[auto_minmax(0,1fr)] overflow-hidden border border-border/70 bg-secondary/45 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.02)]"
 		:data-column-id="column.id"
+		:data-testid="`column-${column.id}`"
 	>
 		<header class="flex items-start justify-between gap-3 border-b border-border/55 px-4 py-3">
 			<div class="min-w-0">
@@ -226,24 +431,30 @@ onBeforeUnmount(() => {
 
 		<div class="app-scroll column-card-list min-h-0 overflow-y-auto">
 			<div class="relative min-h-full">
-				<div ref="listElement" class="flex min-h-full flex-col gap-2.5 px-2.5 py-3">
-				<UiCard
-					v-for="card in sortableCards"
-					:key="card.id"
-					class="board-card group relative grid w-full min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3 overflow-hidden p-3 transition"
-					:data-card-id="card.id"
-					:data-fresh="props.freshCardIds?.has(card.id) ?? false"
-					:data-selected="props.selectedCardId === card.id"
-					role="button"
-					tabindex="0"
-					@click="activateCard(card)"
-					@dblclick.stop="openCardEditor(card)"
-					@mousedown.right.capture.prevent.stop="openContextMenu(card, $event)"
-					@contextmenu.capture.prevent.stop="openContextMenu(card, $event)"
-					@mouseenter="emit('freshSeen', card.id)"
-					@keydown.enter.prevent="openCardEditor(card)"
-					@keydown.space.prevent="activateCard(card)"
+				<div
+					ref="listElement"
+					class="flex min-h-full flex-col gap-2.5 px-2.5 py-3"
+					data-column-list="true"
+					:data-testid="`column-${column.id}-list`"
 				>
+					<UiCard
+						v-for="card in props.cards"
+						:key="card.id"
+						class="board-card group relative grid w-full min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3 overflow-hidden p-3 transition"
+						:data-card-id="card.id"
+						:data-fresh="props.freshCardIds?.has(card.id) ?? false"
+						:data-selected="props.selectedCardId === card.id"
+						:data-testid="`card-${card.id}`"
+						role="button"
+						tabindex="0"
+						@click="activateCard(card)"
+						@dblclick.stop="openCardEditor(card)"
+						@mousedown.right.capture.prevent.stop="openContextMenu(card, $event)"
+						@contextmenu.capture.prevent.stop="openContextMenu(card, $event)"
+						@mouseenter="emit('freshSeen', card.id)"
+						@keydown.enter.prevent="openCardEditor(card)"
+						@keydown.space.prevent="activateCard(card)"
+					>
 					<div
 						class="min-w-0 max-w-full bg-transparent text-left"
 					>
@@ -309,7 +520,22 @@ onBeforeUnmount(() => {
 					>
 						<Trash2 class="h-4 w-4" />
 					</Button>
-				</UiCard>
+					</UiCard>
+				</div>
+
+				<div
+					v-if="showEmptyState"
+					class="pointer-events-none absolute inset-x-0 top-0 px-2.5 py-3"
+					:data-testid="`column-${column.id}-empty`"
+				>
+					<div class="column-empty-state rounded-[8px] border border-dashed border-border/55 bg-background/16 px-6 py-5 text-center">
+						<CircleDashed class="mx-auto h-4 w-4 text-muted-foreground" />
+						<p class="mt-2 text-xs font-medium text-muted-foreground">Drop cards here</p>
+						<Button class="pointer-events-auto mt-3" variant="ghost" size="sm" type="button" @click="emit('create', column.id)">
+							<Plus class="h-3.5 w-3.5" />
+							Add card
+						</Button>
+					</div>
 				</div>
 
 				<Teleport to="body">
@@ -317,23 +543,26 @@ onBeforeUnmount(() => {
 						v-if="contextMenu"
 						class="fixed z-[80] min-w-36 rounded-[7px] border border-border/75 bg-card/98 p-1 shadow-[0_18px_34px_hsl(0_0%_0%/0.16)] backdrop-blur-sm"
 						:style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
+						data-testid="card-context-menu"
 						data-sortable-ignore
 						@pointerdown.stop
 						@click.stop
 					>
-						<button
-							type="button"
-							class="trackboi-mono-font flex w-full items-center rounded-[5px] px-2.5 py-1.5 text-left text-[11px] text-foreground hover:bg-secondary/55"
-							@click="openCardEditor(contextMenu.card); closeContextMenu()"
-						>
-							Edit
+							<button
+								type="button"
+								class="trackboi-mono-font flex w-full items-center rounded-[5px] px-2.5 py-1.5 text-left text-[11px] text-foreground hover:bg-secondary/55"
+								data-testid="card-context-edit"
+								@click="openCardEditor(contextMenu.card); closeContextMenu()"
+							>
+								Edit
 						</button>
-						<button
-							type="button"
-							class="trackboi-mono-font flex w-full items-center rounded-[5px] px-2.5 py-1.5 text-left text-[11px] text-foreground hover:bg-secondary/55"
-							@click="emit('openInEditor', contextMenu.card); closeContextMenu()"
-						>
-							Open in editor
+							<button
+								type="button"
+								class="trackboi-mono-font flex w-full items-center rounded-[5px] px-2.5 py-1.5 text-left text-[11px] text-foreground hover:bg-secondary/55"
+								data-testid="card-context-open-in-editor"
+								@click="emit('openInEditor', contextMenu.card); closeContextMenu()"
+							>
+								Open in editor
 						</button>
 						<div
 							class="relative"
@@ -343,6 +572,7 @@ onBeforeUnmount(() => {
 							<button
 								type="button"
 								class="trackboi-mono-font flex w-full items-center justify-between rounded-[5px] px-2.5 py-1.5 text-left text-[11px] text-foreground hover:bg-secondary/55"
+								data-testid="card-context-move"
 								@click="contextMenu.moveOpen = !contextMenu.moveOpen"
 							>
 								<span>Move to</span>
@@ -352,6 +582,7 @@ onBeforeUnmount(() => {
 								v-if="contextMenu.moveOpen"
 								class="absolute top-0 z-[81] min-w-32 rounded-[7px] border border-border/75 bg-card/98 p-1 shadow-[0_18px_34px_hsl(0_0%_0%/0.16)] backdrop-blur-sm"
 								:class="contextMenu.moveMenuSide === 'left' ? 'right-full mr-1.5' : 'left-full ml-1.5'"
+								data-testid="card-context-move-menu"
 								@mouseenter="openMoveMenu()"
 								@mouseleave="scheduleMoveMenuClose()"
 							>
@@ -360,6 +591,7 @@ onBeforeUnmount(() => {
 									:key="targetColumn.id"
 									type="button"
 									class="trackboi-mono-font flex w-full items-center rounded-[5px] px-2.5 py-1.5 text-left text-[11px] text-foreground hover:bg-secondary/55"
+									:data-testid="`card-context-move-${targetColumn.id}`"
 									@click="moveViaContext(targetColumn.id)"
 								>
 									{{ targetColumn.name }}
@@ -369,29 +601,13 @@ onBeforeUnmount(() => {
 						<button
 							type="button"
 							class="trackboi-mono-font mt-1 flex w-full items-center rounded-[5px] px-2.5 py-1.5 text-left text-[11px] text-destructive hover:bg-destructive/8"
+							data-testid="card-context-delete"
 							@click="emit('delete', contextMenu.card); closeContextMenu()"
 						>
 							Delete
 						</button>
 					</div>
 				</Teleport>
-
-				<div
-					v-if="sortableCards.length === 0"
-					class="pointer-events-none absolute inset-x-2.5 inset-y-3 grid place-items-center"
-					data-sortable-ignore
-				>
-					<div class="grid min-h-28 w-full place-items-center rounded-[8px] border border-dashed border-border/55 bg-background/16 px-6 text-center transition hover:border-primary/35 hover:bg-secondary/25">
-						<div class="pointer-events-auto">
-							<CircleDashed class="mx-auto h-4 w-4 text-muted-foreground" />
-							<p class="mt-2 text-xs font-medium text-muted-foreground">Drop cards here</p>
-							<Button class="mt-3" variant="ghost" size="sm" type="button" @click="emit('create', column.id)">
-								<Plus class="h-3.5 w-3.5" />
-								Add card
-							</Button>
-						</div>
-					</div>
-				</div>
 			</div>
 		</div>
 	</section>

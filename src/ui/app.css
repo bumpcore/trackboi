@@ -537,14 +537,29 @@ body.trackboi-resizing * {
 }
 
 .card-ghost {
-	opacity: 0.52;
-	transform: rotate(1deg) scale(0.995);
+	opacity: 0.92;
+	transform: scale(0.992);
+	border-color: hsl(var(--primary) / 0.55);
+	background: hsl(var(--primary) / 0.1);
+	box-shadow:
+		0 0 0 1px hsl(var(--primary) / 0.32),
+		inset 0 1px 0 hsl(var(--primary) / 0.14);
 }
 
 .card-dragging {
 	cursor: grabbing;
+	opacity: 0.18;
+	transform: scale(0.985);
+	box-shadow: none;
+}
+
+.card-fallback {
+	cursor: grabbing;
 	transform: rotate(1.2deg);
 	box-shadow: var(--card-shadow-drag);
+	opacity: 0.98;
+	z-index: 90;
+	pointer-events: none;
 }
 
 .markdown-body pre.shiki {

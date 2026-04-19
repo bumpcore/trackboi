@@ -89,7 +89,7 @@ function actorLabel(actorId: string) {
 </script>
 
 <template>
-	<div class="grid content-start gap-5">
+	<div class="grid content-start gap-5" data-testid="card-editor">
 		<section class="shell-section">
 			<div>
 				<p class="shell-section-title">Summary</p>

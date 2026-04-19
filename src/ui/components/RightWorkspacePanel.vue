@@ -91,7 +91,7 @@ function submitTrackFromFooter() {
 </script>
 
 <template>
-	<aside class="grid h-full min-h-0 bg-card/95" :class="collapsed ? 'grid-cols-[44px]' : 'grid-cols-[minmax(0,1fr)]'">
+	<aside class="grid h-full min-h-0 bg-card/95" data-testid="right-panel" :class="collapsed ? 'grid-cols-[44px]' : 'grid-cols-[minmax(0,1fr)]'">
 		<div v-if="collapsed" class="border-l border-border/70 bg-card/95">
 			<div class="flex h-full flex-col items-center gap-2 py-3">
 				<button
@@ -121,6 +121,7 @@ function submitTrackFromFooter() {
 								type="button"
 								class="shell-rail-button"
 								:class="{ 'is-active': activeView === item.id }"
+								:data-testid="`right-panel-view-${item.id}`"
 								@click="emit('selectView', item.id)"
 							>
 								<component :is="item.icon" class="h-4 w-4" />
@@ -314,11 +315,17 @@ function submitTrackFromFooter() {
 							variant="outline"
 							type="button"
 							:disabled="busy"
+							data-testid="card-delete-button"
 							@click="emit('deleteCard', card)"
 						>
 							Delete
 						</Button>
-						<Button type="button" :disabled="busy || !draft.title.trim()" @click="emit('submitCard')">
+						<Button
+							type="button"
+							:disabled="busy || !draft.title.trim()"
+							data-testid="card-submit-button"
+							@click="emit('submitCard')"
+						>
 							{{ cardMode === "create" ? "Create Card" : "Save Card" }}
 						</Button>
 					</template>
@@ -329,11 +336,17 @@ function submitTrackFromFooter() {
 							variant="outline"
 							type="button"
 							:disabled="busy"
+							data-testid="track-delete-button"
 							@click="emit('deleteTrack', track)"
 						>
 							Delete
 						</Button>
-						<Button type="button" :disabled="busy" @click="submitTrackFromFooter">
+						<Button
+							type="button"
+							:disabled="busy"
+							data-testid="track-submit-button"
+							@click="submitTrackFromFooter"
+						>
 							{{ trackMode === "create" ? "Create Track" : "Save Track" }}
 						</Button>
 					</template>

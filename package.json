@@ -22,6 +22,8 @@
 		"check:no-any": "node scripts/check-no-any.cjs",
 		"test": "bun test",
 		"test:bench": "bun test tests/ui/performance.test.ts tests/core/performance.test.ts",
+		"test:ui": "bun run build && playwright test",
+		"test:ui:headed": "bun run build && playwright test --headed",
 		"build": "bun run build:ui && bun run build:node",
 		"build:ui": "vite build",
 		"build:node": "bun run build:cli && bun run build:electron",
@@ -80,6 +82,7 @@
 		"zod": "^4.3.6"
 	},
 	"devDependencies": {
+		"@playwright/test": "^1.56.1",
 		"@types/node": "^25.6.0",
 		"@types/sortablejs": "^1.15.9",
 		"@vitejs/plugin-vue": "^5.2.1",
@@ -87,6 +90,7 @@
 		"electron-builder": "^26.0.12",
 		"esbuild": "^0.28.0",
 		"electron": "^41.2.1",
+		"playwright": "^1.56.1",
 		"typescript": "^5.7.2",
 		"vite": "^6.0.3",
 		"vue": "^3.5.13",

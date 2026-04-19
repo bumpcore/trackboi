@@ -24,6 +24,8 @@ playgrounds/
 *.log
 .eslintcache
 .vite/
+playwright-report/
+test-results/
 
 # OS files
 .DS_Store

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onBeforeUnmount, watch } from "vue";
 import { Layers3, ListPlus, Save, SlidersHorizontal, Trash2, X } from "lucide-vue-next";
 import type { BoardDescriptor, Column, CustomField, FieldType, ProjectSnapshot } from "@/core/types";
 import Badge from "@/ui/components/Badge.vue";
@@ -6,7 +7,7 @@ import Button from "@/ui/components/Button.vue";
 import Input from "@/ui/components/Input.vue";
 import Select, { type SelectOption } from "@/ui/components/Select.vue";
 
-defineProps<{
+const props = defineProps<{
 	open: boolean;
 	busy: boolean;
 	snapshot: ProjectSnapshot | null;
@@ -36,6 +37,24 @@ const emit = defineEmits<{
 	addCustomField: [];
 	removeCustomField: [fieldId: string];
 }>();
+
+function handleEscapeKey(event: KeyboardEvent) {
+	if (!props.open || event.key !== "Escape") return;
+	emit("close");
+}
+
+watch(
+	() => props.open,
+	(open) => {
+		if (open) window.addEventListener("keydown", handleEscapeKey);
+		else window.removeEventListener("keydown", handleEscapeKey);
+	},
+	{ immediate: true },
+);
+
+onBeforeUnmount(() => {
+	window.removeEventListener("keydown", handleEscapeKey);
+});
 </script>
 
 <template>
@@ -43,6 +62,7 @@ const emit = defineEmits<{
 		<div
 			v-if="open"
 			class="fixed inset-x-0 bottom-0 top-9 z-30 grid place-items-center bg-background/65 p-5 backdrop-blur-[2px]"
+			data-testid="board-settings-modal"
 			@pointerdown.self="emit('close')"
 		>
 			<aside class="modal-panel grid h-[min(820px,calc(100vh-72px))] w-[min(980px,96vw)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-xl border border-border/60 bg-card shadow-2xl">

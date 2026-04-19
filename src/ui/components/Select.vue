@@ -1,5 +1,8 @@
 <script setup lang="ts">
+defineOptions({ inheritAttrs: false });
+
 import { Check, ChevronDown } from "lucide-vue-next";
+import { useAttrs } from "vue";
 import {
 	SelectContent,
 	SelectIcon,
@@ -21,6 +24,7 @@ export type SelectOption = {
 };
 
 const modelValue = defineModel<string>();
+const attrs = useAttrs();
 
 withDefaults(defineProps<{
 	options: SelectOption[];
@@ -37,6 +41,7 @@ withDefaults(defineProps<{
 <template>
 	<SelectRoot v-model="modelValue" :disabled="disabled" :modal="false">
 		<SelectTrigger
+			v-bind="attrs"
 			:class="cn(
 				'flex h-8 w-full items-center justify-between gap-2 rounded-[5px] border border-input/82 bg-secondary/72 px-2.5 py-1 text-[13px] text-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.02)] outline-none transition-colors hover:bg-secondary/88 focus-visible:border-primary/35 focus-visible:ring-1 focus-visible:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50',
 				$props.class,

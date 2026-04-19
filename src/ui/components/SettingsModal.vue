@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
-import { Keyboard, ListPlus, Monitor, Moon, RotateCcw, Search, Sun, Trash2, UserRoundCog, Wrench, X } from "lucide-vue-next";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { Bot, Code2, HardDrive, Keyboard, ListPlus, Monitor, Moon, Palette, RotateCcw, Sun, Trash2, X } from "lucide-vue-next";
 import Button from "@/ui/components/Button.vue";
 import Input from "@/ui/components/Input.vue";
 import { shortcutFromKeyboardEvent } from "@/ui/lib/keyboardShortcuts";
@@ -51,20 +51,28 @@ watch(
 	},
 );
 
+const sectionMeta: Record<SettingsSection, { group: string; title: string; description: string }> = {
+	storage:    { group: "App",       title: "Storage paths",      description: "Trackboi checks these paths in order and opens the first store it finds. Earlier entries take priority over later ones." },
+	appearance: { group: "App",       title: "Appearance",         description: "Control how Trackboi looks across the desktop shell and editing surfaces." },
+	shortcuts:  { group: "Workspace", title: "Keyboard shortcuts", description: "Bind key combinations to toggle the side panels. Shortcuts won't fire while you're typing inside an input or editor." },
+	agents:     { group: "Workspace", title: "Agents",             description: "Agents registered here are attributed as the actor on card changes made through the MCP interface." },
+	editor:     { group: "Workspace", title: "Code editor",        description: "Choose which editor Trackboi launches when you open a card's source file." },
+};
+
 const themeOptions: Array<{ value: ThemeMode; label: string; description: string; icon: typeof Sun }> = [
-	{ value: "dark", label: "Dark", description: "Keep the cockpit-style dark workspace.", icon: Moon },
-	{ value: "light", label: "Light", description: "Use a brighter canvas with the same warm accent direction.", icon: Sun },
-	{ value: "system", label: "System", description: "Follow the desktop color-scheme preference automatically.", icon: Monitor },
+	{ value: "dark",   label: "Dark",   description: "The default cockpit-style dark workspace.",                     icon: Moon    },
+	{ value: "light",  label: "Light",  description: "A brighter canvas with the same warm accent direction.",        icon: Sun     },
+	{ value: "system", label: "System", description: "Follows your desktop color-scheme preference automatically.",   icon: Monitor },
 ];
 
 const editorOptions = computed(() => [
-	{ id: "auto", label: "Auto detect", description: "Pick the first detected editor, then fall back to the OS default." },
+	{ id: "auto",   label: "Auto-detect",     description: "Use the first detected editor, falling back to the OS default." },
 	...props.detectedEditors.map((editor) => ({
 		id: editor.id,
 		label: editor.label,
 		description: editor.command,
 	})),
-	{ id: "custom", label: "Custom command", description: "Run your own shell command, using {path} as the file placeholder." },
+	{ id: "custom", label: "Custom command",  description: "Provide your own shell command. Use {path} as the file placeholder." },
 ]);
 
 function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
@@ -86,6 +94,24 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 	captureArmed.value = null;
 	(event.currentTarget as HTMLElement | null)?.blur();
 }
+
+function handleEscapeKey(event: KeyboardEvent) {
+	if (!props.open || event.key !== "Escape" || captureArmed.value) return;
+	emit("close");
+}
+
+watch(
+	() => props.open,
+	(open) => {
+		if (open) window.addEventListener("keydown", handleEscapeKey);
+		else window.removeEventListener("keydown", handleEscapeKey);
+	},
+	{ immediate: true },
+);
+
+onBeforeUnmount(() => {
+	window.removeEventListener("keydown", handleEscapeKey);
+});
 </script>
 
 <template>
@@ -93,124 +119,109 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 		<div
 			v-if="open"
 			class="fixed inset-x-0 bottom-0 top-9 z-30 grid place-items-center bg-background/65 p-5 backdrop-blur-[2px]"
+			data-testid="app-settings-modal"
 			@pointerdown.self="emit('close')"
 		>
 			<aside
-				class="modal-panel grid h-[min(760px,calc(100vh-72px))] w-[min(860px,96vw)] grid-cols-[220px_minmax(0,1fr)] overflow-hidden rounded-xl border border-border/60 bg-card shadow-2xl"
+				class="modal-panel grid h-[min(760px,calc(100vh-72px))] w-[min(860px,96vw)] grid-cols-[200px_minmax(0,1fr)] overflow-hidden rounded-xl border border-border/60 bg-card shadow-2xl"
 			>
-				<div class="grid content-start border-r border-border/35 bg-background/32 p-4">
-					<div class="grid gap-6">
-						<div>
-							<p class="text-xs font-semibold uppercase tracking-wide text-primary">Trackboi</p>
-							<h2 class="mt-1 text-lg font-semibold tracking-tight">App settings</h2>
-						</div>
+				<!-- Sidebar -->
+				<div class="grid content-start gap-6 border-r border-border/35 bg-background/32 p-4">
+					<div>
+						<p class="text-xs font-semibold uppercase tracking-wide text-primary">Trackboi</p>
+						<h2 class="mt-1 text-lg font-semibold tracking-tight">Settings</h2>
+					</div>
 
-						<div class="grid gap-4">
-							<div>
-								<p class="px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Storage</p>
+					<nav class="grid gap-4">
+						<div>
+							<p class="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/55">App</p>
+							<div class="grid gap-0.5">
 								<button
 									type="button"
-									class="mt-2 flex w-full items-center gap-2 rounded-md bg-card/55 px-3 py-2 text-left text-sm font-medium text-foreground"
+									class="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition-colors"
+									:class="activeSection === 'storage'
+										? 'bg-secondary/80 font-medium text-foreground'
+										: 'font-normal text-muted-foreground hover:bg-secondary/45 hover:text-foreground'"
 									@click="activeSection = 'storage'"
 								>
-									<Search class="h-4 w-4 text-muted-foreground" />
-									Storage lookup
+									<HardDrive class="h-4 w-4 shrink-0" />
+									Storage
 								</button>
-							</div>
-
-							<div>
-								<p class="px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Appearance</p>
 								<button
 									type="button"
-									class="mt-2 flex w-full items-center gap-2 rounded-md bg-card/55 px-3 py-2 text-left text-sm font-medium text-foreground"
+									class="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition-colors"
+									:class="activeSection === 'appearance'
+										? 'bg-secondary/80 font-medium text-foreground'
+										: 'font-normal text-muted-foreground hover:bg-secondary/45 hover:text-foreground'"
 									@click="activeSection = 'appearance'"
 								>
-									<Sun class="h-4 w-4 text-muted-foreground" />
-									Theme
-								</button>
-							</div>
-
-							<div>
-								<p class="px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Workspace</p>
-								<button
-									type="button"
-									class="mt-2 flex w-full items-center gap-2 rounded-md bg-card/55 px-3 py-2 text-left text-sm font-medium text-foreground"
-									@click="activeSection = 'shortcuts'"
-								>
-									<Keyboard class="h-4 w-4 text-muted-foreground" />
-									Panel shortcuts
-								</button>
-							</div>
-
-							<div>
-								<p class="px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Actors</p>
-								<button
-									type="button"
-									class="mt-2 flex w-full items-center gap-2 rounded-md bg-card/55 px-3 py-2 text-left text-sm font-medium text-foreground"
-									@click="activeSection = 'agents'"
-								>
-									<UserRoundCog class="h-4 w-4 text-muted-foreground" />
-									Agents
-								</button>
-							</div>
-
-							<div>
-								<p class="px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Editor</p>
-								<button
-									type="button"
-									class="mt-2 flex w-full items-center gap-2 rounded-md bg-card/55 px-3 py-2 text-left text-sm font-medium text-foreground"
-									@click="activeSection = 'editor'"
-								>
-									<Wrench class="h-4 w-4 text-muted-foreground" />
-									Open in editor
+									<Palette class="h-4 w-4 shrink-0" />
+									Appearance
 								</button>
 							</div>
 						</div>
-					</div>
+
+						<div>
+							<p class="mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/55">Workspace</p>
+							<div class="grid gap-0.5">
+								<button
+									type="button"
+									class="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition-colors"
+									:class="activeSection === 'shortcuts'
+										? 'bg-secondary/80 font-medium text-foreground'
+										: 'font-normal text-muted-foreground hover:bg-secondary/45 hover:text-foreground'"
+									@click="activeSection = 'shortcuts'"
+								>
+									<Keyboard class="h-4 w-4 shrink-0" />
+									Shortcuts
+								</button>
+								<button
+									type="button"
+									class="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition-colors"
+									:class="activeSection === 'agents'
+										? 'bg-secondary/80 font-medium text-foreground'
+										: 'font-normal text-muted-foreground hover:bg-secondary/45 hover:text-foreground'"
+									@click="activeSection = 'agents'"
+								>
+									<Bot class="h-4 w-4 shrink-0" />
+									Agents
+								</button>
+								<button
+									type="button"
+									class="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition-colors"
+									:class="activeSection === 'editor'
+										? 'bg-secondary/80 font-medium text-foreground'
+										: 'font-normal text-muted-foreground hover:bg-secondary/45 hover:text-foreground'"
+									@click="activeSection = 'editor'"
+								>
+									<Code2 class="h-4 w-4 shrink-0" />
+									Editor
+								</button>
+							</div>
+						</div>
+					</nav>
 				</div>
 
+				<!-- Main content -->
 				<div class="app-scroll grid content-start gap-6 overflow-y-auto p-6">
 					<header class="flex items-start justify-between gap-3 border-b border-border/30 pb-5">
 						<div>
-							<p class="text-xs font-semibold uppercase tracking-wide text-primary">General</p>
-							<h2 class="mt-1 text-xl font-semibold tracking-tight">
-								{{
-									activeSection === "storage"
-										? "Storage lookup"
-										: activeSection === "appearance"
-											? "Theme"
-											: activeSection === "shortcuts"
-												? "Panel shortcuts"
-												: activeSection === "agents"
-													? "Agents"
-													: "Open in editor"
-								}}
-							</h2>
-							<p class="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-								{{
-									activeSection === "storage"
-										? "Trackboi searches these repo-relative locations in order and opens the first store it finds."
-										: activeSection === "appearance"
-											? "Choose how Trackboi paints the desktop shell and code surfaces."
-											: activeSection === "shortcuts"
-												? "Configure the global shortcuts that collapse or reopen the desktop side panels."
-												: activeSection === "agents"
-													? "Manage globally registered agents used by MCP mutations."
-													: "Choose how card files open in an external editor."
-								}}
-							</p>
+							<p class="text-xs font-semibold uppercase tracking-wide text-primary">{{ sectionMeta[activeSection].group }}</p>
+							<h2 class="mt-1 text-xl font-semibold tracking-tight">{{ sectionMeta[activeSection].title }}</h2>
+							<p class="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{{ sectionMeta[activeSection].description }}</p>
 						</div>
 						<Button variant="ghost" size="icon" type="button" @click="emit('close')">
 							<X class="h-4 w-4" />
 						</Button>
 					</header>
 
+					<!-- Storage -->
 					<section v-if="activeSection === 'storage'" class="grid gap-4">
-						<section class="grid gap-1 overflow-hidden rounded-lg bg-background/12">
+						<section class="grid gap-0 overflow-hidden rounded-lg bg-background/12">
 							<div class="border-b border-border/60 px-4 py-3">
-								<h3 class="text-sm font-semibold text-foreground">Search order</h3>
+								<h3 class="text-sm font-semibold text-foreground">Path priority</h3>
 								<p class="mt-1 text-sm leading-6 text-muted-foreground">
-									Earlier paths win. If a repo contains more than one Trackboi store, the first matching path becomes the active database.
+									The first path that resolves to a valid store becomes active. Drag to reorder, or remove paths you don't need.
 								</p>
 							</div>
 
@@ -222,11 +233,18 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 								>
 									<div class="min-w-0">
 										<p class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-											{{ index + 1 }} priority
+											{{ index === 0 ? "Highest priority" : `Priority ${index + 1}` }}
 										</p>
 										<p class="mt-1 truncate font-mono text-sm text-foreground">{{ path }}</p>
 									</div>
-									<Button variant="ghost" size="icon" type="button" :disabled="busy" @click="emit('remove', path)">
+									<Button
+										variant="ghost"
+										size="icon"
+										type="button"
+										:disabled="busy"
+										class="text-muted-foreground hover:text-destructive"
+										@click="emit('remove', path)"
+									>
 										<Trash2 class="h-4 w-4" />
 									</Button>
 								</div>
@@ -235,15 +253,15 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 
 						<section class="grid gap-4 rounded-lg bg-background/12 p-4">
 							<div>
-								<h3 class="text-sm font-semibold text-foreground">Add location</h3>
+								<h3 class="text-sm font-semibold text-foreground">Add a path</h3>
 								<p class="mt-1 text-sm leading-6 text-muted-foreground">
-									Use repo-relative paths only. Keep them narrow and predictable so Trackboi stays easy to reason about.
+									Repo-relative paths only. The new path is appended at the lowest priority.
 								</p>
 							</div>
 
 							<form class="grid gap-3" @submit.prevent="emit('add')">
 								<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-									Storage path
+									Path
 									<Input v-model="draft" autocomplete="off" placeholder=".etc/.trackboi" />
 								</label>
 								<div class="flex flex-wrap gap-2">
@@ -260,12 +278,13 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 						</section>
 					</section>
 
+					<!-- Appearance -->
 					<section v-else-if="activeSection === 'appearance'" class="grid gap-4">
 						<section class="grid gap-4 rounded-lg bg-background/12 p-4">
 							<div>
-								<h3 class="text-sm font-semibold text-foreground">Theme mode</h3>
+								<h3 class="text-sm font-semibold text-foreground">Color theme</h3>
 								<p class="mt-1 text-sm leading-6 text-muted-foreground">
-									Switch between the dark workspace, a lighter drafting surface, or your system preference.
+									Pick a theme or let the desktop decide. The change takes effect immediately.
 								</p>
 							</div>
 
@@ -288,7 +307,7 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 								</button>
 							</div>
 
-							<div class="flex flex-wrap gap-2">
+							<div>
 								<Button variant="outline" type="button" @click="emit('resetTheme')">
 									<RotateCcw class="h-4 w-4" />
 									Restore default
@@ -297,12 +316,13 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 						</section>
 					</section>
 
+					<!-- Shortcuts -->
 					<section v-else-if="activeSection === 'shortcuts'" class="grid gap-4">
 						<section class="grid gap-4 rounded-lg bg-background/12 p-4">
 							<div>
-								<h3 class="text-sm font-semibold text-foreground">Panel toggle shortcuts</h3>
+								<h3 class="text-sm font-semibold text-foreground">Panel toggles</h3>
 								<p class="mt-1 text-sm leading-6 text-muted-foreground">
-									Focus a shortcut field and press the new key combination. Shortcuts stay global, but they do not fire while you are typing inside inputs or editors.
+									Click a field and press the key combination you want to assign. Press Escape to cancel.
 								</p>
 							</div>
 
@@ -312,12 +332,13 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 									<button
 										type="button"
 										class="trackboi-mono-font flex h-8 w-full items-center rounded-[5px] border border-input/82 bg-secondary/72 px-2.5 py-1 text-left text-[13px] text-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.02)] transition-colors hover:bg-secondary/88 focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+										:class="captureArmed === 'left' ? 'border-primary/35 ring-1 ring-ring' : ''"
 										@click="captureArmed = 'left'"
 										@focus="captureArmed = 'left'"
 										@blur="captureArmed = null"
 										@keydown="captureShortcut('left', $event)"
 									>
-										{{ captureArmed === 'left' ? "Press shortcut" : leftPanelShortcut }}
+										{{ captureArmed === "left" ? "Listening for shortcut…" : leftPanelShortcut }}
 									</button>
 								</label>
 
@@ -326,17 +347,18 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 									<button
 										type="button"
 										class="trackboi-mono-font flex h-8 w-full items-center rounded-[5px] border border-input/82 bg-secondary/72 px-2.5 py-1 text-left text-[13px] text-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.02)] transition-colors hover:bg-secondary/88 focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+										:class="captureArmed === 'right' ? 'border-primary/35 ring-1 ring-ring' : ''"
 										@click="captureArmed = 'right'"
 										@focus="captureArmed = 'right'"
 										@blur="captureArmed = null"
 										@keydown="captureShortcut('right', $event)"
 									>
-										{{ captureArmed === 'right' ? "Press shortcut" : rightPanelShortcut }}
+										{{ captureArmed === "right" ? "Listening for shortcut…" : rightPanelShortcut }}
 									</button>
 								</label>
 							</div>
 
-							<div class="flex flex-wrap gap-2">
+							<div>
 								<Button variant="outline" type="button" @click="emit('resetShortcuts')">
 									<RotateCcw class="h-4 w-4" />
 									Restore defaults
@@ -345,12 +367,13 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 						</section>
 					</section>
 
+					<!-- Agents -->
 					<section v-else-if="activeSection === 'agents'" class="grid gap-4">
 						<section class="grid gap-4 rounded-lg bg-background/12 p-4">
 							<div>
 								<h3 class="text-sm font-semibold text-foreground">Registered agents</h3>
 								<p class="mt-1 text-sm leading-6 text-muted-foreground">
-									MCP mutations are attributed to the active registered agent instead of a freeform model label.
+									Each registered agent gets a stable identity. Card mutations from MCP are attributed to the matching agent rather than a raw model name.
 								</p>
 							</div>
 
@@ -364,23 +387,35 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 										<div class="trackboi-mono-font text-[12px] text-foreground">{{ agent.name }}</div>
 										<p class="mt-1 text-sm text-muted-foreground">{{ agent.description }}</p>
 									</div>
-									<Button variant="outline" type="button" @click="emit('removeAgent', agent.id)">
+									<Button
+										variant="ghost"
+										size="icon"
+										type="button"
+										class="text-muted-foreground hover:text-destructive"
+										@click="emit('removeAgent', agent.id)"
+									>
 										<Trash2 class="h-4 w-4" />
 									</Button>
 								</div>
 							</div>
 
+							<div v-else class="rounded-md border border-dashed border-border/75 bg-background/20 px-4 py-4 text-sm text-muted-foreground">
+								No agents registered yet.
+							</div>
+
 							<form class="grid gap-3" @submit.prevent="emit('registerAgent')">
-								<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-									Agent name
-									<Input v-model="agentNameDraft" autocomplete="off" placeholder="Claude Code" />
-								</label>
-								<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-									Description
-									<Input v-model="agentDescriptionDraft" autocomplete="off" placeholder="Primary coding agent on this machine" />
-								</label>
+								<div class="grid gap-3 sm:grid-cols-2">
+									<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+										Name
+										<Input v-model="agentNameDraft" autocomplete="off" placeholder="Claude Code" />
+									</label>
+									<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+										Description
+										<Input v-model="agentDescriptionDraft" autocomplete="off" placeholder="Primary coding agent" />
+									</label>
+								</div>
 								<div>
-									<Button type="submit" :disabled="!agentNameDraft.trim()">
+									<Button type="submit" :disabled="!agentNameDraft.trim()" @click="emit('registerAgent')">
 										<ListPlus class="h-4 w-4" />
 										Register agent
 									</Button>
@@ -389,12 +424,13 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 						</section>
 					</section>
 
+					<!-- Editor -->
 					<section v-else-if="activeSection === 'editor'" class="grid gap-4">
 						<section class="grid gap-4 rounded-lg bg-background/12 p-4">
 							<div>
 								<h3 class="text-sm font-semibold text-foreground">Preferred editor</h3>
 								<p class="mt-1 text-sm leading-6 text-muted-foreground">
-									Use auto-detect, pick a detected editor, or provide a custom shell command. Use <span class="trackboi-mono-font">{path}</span> as the file placeholder.
+									Select from detected editors or provide a custom command. Use <span class="trackboi-mono-font">{path}</span> where the file path should go.
 								</p>
 							</div>
 
@@ -417,13 +453,13 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 							</div>
 
 							<label v-if="preferredEditorId === 'custom'" class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-								Custom command
+								Command
 								<Input v-model="customEditorCommand" autocomplete="off" placeholder='cursor "{path}"' />
 							</label>
 
 							<div>
 								<Button type="button" @click="emit('saveEditor')">
-									Save editor
+									Save
 								</Button>
 							</div>
 						</section>

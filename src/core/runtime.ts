@@ -201,10 +201,12 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		const project = activeProjectFromRegistry(current);
 		const view = listView();
 		const selectedBoardId = current.selectedBoardId;
+		const selectedWorktreeId = current.selectedWorktreeId;
 		if (!project || !existsSync(project.path)) {
 			return {
 				projectKey: "none",
 				selectedBoardId,
+				selectedWorktreeId,
 				snapshotBase: null,
 				view,
 				worktrees: [],
@@ -213,7 +215,11 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 
 		const cacheKey = projectCacheKey(project);
 		const cached = desktopStateCache.get(cacheKey);
-		if (cached && cached.selectedBoardId === selectedBoardId) {
+		if (
+			cached &&
+			cached.selectedBoardId === selectedBoardId &&
+			cached.selectedWorktreeId === selectedWorktreeId
+		) {
 			return {
 				...cached,
 				view,
@@ -224,6 +230,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		const nextCachedState = {
 			projectKey: cacheKey,
 			selectedBoardId,
+			selectedWorktreeId,
 			snapshotBase: aggregated.snapshotBase,
 			view,
 			worktrees: aggregated.worktrees,
@@ -281,6 +288,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 				desktopStateCache.set(cacheKey, {
 					projectKey: cacheKey,
 					selectedBoardId: registry.readRegistry().selectedBoardId,
+					selectedWorktreeId: registry.readRegistry().selectedWorktreeId,
 					snapshotBase: aggregated.snapshotBase,
 					view,
 					worktrees: aggregated.worktrees,

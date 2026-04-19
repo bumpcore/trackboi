@@ -33,7 +33,7 @@ function projectMonogram(name: string) {
 </script>
 
 <template>
-	<aside class="border-r border-border/70 bg-card/90">
+	<aside class="border-r border-border/70 bg-card/90" data-testid="left-rail">
 		<div class="flex h-full flex-col items-center gap-2 py-3">
 			<div class="grid h-8 w-8 place-items-center rounded-md border border-border/70 bg-secondary/85 text-[11px] font-bold text-primary">
 				tb
@@ -51,6 +51,7 @@ function projectMonogram(name: string) {
 						class="shell-rail-button text-[10px] font-medium"
 						:class="{ 'is-active': activeProjectId === project.projectId }"
 						:style="activeProjectId === project.projectId ? projectColorStyle(project) : undefined"
+						:data-testid="`workspace-${project.projectId}`"
 						@click="emit('switchProject', project.projectId)"
 					>
 						<span class="leading-none">{{ projectMonogram(project.name) }}</span>
@@ -61,6 +62,7 @@ function projectMonogram(name: string) {
 					<button
 						type="button"
 						class="shell-rail-button"
+						data-testid="add-workspace-button"
 						@click="emit('addProject')"
 					>
 						<Plus class="h-4 w-4" />
@@ -75,6 +77,7 @@ function projectMonogram(name: string) {
 					type="button"
 					class="shell-rail-button"
 					:class="{ 'is-active': activeView === 'agents' }"
+					data-testid="agents-view-button"
 					@click="emit('select', 'agents')"
 				>
 					<Bot class="h-4 w-4" />
@@ -88,7 +91,7 @@ function projectMonogram(name: string) {
 					</Button>
 				</Tooltip>
 				<Tooltip content="Global settings" side="right">
-					<Button variant="ghost" size="icon" type="button" @click="emit('settings')">
+					<Button variant="ghost" size="icon" type="button" data-testid="app-settings-button" @click="emit('settings')">
 						<Settings class="h-4 w-4" />
 					</Button>
 				</Tooltip>

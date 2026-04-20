@@ -65,12 +65,12 @@ function benchmarkProjectSwitches(
 	if (prewarm) runtime.prewarmProjects();
 
 	const view = runtime.listView();
-	const mainProjectId = view.sources.flatMap((source) => source.entries)
-		.find((entry) => entry.path === fixture.mainRepo)?.projectId;
-	const secondaryProjectId = view.sources.flatMap((source) => source.entries)
-		.find((entry) => entry.path === fixture.secondaryRepo)?.projectId;
+	const mainProjectPath = view.sources.flatMap((source) => source.entries)
+		.find((entry) => entry.path === fixture.mainRepo)?.projectPath;
+	const secondaryProjectPath = view.sources.flatMap((source) => source.entries)
+		.find((entry) => entry.path === fixture.secondaryRepo)?.projectPath;
 
-	if (!mainProjectId || !secondaryProjectId) {
+	if (!mainProjectPath || !secondaryProjectPath) {
 		throw new Error("Expected both benchmark projects to be visible");
 	}
 
@@ -78,7 +78,7 @@ function benchmarkProjectSwitches(
 	let visibleCards = 0;
 
 	for (let index = 0; index < 16; index += 1) {
-		visibleCards += runtime.switchProject(index % 2 === 0 ? mainProjectId : secondaryProjectId).snapshot?.cards.length ?? 0;
+		visibleCards += runtime.switchProject(index % 2 === 0 ? mainProjectPath : secondaryProjectPath).snapshot?.cards.length ?? 0;
 	}
 
 	return {
@@ -132,11 +132,7 @@ function createPerformanceFixture() {
 			};
 			const metadata: ProjectMetadata = {
 				version: 1,
-				projectId: `${prefix}-project`,
 				name: path.basename(projectPath),
-				storagePath,
-				createdAt: "2026-04-18T07:59:00.000Z",
-				customFields: [],
 				people: [],
 			};
 

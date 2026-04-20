@@ -59,14 +59,14 @@ export function registerTrackboiIpcHandlers(options: {
 	));
 	ipcMain.handle(ipcChannels.trackboi.openWorkspaceFile, () => trackboi.openWorkspaceFile());
 	ipcMain.handle(ipcChannels.trackboi.chooseProject, () => trackboi.chooseProject());
-	ipcMain.handle(ipcChannels.trackboi.locateProject, (_event: IpcMainInvokeEvent, projectId: string) => (
-		trackboi.locateProject(projectId)
+	ipcMain.handle(ipcChannels.trackboi.locateProject, (_event: IpcMainInvokeEvent, projectPath: string) => (
+		trackboi.locateProject(projectPath)
 	));
-	ipcMain.handle(ipcChannels.trackboi.removeProject, (_event: IpcMainInvokeEvent, projectId: string) => (
-		trackboi.removeProject(projectId)
+	ipcMain.handle(ipcChannels.trackboi.removeProject, (_event: IpcMainInvokeEvent, projectPath: string) => (
+		trackboi.removeProject(projectPath)
 	));
-	ipcMain.handle(ipcChannels.trackboi.switchProject, (_event: IpcMainInvokeEvent, projectId: string) => (
-		trackboi.switchProject(projectId)
+	ipcMain.handle(ipcChannels.trackboi.switchProject, (_event: IpcMainInvokeEvent, projectPath: string) => (
+		trackboi.switchProject(projectPath)
 	));
 	ipcMain.handle(ipcChannels.trackboi.createCard, (_event: IpcMainInvokeEvent, input) => trackboi.createCard(input));
 	ipcMain.handle(ipcChannels.trackboi.updateCard, (_event: IpcMainInvokeEvent, cardId: string, patch) => (

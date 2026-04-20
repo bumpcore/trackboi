@@ -12,24 +12,14 @@ type CodeWorkspaceFile = {
 	}>;
 };
 
-export function decodeDiscoveredPath(projectId: string): string | null {
-	for (const prefix of ["workspace:"]) {
-		if (projectId.startsWith(prefix)) return projectId.slice(prefix.length);
-	}
-	return null;
-}
-
 export function activeProjectFromRegistry(registry: ProjectRegistry): Project | null {
-	const id = registry.activeProjectId;
-	if (!id) return null;
-	const manual = registry.projects.find((project) => project.id === id);
+	const projectPath = registry.activeProjectPath;
+	if (!projectPath) return null;
+	const manual = registry.projects.find((project) => project.path === projectPath);
 	if (manual) return manual;
-	const discoveredPath = decodeDiscoveredPath(id);
-	if (!discoveredPath) return null;
 	return {
-		id,
-		name: projectName(discoveredPath),
-		path: discoveredPath,
+		name: projectName(projectPath),
+		path: projectPath,
 		storagePath: undefined,
 	};
 }
@@ -50,7 +40,7 @@ function projectCardCount(project: Project, registry: ProjectRegistry): number |
 export function projectEntry(project: Project, registry: ProjectRegistry): ProjectEntry {
 	const git = readGitContext(project.path);
 	return {
-		projectId: project.id,
+		projectPath: project.path,
 		name: project.name,
 		path: project.path,
 		storagePath: project.storagePath,
@@ -62,7 +52,6 @@ export function projectEntry(project: Project, registry: ProjectRegistry): Proje
 
 export function canonicalStorageKey(entry: ProjectEntry, registry: ProjectRegistry): string {
 	const project: Project = {
-		id: entry.projectId,
 		name: entry.name,
 		path: entry.path,
 		storagePath: entry.storagePath,
@@ -90,7 +79,6 @@ export function listWorkspaceSource(registry: ProjectRegistry): ProjectSource | 
 			const resolved = path.isAbsolute(folderPath) ? folderPath : path.join(workspaceDir, folderPath);
 			const canonical = existsSync(resolved) ? realpathSync(resolved) : path.resolve(resolved);
 			return projectEntry({
-				id: `workspace:${canonical}`,
 				name: folder.name ?? projectName(canonical),
 				path: canonical,
 				storagePath: undefined,

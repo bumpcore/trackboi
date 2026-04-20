@@ -2,11 +2,11 @@ import path from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import * as z from "zod/v4";
-import type { Card, NodeFsTrackboiActions, ProjectEntry, ProjectSnapshot, ProjectView } from "../../core";
+import type { AgentContext, Card, NodeFsTrackboiActions, ProjectEntry, ProjectSnapshot, ProjectView, WorktreeContext } from "../../core";
 
 export type ToolHandler = () => unknown | Promise<unknown>;
 
-export const projectIdSchema = z.string().optional().describe("Project id. Defaults to the agent's active project.");
+export const projectPathSchema = z.string().optional().describe("Project path. Defaults to the agent's active project.");
 export const boardIdSchema = z.string().optional().describe("Board id. Defaults to the agent's active board for that project.");
 export const columnSchema = z.string().min(1).describe("Board column id.");
 export const cardIdSchema = z.string().min(1).describe("Card id.");
@@ -48,9 +48,9 @@ export function toolResult(handler: ToolHandler): Promise<CallToolResult> {
 export async function requireSnapshot(
 	trackboi: NodeFsTrackboiActions,
 	context: McpProjectContext,
-	projectId?: string,
+	projectPath?: string,
 ): Promise<ProjectSnapshot> {
-	const snapshot = await withProject(trackboi, context, projectId, () => trackboi.getActiveProject());
+	const snapshot = await withProject(trackboi, context, projectPath, (actions) => actions.getActiveProject());
 	if (!snapshot) throw new Error("Choose a project first");
 	return snapshot;
 }
@@ -63,9 +63,9 @@ export async function getCard(
 	trackboi: NodeFsTrackboiActions,
 	context: McpProjectContext,
 	cardId: string,
-	projectId?: string,
+	projectPath?: string,
 ): Promise<Card> {
-	const card = (await requireSnapshot(trackboi, context, projectId)).cards.find((candidate) => candidate.id === cardId);
+	const card = (await requireSnapshot(trackboi, context, projectPath)).cards.find((candidate) => candidate.id === cardId);
 	if (!card) throw new Error(`Unknown card: ${cardId}`);
 	return card;
 }
@@ -75,15 +75,21 @@ export async function getCard(
  * desktop UI's selected project.
  */
 export type McpProjectContext = {
-	currentProjectId(): Promise<string | null>;
-	setCurrentProjectId(projectId: string): Promise<ProjectEntry>;
-	currentBoardId(projectId?: string): Promise<string | null>;
-	setCurrentBoardId(projectId: string, boardId: string | null): Promise<void>;
+	currentProjectPath(): Promise<string | null>;
+	setCurrentProjectPath(projectPath: string): Promise<ProjectEntry>;
+	currentWorktreeId(projectPath?: string): Promise<string | null>;
+	setCurrentWorktreeId(projectPath: string, worktreeId: string | null): Promise<void>;
+	currentBoardId(projectPath?: string): Promise<string | null>;
+	setCurrentBoardId(projectPath: string, boardId: string | null): Promise<void>;
 	currentAgentId(): Promise<string | null>;
 	setCurrentAgentId(agentId: string | null): Promise<void>;
 	listView(): Promise<ProjectView & {
-		agentActiveProjectId: string | null;
-		desktopActiveProjectId: string | null;
+		agentActiveProjectPath: string | null;
+		desktopActiveProjectPath: string | null;
+		agentActiveWorktreeId: string | null;
+		desktopActiveWorktreeId: string | null;
+		agentActiveBoardId: string | null;
+		desktopActiveBoardId: string | null;
 	}>;
 };
 
@@ -91,55 +97,116 @@ export async function createMcpProjectContext(
 	trackboi: NodeFsTrackboiActions,
 	cwd: string = process.cwd(),
 ): Promise<McpProjectContext> {
-	let activeProjectId = pickAgentProjectId(await trackboi.listView(), cwd);
-	const activeBoardIdsByProject = new Map<string, string | null>();
 	let activeAgentId: string | null = trackboi.readRegistry().appSettings.agents[0]?.id ?? null;
 
-	async function currentProjectId(): Promise<string | null> {
-		const view = await trackboi.listView();
-		const projectId = activeProjectId && listEntries(view).some((entry) => entry.projectId === activeProjectId)
-			? activeProjectId
-			: pickAgentProjectId(view, cwd);
-		activeProjectId = projectId;
-		return projectId;
+	async function currentProjectPath(): Promise<string | null> {
+		const agentContext = await currentContext();
+		return agentContext.projectPath;
+	}
+
+	async function currentContext(): Promise<AgentContext> {
+		const settings = await trackboi.readAppSettings();
+		const agentId = await currentAgentId();
+		const key = agentContextKey(agentId);
+		const persisted = settings.agentContexts.find((entry) => entry.agentId === key);
+		if (persisted) {
+			return persisted;
+		}
+
+		const initial = await resolveInitialAgentContext(trackboi, cwd);
+		const created: AgentContext = {
+			agentId: key,
+			projectPath: initial.projectPath,
+			worktreeId: initial.worktreeId,
+			boardId: initial.boardId,
+		};
+		await writeAgentContext(trackboi, created);
+		return created;
+	}
+
+	async function updateContext(updater: (context: AgentContext) => AgentContext): Promise<AgentContext> {
+		const next = updater(await currentContext());
+		await writeAgentContext(trackboi, next);
+		return next;
+	}
+
+	async function currentAgentId(): Promise<string | null> {
+		const agents = trackboi.readRegistry().appSettings.agents;
+		if (activeAgentId && agents.some((agent) => agent.id === activeAgentId)) return activeAgentId;
+		activeAgentId = agents[0]?.id ?? null;
+		return activeAgentId;
 	}
 
 	return {
-		async currentProjectId() {
-			return currentProjectId();
+		async currentProjectPath() {
+			return currentProjectPath();
 		},
-		async setCurrentProjectId(projectId: string) {
+		async setCurrentProjectPath(projectPath: string) {
 			const view = await trackboi.listView();
-			const entry = listEntries(view).find((candidate) => candidate.projectId === projectId);
-			if (!entry) throw new Error(`Unknown project: ${projectId}`);
-			activeProjectId = entry.projectId;
+			const entry = listEntries(view).find((candidate) => candidate.projectPath === projectPath);
+			if (!entry) throw new Error(`Unknown project: ${projectPath}`);
+			const initial = await resolveProjectWorktreeAndBoard(trackboi, entry.projectPath, cwd);
+			await updateContext((context) => ({
+				...context,
+				projectPath: entry.projectPath,
+				worktreeId: initial.worktreeId,
+				boardId: initial.boardId,
+			}));
 			return entry;
 		},
-		async currentBoardId(projectId) {
-			const resolvedProjectId = projectId ?? await currentProjectId();
-			if (!resolvedProjectId) return null;
-			return activeBoardIdsByProject.get(resolvedProjectId) ?? null;
+		async currentWorktreeId(projectPath) {
+			const context = await currentContext();
+			if (projectPath && context.projectPath !== projectPath) return null;
+			return context.worktreeId;
 		},
-		async setCurrentBoardId(projectId, boardId) {
-			activeBoardIdsByProject.set(projectId, boardId);
+		async setCurrentWorktreeId(projectPath, worktreeId) {
+			await updateContext((context) => {
+				if (context.projectPath !== projectPath) {
+					return {
+						...context,
+						projectPath,
+						worktreeId,
+						boardId: context.boardId,
+					};
+				}
+				return {
+					...context,
+					worktreeId,
+				};
+			});
+		},
+		async currentBoardId(projectPath) {
+			const context = await currentContext();
+			const resolvedProjectPath = projectPath ?? context.projectPath;
+			if (!resolvedProjectPath || context.projectPath !== resolvedProjectPath) return null;
+			return context.boardId;
+		},
+		async setCurrentBoardId(projectPath, boardId) {
+			await updateContext((context) => ({
+				...context,
+				projectPath,
+				boardId,
+			}));
 		},
 		async currentAgentId() {
-			const agents = trackboi.readRegistry().appSettings.agents;
-			if (activeAgentId && agents.some((agent) => agent.id === activeAgentId)) return activeAgentId;
-			activeAgentId = agents[0]?.id ?? null;
-			return activeAgentId;
+			return currentAgentId();
 		},
 		async setCurrentAgentId(agentId) {
 			activeAgentId = agentId;
+			await currentContext();
 		},
 		async listView() {
 			const view = await trackboi.listView();
-			const agentActiveProjectId = await currentProjectId();
+			const context = await currentContext();
 			return {
 				...view,
-				agentActiveProjectId,
-				desktopActiveProjectId: view.activeProjectId,
-				activeProjectId: agentActiveProjectId ?? view.activeProjectId,
+				agentActiveProjectPath: context.projectPath,
+				desktopActiveProjectPath: view.activeProjectPath,
+				agentActiveWorktreeId: context.worktreeId,
+				desktopActiveWorktreeId: trackboi.readRegistry().selectedWorktreeId,
+				agentActiveBoardId: context.boardId,
+				desktopActiveBoardId: trackboi.readRegistry().selectedBoardId,
+				activeProjectPath: context.projectPath ?? view.activeProjectPath,
 			};
 		},
 	};
@@ -165,40 +232,124 @@ export async function requireAgentId(
 export async function withProject<T>(
 	trackboi: NodeFsTrackboiActions,
 	context: McpProjectContext,
-	projectId: string | undefined,
-	action: () => T | Promise<T>,
+	projectPath: string | undefined,
+	action: (actions: NodeFsTrackboiActions) => T | Promise<T>,
 ): Promise<T> {
-	const resolvedProjectId = projectId ?? await context.currentProjectId();
-	if (!resolvedProjectId) return action();
-	const registry = trackboi.readRegistry();
-	const previousActiveProjectId = registry.activeProjectId;
-	const previousSelectedWorktreeId = registry.selectedWorktreeId;
-	const previousSelectedBoardId = registry.selectedBoardId;
-	await trackboi.switchProject(resolvedProjectId);
-	const nextBoardId = await context.currentBoardId(resolvedProjectId);
-	if (nextBoardId) await trackboi.setActiveBoard(nextBoardId);
-	try {
-		return await action();
-	} finally {
-		const nextRegistry = trackboi.readRegistry();
-		nextRegistry.activeProjectId = previousActiveProjectId;
-		nextRegistry.selectedWorktreeId = previousSelectedWorktreeId;
-		nextRegistry.selectedBoardId = previousSelectedBoardId;
-		trackboi.writeRegistry(nextRegistry);
-	}
+	const resolvedProjectPath = projectPath ?? await context.currentProjectPath();
+	if (!resolvedProjectPath) return action(trackboi);
+	const worktreeId = await context.currentWorktreeId(resolvedProjectPath);
+	const boardId = await context.currentBoardId(resolvedProjectPath);
+	return trackboi.withScopedContext({
+		projectPath: resolvedProjectPath,
+		worktreeId: worktreeId ?? resolvedProjectPath,
+		boardId,
+	}, async (scoped) => action(scoped));
 }
 
-export function pickAgentProjectId(view: ProjectView, cwd: string): string | null {
+export function pickAgentProjectPath(view: ProjectView, cwd: string): string | null {
 	const entries = listEntries(view);
 	const normalizedCwd = normalizePath(cwd);
 	const matchingEntry = entries
 		.filter((entry) => pathContains(normalizedCwd, normalizePath(entry.path)))
 		.sort((left, right) => right.path.length - left.path.length)[0];
-	return matchingEntry?.projectId ?? view.activeProjectId;
+	return matchingEntry?.projectPath ?? view.activeProjectPath;
 }
 
 function listEntries(view: ProjectView): ProjectEntry[] {
 	return view.sources.flatMap((source) => source.entries);
+}
+
+async function resolveInitialAgentContext(
+	trackboi: NodeFsTrackboiActions,
+	cwd: string,
+): Promise<{ projectPath: string | null; worktreeId: string | null; boardId: string | null }> {
+	const view = await trackboi.listView();
+	const normalizedCwd = normalizePath(cwd);
+	const directProjectPath = pickAgentProjectPath(view, cwd);
+	const visibleProjects = listEntries(view);
+	const containingProject = directProjectPath
+		? visibleProjects.find((entry) => entry.projectPath === directProjectPath) ?? null
+		: null;
+
+	if (containingProject) {
+		const worktreeId = await resolveWorktreeForProject(trackboi, containingProject.projectPath, normalizedCwd);
+		const boardId = await resolveBoardForProject(trackboi, containingProject.projectPath, worktreeId);
+		return { projectPath: containingProject.projectPath, worktreeId, boardId };
+	}
+
+	for (const entry of visibleProjects) {
+		const worktreeId = await resolveWorktreeForProject(trackboi, entry.projectPath, normalizedCwd);
+		if (!worktreeId) continue;
+		const boardId = await resolveBoardForProject(trackboi, entry.projectPath, worktreeId);
+		return { projectPath: entry.projectPath, worktreeId, boardId };
+	}
+
+	const projectPath = view.activeProjectPath;
+	if (!projectPath) return { projectPath: null, worktreeId: null, boardId: null };
+	const boardId = trackboi.readRegistry().selectedBoardId;
+	return { projectPath, worktreeId: trackboi.readRegistry().selectedWorktreeId ?? projectPath, boardId };
+}
+
+async function resolveProjectWorktreeAndBoard(
+	trackboi: NodeFsTrackboiActions,
+	projectPath: string,
+	cwd: string,
+): Promise<{ worktreeId: string | null; boardId: string | null }> {
+	const normalizedCwd = normalizePath(cwd);
+	const worktreeId = await resolveWorktreeForProject(trackboi, projectPath, normalizedCwd);
+	const boardId = await resolveBoardForProject(trackboi, projectPath, worktreeId);
+	return { worktreeId, boardId };
+}
+
+async function resolveWorktreeForProject(
+	trackboi: NodeFsTrackboiActions,
+	projectPath: string,
+	normalizedCwd: string,
+): Promise<string | null> {
+	const worktrees = await listProjectWorktrees(trackboi, projectPath);
+	const match = worktrees
+		.filter((worktree) => pathContains(normalizedCwd, normalizePath(worktree.path)))
+		.sort((left, right) => right.path.length - left.path.length)[0];
+	return match?.id ?? worktrees.find((worktree) => worktree.isPrimary)?.id ?? worktrees[0]?.id ?? projectPath;
+}
+
+async function resolveBoardForProject(
+	trackboi: NodeFsTrackboiActions,
+	projectPath: string,
+	worktreeId: string | null,
+): Promise<string | null> {
+	return trackboi.withScopedContext({
+		projectPath,
+		worktreeId: worktreeId ?? projectPath,
+		boardId: null,
+	}, async (scoped) => {
+		const snapshot = await scoped.getActiveProject();
+		return snapshot?.board.id ?? null;
+	});
+}
+
+async function listProjectWorktrees(trackboi: NodeFsTrackboiActions, projectPath: string): Promise<WorktreeContext[]> {
+	return trackboi.withScopedContext({
+		projectPath,
+		worktreeId: projectPath,
+		boardId: null,
+	}, async (scoped) => {
+		const state = await scoped.readDesktopState();
+		return state.worktrees;
+	});
+}
+
+function agentContextKey(agentId: string | null): string {
+	return agentId ?? "__default__";
+}
+
+async function writeAgentContext(trackboi: NodeFsTrackboiActions, nextContext: AgentContext): Promise<void> {
+	const settings = await trackboi.readAppSettings();
+	const agentContexts = settings.agentContexts.filter((entry) => entry.agentId !== nextContext.agentId);
+	await trackboi.updateAppSettings({
+		...settings,
+		agentContexts: [...agentContexts, nextContext],
+	});
 }
 
 function normalizePath(value: string): string {

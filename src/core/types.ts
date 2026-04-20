@@ -49,6 +49,13 @@ export type AgentRegistration = {
 	description: string;
 };
 
+export type AgentContext = {
+	agentId: string;
+	projectPath: string | null;
+	worktreeId: string | null;
+	boardId: string | null;
+};
+
 export type EditorPreference = {
 	preferredEditorId: string;
 	customCommand: string;
@@ -57,15 +64,13 @@ export type EditorPreference = {
 export type AppSettings = {
 	version: 1;
 	agents: AgentRegistration[];
+	agentContexts: AgentContext[];
 	editor: EditorPreference;
 };
 
 export type ProjectMetadata = {
 	version: 1;
-	projectId: string;
 	name: string;
-	storagePath: string;
-	createdAt: string;
 	people: PersonAlias[];
 };
 
@@ -184,7 +189,6 @@ export type CardVariant = {
 };
 
 export type Project = {
-	id: string;
 	name: string;
 	path: string;
 	storagePath?: string;
@@ -197,7 +201,7 @@ export type ProjectSourceKind =
 	| { kind: "codeWorkspace"; filePath: string };
 
 export type ProjectEntry = {
-	projectId: string;
+	projectPath: string;
 	name: string;
 	path: string;
 	storagePath?: string;
@@ -214,13 +218,13 @@ export type ProjectSource = ProjectSourceKind & {
 
 export type ProjectView = {
 	sources: ProjectSource[];
-	activeProjectId: string | null;
+	activeProjectPath: string | null;
 	storageSearchPaths: string[];
 };
 
 export type ProjectRegistry = {
 	projects: Project[];
-	activeProjectId: string | null;
+	activeProjectPath: string | null;
 	storageSearchPaths: string[];
 	activeWorkspaceFile: string | null;
 	selectedWorktreeId: string | null;
@@ -365,9 +369,9 @@ export type TrackboiRuntime = {
 	updateAppSettings(settings: AppSettings): AppSettings;
 	updateProjectPeople(people: PersonAlias[]): ProjectMetadata;
 	chooseProjectPath(projectPath: string): ProjectSnapshot;
-	locateProjectPath(projectId: string, projectPath: string): ProjectSnapshot;
-	removeProject(projectId: string): ProjectSnapshot | null;
-	switchProject(projectId: string): DesktopState;
+	locateProjectPath(currentProjectPath: string, projectPath: string): ProjectSnapshot;
+	removeProject(projectPath: string): ProjectSnapshot | null;
+	switchProject(projectPath: string): DesktopState;
 	setStorageSearchPaths(paths: string[]): ProjectView;
 	setActiveWorkspaceFile(filePath: string | null): ProjectView;
 	createBoard(input: CreateBoardInput): ProjectSnapshot;
@@ -414,13 +418,19 @@ export type TrackboiActions = {
 	deleteTrackFile(trackId: string, fileName: string): Promise<{ ok: true }>;
 	openWorkspaceFile(): Promise<ProjectView | null>;
 	chooseProject(): Promise<ProjectSnapshot | null>;
-	locateProject(projectId: string): Promise<ProjectSnapshot | null>;
-	removeProject(projectId: string): Promise<ProjectSnapshot | null>;
-	switchProject(projectId: string): Promise<DesktopState>;
+	locateProject(projectPath: string): Promise<ProjectSnapshot | null>;
+	removeProject(projectPath: string): Promise<ProjectSnapshot | null>;
+	switchProject(projectPath: string): Promise<DesktopState>;
 	createCard(input: CreateCardInput): Promise<Card>;
 	addCardComment(input: CreateCardCommentInput): Promise<CardComment>;
 	updateCard(cardId: string, patch: CardPatch): Promise<Card>;
 	updateBoard(board: Board): Promise<Board>;
 	moveCard(cardId: string, toColumn: string, beforeCardId: string | null): Promise<Card>;
 	deleteCard(cardId: string): Promise<{ ok: true }>;
+};
+
+export type ScopedTrackboiContext = {
+	projectPath: string | null;
+	worktreeId: string | null;
+	boardId: string | null;
 };

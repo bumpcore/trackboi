@@ -14,7 +14,7 @@ const props = defineProps<{
 const emit = defineEmits<{
 	settings: [];
 	chooseProject: [];
-	switchProject: [projectId: string];
+	switchProject: [projectPath: string];
 }>();
 
 function projectInitial(name: string) {
@@ -39,18 +39,18 @@ const manualSource = computed(() => props.view.sources.find((source) => source.k
 		<div class="mt-5 grid gap-2.5">
 			<Tooltip
 				v-for="entry in manualSource?.entries ?? []"
-				:key="entry.projectId"
+				:key="entry.projectPath"
 				:content="projectTooltip(entry, manualSource?.label ?? 'Projects')"
 				side="right"
 			>
 					<button
 						class="relative grid h-8 w-8 place-items-center rounded-md border text-sm font-semibold transition"
-						:class="entry.projectId === view.activeProjectId
+						:class="entry.projectPath === view.activeProjectPath
 							? 'border-[var(--project-color)] bg-[var(--project-color)] text-[var(--project-fg)] shadow-[0_0_0_1px_hsl(var(--background)),0_0_0_2px_var(--project-color)]'
 							: 'border-border/60 bg-background/40 text-muted-foreground hover:border-muted-foreground/70 hover:text-foreground'"
 						:style="projectColorStyle(entry)"
 						type="button"
-						@click="emit('switchProject', entry.projectId)"
+						@click="emit('switchProject', entry.projectPath)"
 					>
 						{{ projectInitial(entry.name) }}
 					</button>

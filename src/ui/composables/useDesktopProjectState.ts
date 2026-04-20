@@ -31,12 +31,12 @@ type DesktopProjectState = {
 	loadProject(): Promise<void>;
 	refreshDesktopState(): Promise<void>;
 	chooseProject(): Promise<void>;
-	locateProject(projectId: string): Promise<void>;
-	removeProject(projectId: string): Promise<void>;
+	locateProject(projectPath: string): Promise<void>;
+	removeProject(projectPath: string): Promise<void>;
 	addStorageSearchPath(): Promise<void>;
 	removeStorageSearchPath(path: string): Promise<void>;
 	resetStorageSearchPaths(): Promise<void>;
-	switchProject(projectId: string): Promise<void>;
+	switchProject(projectPath: string): Promise<void>;
 	selectWorktree(worktreeId: string): Promise<void>;
 	closeSettings(): void;
 	openProjectSettings(): void;
@@ -58,7 +58,7 @@ type DesktopProjectState = {
  */
 export function useDesktopProjectState(requestConfirmation: ConfirmationRequester): DesktopProjectState {
 	const snapshot = ref<ProjectSnapshot | null>(null);
-	const view = ref<ProjectView>({ sources: [], activeProjectId: null, storageSearchPaths: [] });
+	const view = ref<ProjectView>({ sources: [], activeProjectPath: null, storageSearchPaths: [] });
 	const worktrees = ref<WorktreeContext[]>([]);
 	const selectedWorktreeId = ref<string | null>(null);
 	const selectedBoardId = ref<string | null>(null);
@@ -73,16 +73,16 @@ export function useDesktopProjectState(requestConfirmation: ConfirmationRequeste
 		view.value.sources.flatMap((source) => source.entries)
 	));
 	const activeProject = computed<ProjectEntry | null>(() => {
-		const id = view.value.activeProjectId;
-		if (!id) return null;
-		return allEntries.value.find((entry) => entry.projectId === id) ?? null;
+		const projectPath = view.value.activeProjectPath;
+		if (!projectPath) return null;
+		return allEntries.value.find((entry) => entry.projectPath === projectPath) ?? null;
 	});
 	const canRemoveActiveProject = computed(() => {
-		const id = view.value.activeProjectId;
-		if (!id) return false;
+		const projectPath = view.value.activeProjectPath;
+		if (!projectPath) return false;
 		return view.value.sources
 			.find((source) => source.kind === "manual")
-			?.entries.some((entry) => entry.projectId === id) ?? false;
+			?.entries.some((entry) => entry.projectPath === projectPath) ?? false;
 	});
 	const hasProjects = computed(() => allEntries.value.length > 0);
 	const selectedWorktree = computed(() => (
@@ -123,23 +123,23 @@ export function useDesktopProjectState(requestConfirmation: ConfirmationRequeste
 		window.localStorage.setItem(WORKTREE_MEMORY_KEY, JSON.stringify(memory));
 	}
 
-	function rememberProjectWorktree(projectId: string | null, worktreeId: string | null) {
-		if (!projectId) return;
+	function rememberProjectWorktree(projectPath: string | null, worktreeId: string | null) {
+		if (!projectPath) return;
 
 		const memory = readWorktreeMemory();
-		memory[projectId] = worktreeId;
+		memory[projectPath] = worktreeId;
 		writeWorktreeMemory(memory);
 	}
 
 	async function restoreRememberedWorktree(nextState: DesktopState): Promise<DesktopState> {
-		const projectId = nextState.view.activeProjectId;
-		if (!projectId) return nextState;
+		const projectPath = nextState.view.activeProjectPath;
+		if (!projectPath) return nextState;
 
-		const rememberedWorktreeId = readWorktreeMemory()[projectId] ?? null;
+		const rememberedWorktreeId = readWorktreeMemory()[projectPath] ?? null;
 		if (!rememberedWorktreeId) return nextState;
 
 		if (!nextState.worktrees.some((worktree) => worktree.id === rememberedWorktreeId)) {
-			rememberProjectWorktree(projectId, null);
+			rememberProjectWorktree(projectPath, null);
 			return nextState;
 		}
 
@@ -191,15 +191,15 @@ export function useDesktopProjectState(requestConfirmation: ConfirmationRequeste
 		});
 	}
 
-	async function locateProject(projectId: string) {
+	async function locateProject(projectPath: string) {
 		await run(async () => {
-			await desktop.locateProject(projectId);
+			await desktop.locateProject(projectPath);
 			await refreshDesktopState();
 		});
 	}
 
-	async function removeProject(projectId: string) {
-		const entry = allEntries.value.find((candidate) => candidate.projectId === projectId);
+	async function removeProject(projectPath: string) {
+		const entry = allEntries.value.find((candidate) => candidate.projectPath === projectPath);
 		if (!entry) return;
 
 		requestConfirmation({
@@ -209,7 +209,7 @@ export function useDesktopProjectState(requestConfirmation: ConfirmationRequeste
 			destructive: true,
 			onConfirm: async () => {
 				await run(async () => {
-					await desktop.removeProject(projectId);
+					await desktop.removeProject(projectPath);
 					await refreshDesktopState();
 				});
 			},
@@ -245,11 +245,11 @@ export function useDesktopProjectState(requestConfirmation: ConfirmationRequeste
 		});
 	}
 
-	async function switchProject(projectId: string) {
-		if (projectId === view.value.activeProjectId) return;
+	async function switchProject(projectPath: string) {
+		if (projectPath === view.value.activeProjectPath) return;
 
 		await run(async () => {
-			applyDesktopState(await restoreRememberedWorktree(await desktop.switchProject(projectId)));
+			applyDesktopState(await restoreRememberedWorktree(await desktop.switchProject(projectPath)));
 		});
 	}
 
@@ -258,7 +258,7 @@ export function useDesktopProjectState(requestConfirmation: ConfirmationRequeste
 
 		await run(async () => {
 			applyDesktopState(await desktop.setSelectedWorktree(worktreeId));
-			rememberProjectWorktree(view.value.activeProjectId, worktreeId);
+			rememberProjectWorktree(view.value.activeProjectPath, worktreeId);
 		});
 	}
 

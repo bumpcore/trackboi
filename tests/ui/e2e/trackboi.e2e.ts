@@ -44,6 +44,13 @@ test("keeps empty-state top aligned and supports drag/drop plus card context int
 	await expect.poll(() => columnCardIds(page, "doing")).toEqual([seededIds.cardAlpha]);
 	await expect.poll(() => columnCardIds(page, "todo")).toEqual([seededIds.cardBeta]);
 
+	await dragCard(page, page.getByTestId(`card-${seededIds.cardBeta}`), page.getByTestId(`card-${seededIds.cardGamma}`), "top");
+	await expect.poll(() => columnCardIds(page, "done")).toEqual([
+		seededIds.cardBeta,
+		seededIds.cardGamma,
+	]);
+	await expect.poll(() => columnCardIds(page, "todo")).toEqual([]);
+
 	const alphaCard = page.getByTestId(`card-${seededIds.cardAlpha}`);
 	await alphaCard.dblclick();
 	await expect(page.getByTestId("card-editor")).toBeVisible();

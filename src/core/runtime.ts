@@ -131,7 +131,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 
 		return {
 			sources,
-			activeProjectId: current.activeProjectId,
+			activeProjectPath: current.activeProjectPath,
 			storageSearchPaths: storageCandidates(current),
 		};
 	}
@@ -154,20 +154,19 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		return listView().sources
 			.flatMap((source) => source.entries)
 			.filter((entry) => {
-				if (seen.has(entry.projectId)) return false;
-				seen.add(entry.projectId);
+				if (seen.has(entry.projectPath)) return false;
+				seen.add(entry.projectPath);
 				return true;
 			})
 			.map((entry) => ({
-				id: entry.projectId,
 				name: entry.name,
 				path: entry.path,
 				storagePath: entry.storagePath,
 			}));
 	}
 
-	function resolveVisibleProject(projectId: string): Project | null {
-		return visibleProjects().find((project) => project.id === projectId) ?? null;
+	function resolveVisibleProject(projectPath: string): Project | null {
+		return visibleProjects().find((project) => project.path === projectPath) ?? null;
 	}
 
 	function toStoredCardPatch(
@@ -602,7 +601,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		const current = registry.readRegistry();
 		const existing = current.projects.find((project) => project.path === canonicalPath);
 		if (existing) {
-			current.activeProjectId = existing.id;
+			current.activeProjectPath = existing.path;
 			current.selectedWorktreeId = canonicalPath;
 			registry.writeRegistry(current);
 			invalidateCache();
@@ -610,42 +609,41 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		}
 
 		const project: Project = {
-			id: newId("project"),
 			name: projectName(canonicalPath),
 			path: canonicalPath,
 			storagePath: undefined,
 		};
 		project.storagePath = resolveProjectStorage(project, current, true)?.storagePath;
 		current.projects.push(project);
-		current.activeProjectId = project.id;
+		current.activeProjectPath = project.path;
 		current.selectedWorktreeId = canonicalPath;
 		registry.writeRegistry(current);
 		invalidateCache();
 		return stripInternalSnapshotFields(aggregateSnapshot(project, true).snapshotBase)!;
 	}
 
-	function locateProjectPath(projectId: string, projectPath: string): ProjectSnapshot {
+	function locateProjectPath(currentProjectPath: string, projectPath: string): ProjectSnapshot {
 		const canonicalPath = canonicalProjectPath(projectPath);
 		const current = registry.readRegistry();
-		const project = current.projects.find((entry) => entry.id === projectId);
-		if (!project) throw new Error(`Unknown project: ${projectId}`);
+		const project = current.projects.find((entry) => entry.path === currentProjectPath);
+		if (!project) throw new Error(`Unknown project: ${currentProjectPath}`);
 		project.path = canonicalPath;
 		project.name = projectName(canonicalPath);
 		project.storagePath = resolveProjectStorage(project, current, true)?.storagePath;
-		current.activeProjectId = project.id;
+		current.activeProjectPath = project.path;
 		current.selectedWorktreeId = canonicalPath;
 		registry.writeRegistry(current);
 		invalidateCache();
 		return stripInternalSnapshotFields(aggregateSnapshot(project, true).snapshotBase)!;
 	}
 
-	function removeProject(projectId: string): ProjectSnapshot | null {
+	function removeProject(projectPath: string): ProjectSnapshot | null {
 		const current = registry.readRegistry();
 		const previousLength = current.projects.length;
-		current.projects = current.projects.filter((project) => project.id !== projectId);
-		if (current.projects.length === previousLength) throw new Error(`Unknown project: ${projectId}`);
-		if (current.activeProjectId === projectId) {
-			current.activeProjectId = current.projects[0]?.id ?? null;
+		current.projects = current.projects.filter((project) => project.path !== projectPath);
+		if (current.projects.length === previousLength) throw new Error(`Unknown project: ${projectPath}`);
+		if (current.activeProjectPath === projectPath) {
+			current.activeProjectPath = current.projects[0]?.path ?? null;
 			current.selectedWorktreeId = current.projects[0]?.path ?? null;
 		}
 		registry.writeRegistry(current);
@@ -653,11 +651,11 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		return activeSnapshot();
 	}
 
-	function switchProject(projectId: string): DesktopState {
+	function switchProject(projectPath: string): DesktopState {
 		const current = registry.readRegistry();
-		const project = resolveVisibleProject(projectId);
-		if (!project) throw new Error(`Unknown project: ${projectId}`);
-		current.activeProjectId = projectId;
+		const project = resolveVisibleProject(projectPath);
+		if (!project) throw new Error(`Unknown project: ${projectPath}`);
+		current.activeProjectPath = projectPath;
 		current.selectedWorktreeId = project.path;
 		registry.writeRegistry(current);
 		return toDesktopState(getCachedDesktopState(true));

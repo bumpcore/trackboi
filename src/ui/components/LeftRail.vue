@@ -9,13 +9,13 @@ import type { LeftPanelView } from "@/ui/viewTypes";
 
 const props = defineProps<{
 	activeView: LeftPanelView;
-	activeProjectId: string | null;
+	activeProjectPath: string | null;
 	projects: ProjectEntry[];
 }>();
 
 const emit = defineEmits<{
 	select: [view: LeftPanelView];
-	switchProject: [projectId: string];
+	switchProject: [projectPath: string];
 	addProject: [];
 	settings: [];
 }>();
@@ -42,17 +42,17 @@ function projectMonogram(name: string) {
 			<div class="mt-1 flex flex-col gap-2">
 				<Tooltip
 					v-for="project in railProjects"
-					:key="project.projectId"
+					:key="project.projectPath"
 					:content="project.name"
 					side="right"
 				>
 					<button
 						type="button"
 						class="shell-rail-button text-[10px] font-medium"
-						:class="{ 'is-active': activeProjectId === project.projectId }"
-						:style="activeProjectId === project.projectId ? projectColorStyle(project) : undefined"
-						:data-testid="`workspace-${project.projectId}`"
-						@click="emit('switchProject', project.projectId)"
+						:class="{ 'is-active': activeProjectPath === project.projectPath }"
+						:style="activeProjectPath === project.projectPath ? projectColorStyle(project) : undefined"
+						:data-testid="`workspace-${project.projectPath}`"
+						@click="emit('switchProject', project.projectPath)"
 					>
 						<span class="leading-none">{{ projectMonogram(project.name) }}</span>
 					</button>

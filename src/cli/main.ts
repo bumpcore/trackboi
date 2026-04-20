@@ -105,7 +105,7 @@ function printProjectSource(source: ProjectSource, view: ProjectView): void {
 	if (source.entries.length === 0) return;
 	console.log(source.label);
 	for (const entry of source.entries) {
-		const active = entry.projectId === view.activeProjectId ? "*" : " ";
+		const active = entry.projectPath === view.activeProjectPath ? "*" : " ";
 		console.log(`${active} ${entry.name}  ${entry.status}  ${entry.path}`);
 	}
 }

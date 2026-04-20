@@ -546,6 +546,10 @@ body.trackboi-resizing * {
 		inset 0 1px 0 hsl(var(--primary) / 0.14);
 }
 
+.card-chosen {
+	cursor: grabbing;
+}
+
 .card-dragging {
 	cursor: grabbing;
 	opacity: 0.18;

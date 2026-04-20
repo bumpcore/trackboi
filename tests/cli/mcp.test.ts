@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import type { NodeFsTrackboiActions, ProjectRegistry, ProjectView } from "../../src/core";
-import { createMcpProjectContext, pickAgentProjectId, withProject } from "../../src/cli/mcp/helpers";
+import { createMcpProjectContext, pickAgentProjectPath, withProject } from "../../src/cli/mcp/helpers";
 
 function createTrackboiActions(overrides: Partial<NodeFsTrackboiActions> = {}): NodeFsTrackboiActions {
 	let registry: ProjectRegistry = {
 		projects: [
-			{ id: "backend", name: "backend", path: "/work/backend" },
-			{ id: "frontend", name: "frontend", path: "/work/frontend" },
+			{ name: "backend", path: "/work/backend" },
+			{ name: "frontend", path: "/work/frontend" },
 		],
-		activeProjectId: "frontend",
+		activeProjectPath: "/work/frontend",
 		storageSearchPaths: [".trackboi"],
 		activeWorkspaceFile: null,
 		selectedWorktreeId: "/work/frontend",
@@ -16,6 +16,7 @@ function createTrackboiActions(overrides: Partial<NodeFsTrackboiActions> = {}): 
 		appSettings: {
 			version: 1,
 			agents: [],
+			agentContexts: [],
 			editor: {
 				preferredEditorId: "auto",
 				customCommand: "",
@@ -29,11 +30,11 @@ function createTrackboiActions(overrides: Partial<NodeFsTrackboiActions> = {}): 
 			kind: "manual",
 			label: "Projects",
 			entries: [
-				{ projectId: "backend", name: "backend", path: "/work/backend", status: "ready" },
-				{ projectId: "frontend", name: "frontend", path: "/work/frontend", status: "ready" },
+				{ projectPath: "/work/backend", name: "backend", path: "/work/backend", status: "ready" },
+				{ projectPath: "/work/frontend", name: "frontend", path: "/work/frontend", status: "ready" },
 			],
 		}],
-		activeProjectId: "frontend",
+		activeProjectPath: "/work/frontend",
 		storageSearchPaths: [".trackboi"],
 	};
 
@@ -48,9 +49,25 @@ function createTrackboiActions(overrides: Partial<NodeFsTrackboiActions> = {}): 
 		activeSnapshot: async () => null,
 		activeSnapshotWithInternals: async () => null,
 		invalidateCache: () => {},
+		withScopedContext: async (context, action) => {
+			const scopedRegistry: ProjectRegistry = {
+				...registry,
+				activeProjectPath: context.projectPath,
+				selectedWorktreeId: context.worktreeId,
+				selectedBoardId: context.boardId,
+			};
+			const scopedActions = createTrackboiActions({
+				readRegistry: () => ({ ...scopedRegistry }),
+				writeRegistry: (nextRegistry) => {
+					Object.assign(scopedRegistry, nextRegistry);
+					return { ...scopedRegistry };
+				},
+			});
+			return action(scopedActions);
+		},
 		getActiveProject: async () => null,
 		listProjects: async () => registry,
-		listView: async () => ({ ...view, activeProjectId: registry.activeProjectId }),
+		listView: async () => ({ ...view, activeProjectPath: registry.activeProjectPath }),
 		readDesktopState: async () => ({ snapshot: null, view, worktrees: [], selectedWorktreeId: registry.selectedWorktreeId, selectedBoardId: registry.selectedBoardId }),
 		prewarmProjects: async () => {},
 		setSelectedWorktree: async () => ({ snapshot: null, view, worktrees: [], selectedWorktreeId: registry.selectedWorktreeId, selectedBoardId: registry.selectedBoardId }),
@@ -61,8 +78,8 @@ function createTrackboiActions(overrides: Partial<NodeFsTrackboiActions> = {}): 
 		},
 		setStorageSearchPaths: async () => view,
 		setActiveWorkspaceFile: async () => view,
-		createBoard: async () => ({ project: { id: "backend", name: "backend", path: "/work/backend" }, metadata: {} as never, git: {} as never, board: {} as never, boards: [], tracks: [], cards: [] }),
-		deleteBoard: async () => ({ project: { id: "backend", name: "backend", path: "/work/backend" }, metadata: {} as never, git: {} as never, board: {} as never, boards: [], tracks: [], cards: [] }),
+		createBoard: async () => ({ project: { name: "backend", path: "/work/backend" }, metadata: {} as never, git: {} as never, board: {} as never, boards: [], tracks: [], cards: [] }),
+		deleteBoard: async () => ({ project: { name: "backend", path: "/work/backend" }, metadata: {} as never, git: {} as never, board: {} as never, boards: [], tracks: [], cards: [] }),
 		listTracks: async () => [],
 		getTrack: async () => { throw new Error("not implemented"); },
 		createTrack: async () => { throw new Error("not implemented"); },
@@ -75,10 +92,10 @@ function createTrackboiActions(overrides: Partial<NodeFsTrackboiActions> = {}): 
 		chooseProject: async () => null,
 		locateProject: async () => null,
 		removeProject: async () => null,
-		switchProject: async (projectId: string) => {
-			registry.activeProjectId = projectId;
-			registry.selectedWorktreeId = `/work/${projectId}`;
-			return { snapshot: null, view: { ...view, activeProjectId: projectId }, worktrees: [], selectedWorktreeId: registry.selectedWorktreeId, selectedBoardId: registry.selectedBoardId };
+		switchProject: async (projectPath: string) => {
+			registry.activeProjectPath = projectPath;
+			registry.selectedWorktreeId = projectPath;
+			return { snapshot: null, view: { ...view, activeProjectPath: projectPath }, worktrees: [], selectedWorktreeId: registry.selectedWorktreeId, selectedBoardId: registry.selectedBoardId };
 		},
 		readAppSettings: async () => registry.appSettings,
 		updateAppSettings: async (settings) => {
@@ -98,63 +115,63 @@ function createTrackboiActions(overrides: Partial<NodeFsTrackboiActions> = {}): 
 
 describe("mcp project context", () => {
 	test("prefers the cwd project over the desktop active project", () => {
-		const projectId = pickAgentProjectId({
+		const projectPath = pickAgentProjectPath({
 			sources: [{
 				id: "manual",
 				kind: "manual",
 				label: "Projects",
 				entries: [
-					{ projectId: "frontend", name: "frontend", path: "/work/frontend", status: "ready" },
-					{ projectId: "backend", name: "backend", path: "/work/backend", status: "ready" },
+					{ projectPath: "/work/frontend", name: "frontend", path: "/work/frontend", status: "ready" },
+					{ projectPath: "/work/backend", name: "backend", path: "/work/backend", status: "ready" },
 				],
 			}],
-			activeProjectId: "frontend",
+			activeProjectPath: "/work/frontend",
 			storageSearchPaths: [".trackboi"],
 		}, "/work/backend/src/server");
 
-		expect(projectId).toBe("backend");
+		expect(projectPath).toBe("/work/backend");
 	});
 
 	test("reports an agent-local active project in list view", async () => {
 		const context = await createMcpProjectContext(createTrackboiActions(), "/work/backend");
 		const view = await context.listView();
 
-		expect(view.agentActiveProjectId).toBe("backend");
-		expect(view.desktopActiveProjectId).toBe("frontend");
-		expect(view.activeProjectId).toBe("backend");
+		expect(view.agentActiveProjectPath).toBe("/work/backend");
+		expect(view.desktopActiveProjectPath).toBe("/work/frontend");
+		expect(view.activeProjectPath).toBe("/work/backend");
 	});
 
-	test("restores desktop project and selected worktree after temporary tool routing", async () => {
+	test("uses an isolated scoped project without overwriting desktop selection", async () => {
 		const trackboi = createTrackboiActions();
 		const context = await createMcpProjectContext(trackboi, "/work/backend");
-		const result = await withProject(trackboi, context, undefined, () => {
-			const registry = trackboi.readRegistry();
+		const result = await withProject(trackboi, context, undefined, (actions) => {
+			const registry = actions.readRegistry();
 			return {
-				activeProjectId: registry.activeProjectId,
+				activeProjectPath: registry.activeProjectPath,
 				selectedWorktreeId: registry.selectedWorktreeId,
 				selectedBoardId: registry.selectedBoardId,
 			};
 		});
 
 		expect(result).toEqual({
-			activeProjectId: "backend",
+			activeProjectPath: "/work/backend",
 			selectedWorktreeId: "/work/backend",
-			selectedBoardId: "frontend-default",
+			selectedBoardId: null,
 		});
 		expect(trackboi.readRegistry()).toMatchObject({
-			activeProjectId: "frontend",
+			activeProjectPath: "/work/frontend",
 			selectedWorktreeId: "/work/frontend",
 			selectedBoardId: "frontend-default",
 		});
 	});
 
-	test("keeps an agent-local board context per project while restoring the desktop board selection", async () => {
+	test("keeps an agent-local board context per project while leaving the desktop board untouched", async () => {
 		const trackboi = createTrackboiActions();
 		const context = await createMcpProjectContext(trackboi, "/work/backend");
 
-		await context.setCurrentProjectId("backend");
-		await context.setCurrentBoardId("backend", "backend-review");
-		const result = await withProject(trackboi, context, "backend", () => trackboi.readRegistry().selectedBoardId);
+		await context.setCurrentProjectPath("/work/backend");
+		await context.setCurrentBoardId("/work/backend", "backend-review");
+		const result = await withProject(trackboi, context, "/work/backend", (actions) => actions.readRegistry().selectedBoardId);
 
 		expect(result).toBe("backend-review");
 		expect(trackboi.readRegistry().selectedBoardId).toBe("frontend-default");

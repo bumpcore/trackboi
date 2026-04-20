@@ -145,7 +145,7 @@ function trackSourceLabel(track: Track) {
 		<footer class="border-t border-border/70 px-4 py-3">
 			<div class="flex items-center justify-between gap-3">
 				<div class="font-mono text-[10px] text-muted-foreground">
-					{{ snapshot?.metadata.storagePath ?? ".trackboi" }}
+					{{ snapshot?.project.storagePath ?? ".trackboi" }}
 				</div>
 				<button
 					type="button"

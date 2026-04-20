@@ -28,7 +28,7 @@ export async function openCardInEditor(trackboi: NodeFsTrackboiActions, cardId: 
 	if (!card?.originWorktreeId) throw new Error(`Unknown card: ${cardId}`);
 
 	const registry = trackboi.readRegistry();
-	const project = registry.projects.find((candidate) => candidate.id === registry.activeProjectId);
+	const project = registry.projects.find((candidate) => candidate.path === registry.activeProjectPath);
 	if (!project) throw new Error("Choose a project first");
 	const worktree = (trackboi.runtime.readDesktopState().worktrees ?? []).find((candidate) => candidate.id === card.originWorktreeId);
 	if (!worktree?.storageRoot) throw new Error(`Unknown card origin for ${cardId}`);

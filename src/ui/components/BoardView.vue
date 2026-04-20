@@ -43,13 +43,13 @@ const emit = defineEmits<{
 	createCard: [columnId?: string];
 	deleteCard: [card: TrackboiCard];
 	editCard: [card: TrackboiCard];
-	locateProject: [projectId: string];
+	locateProject: [projectPath: string];
 	moveCard: [cardId: string, toColumn: string, beforeCardId: string | null];
 	openWorkspace: [];
 	openNewCard: [];
 	projectSettings: [];
 	createTrack: [];
-	removeProject: [projectId: string];
+	removeProject: [projectPath: string];
 	selectWorktree: [worktreeId: string];
 	selectTrack: [trackId: string];
 }>();
@@ -178,12 +178,12 @@ function workspaceFileLabel(filePath: string) {
 					</Tooltip>
 					<template v-if="activeProject && canRemoveActiveProject">
 						<Tooltip content="Locate project folder" side="bottom">
-							<Button variant="outline" size="icon" type="button" :disabled="busy" @click="$emit('locateProject', activeProject.projectId)">
+							<Button variant="outline" size="icon" type="button" :disabled="busy" @click="$emit('locateProject', activeProject.projectPath)">
 								<RefreshCw class="h-4 w-4" />
 							</Button>
 						</Tooltip>
 						<Tooltip content="Remove project" side="bottom">
-							<Button variant="outline" size="icon" type="button" :disabled="busy" @click="$emit('removeProject', activeProject.projectId)">
+							<Button variant="outline" size="icon" type="button" :disabled="busy" @click="$emit('removeProject', activeProject.projectPath)">
 								<Trash2 class="h-4 w-4" />
 							</Button>
 						</Tooltip>
@@ -218,11 +218,11 @@ function workspaceFileLabel(filePath: string) {
 					</div>
 				</div>
 				<div v-if="canRemoveActiveProject" class="flex flex-wrap gap-2">
-					<Button type="button" :disabled="busy" @click="$emit('locateProject', activeProject.projectId)">
+					<Button type="button" :disabled="busy" @click="$emit('locateProject', activeProject.projectPath)">
 						<RefreshCw class="h-4 w-4" />
 						Locate folder
 					</Button>
-					<Button variant="outline" type="button" :disabled="busy" @click="$emit('removeProject', activeProject.projectId)">
+					<Button variant="outline" type="button" :disabled="busy" @click="$emit('removeProject', activeProject.projectPath)">
 						<Trash2 class="h-4 w-4" />
 						Remove from Trackboi
 					</Button>

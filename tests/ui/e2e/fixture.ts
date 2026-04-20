@@ -202,11 +202,10 @@ function writeRegistry(configHome: string, repoPath: string) {
 	const registryDir = path.join(configHome, "Trackboi");
 	const registry: ProjectRegistry = {
 		projects: [{
-			id: "workspace_trackboi",
 			name: "trackboi",
 			path: repoPath,
 		}],
-		activeProjectId: "workspace_trackboi",
+		activeProjectPath: repoPath,
 		storageSearchPaths: [".trackboi", ".etc/.trackboi", ".etc/trackboi"],
 		activeWorkspaceFile: null,
 		selectedWorktreeId: repoPath,
@@ -214,6 +213,7 @@ function writeRegistry(configHome: string, repoPath: string) {
 		appSettings: {
 			version: 1,
 			agents: [],
+			agentContexts: [],
 			editor: {
 				preferredEditorId: "auto",
 				customCommand: "",
@@ -227,10 +227,7 @@ function seedStore(projectPath: string, storagePath: string, input: SeedStoreInp
 	const storageRoot = path.join(projectPath, storagePath);
 	const metadata: ProjectMetadata = {
 		version: 1,
-		projectId: `project_${path.basename(projectPath)}`,
 		name: path.basename(projectPath),
-		storagePath,
-		createdAt: "2026-04-19T00:00:00.000Z",
 		people: [],
 	};
 	writeJsonAtomic(path.join(storageRoot, "project.json"), metadata);

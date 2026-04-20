@@ -43,7 +43,7 @@ describe("nodefs trackboi actions", () => {
 
 		const registry = await trackboi.listProjects();
 		expect(registry.projects.map((project) => project.path)).toContain(fixture.repo);
-		expect(registry.activeProjectId).toBe(registry.projects[0]?.id ?? null);
+		expect(registry.activeProjectPath).toBe(registry.projects[0]?.path ?? null);
 
 		await trackboi.openWorkspaceFile();
 		expect(trackboi.readRegistry().activeWorkspaceFile).toBe(workspaceFile);
@@ -275,11 +275,7 @@ function createActionsFixture() {
 			};
 			const metadata: ProjectMetadata = {
 				version: 1,
-				projectId: "fixture-project",
 				name: path.basename(projectPath),
-				storagePath,
-				createdAt: "2026-04-18T07:59:00.000Z",
-				customFields: [],
 				people: [],
 			};
 			writeJsonAtomic(path.join(storageRoot, "boards/default.json"), board);

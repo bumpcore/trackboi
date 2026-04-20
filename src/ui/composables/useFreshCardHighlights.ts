@@ -12,24 +12,24 @@ type FreshCardHighlights = {
  */
 export function useFreshCardHighlights(snapshot: Ref<ProjectSnapshot | null>): FreshCardHighlights {
 	const freshCardIdSet = ref(new Set<string>());
-	let seededProjectId: string | null = null;
+	let seededProjectPath: string | null = null;
 	let seenCardIds = new Set<string>();
 
 	watch(
 		() => snapshot.value,
 		(nextSnapshot) => {
-			const nextProjectId = nextSnapshot?.project.id ?? null;
+			const nextProjectPath = nextSnapshot?.project.path ?? null;
 			const nextCardIds = new Set(nextSnapshot?.cards.map((card) => card.id) ?? []);
 
-			if (!nextProjectId) {
-				seededProjectId = null;
+			if (!nextProjectPath) {
+				seededProjectPath = null;
 				seenCardIds = new Set();
 				freshCardIdSet.value = new Set();
 				return;
 			}
 
-			if (seededProjectId !== nextProjectId) {
-				seededProjectId = nextProjectId;
+			if (seededProjectPath !== nextProjectPath) {
+				seededProjectPath = nextProjectPath;
 				seenCardIds = nextCardIds;
 				freshCardIdSet.value = new Set();
 				return;

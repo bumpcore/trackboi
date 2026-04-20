@@ -7,26 +7,26 @@ import { createWindowShell } from "../../src/electron/window";
 function createTrackboiBridge(overrides: Partial<TrackboiBridgeApi> = {}): TrackboiBridgeApi {
 	return {
 		getActiveProject: async () => null,
-		listProjects: async () => ({ projects: [], activeProjectId: null, storageSearchPaths: [], activeWorkspaceFile: null, selectedWorktreeId: null }),
-		listView: async () => ({ sources: [], activeProjectId: null, storageSearchPaths: [] }),
-		readDesktopState: async () => ({ snapshot: null, view: { sources: [], activeProjectId: null, storageSearchPaths: [] }, worktrees: [], selectedWorktreeId: null, selectedBoardId: null }),
+		listProjects: async () => ({ projects: [], activeProjectPath: null, storageSearchPaths: [], activeWorkspaceFile: null, selectedWorktreeId: null, selectedBoardId: null, appSettings: { version: 1, agents: [], agentContexts: [], editor: { preferredEditorId: "auto", customCommand: "" } } }),
+		listView: async () => ({ sources: [], activeProjectPath: null, storageSearchPaths: [] }),
+		readDesktopState: async () => ({ snapshot: null, view: { sources: [], activeProjectPath: null, storageSearchPaths: [] }, worktrees: [], selectedWorktreeId: null, selectedBoardId: null }),
 		prewarmProjects: async () => {},
-		setSelectedWorktree: async () => ({ snapshot: null, view: { sources: [], activeProjectId: null, storageSearchPaths: [] }, worktrees: [], selectedWorktreeId: null, selectedBoardId: null }),
+		setSelectedWorktree: async () => ({ snapshot: null, view: { sources: [], activeProjectPath: null, storageSearchPaths: [] }, worktrees: [], selectedWorktreeId: null, selectedBoardId: null }),
 		listBoards: async () => [],
-		setActiveBoard: async () => ({ snapshot: null, view: { sources: [], activeProjectId: null, storageSearchPaths: [] }, worktrees: [], selectedWorktreeId: null, selectedBoardId: null }),
-		readAppSettings: async () => ({ version: 1, agents: [], editor: { preferredEditorId: "auto", customCommand: "" } }),
+		setActiveBoard: async () => ({ snapshot: null, view: { sources: [], activeProjectPath: null, storageSearchPaths: [] }, worktrees: [], selectedWorktreeId: null, selectedBoardId: null }),
+		readAppSettings: async () => ({ version: 1, agents: [], agentContexts: [], editor: { preferredEditorId: "auto", customCommand: "" } }),
 		updateAppSettings: async (settings) => settings,
 		listDetectedEditors: async () => [],
 		openCardInEditor: async () => ({ ok: true }),
-		setStorageSearchPaths: async () => ({ sources: [], activeProjectId: null, storageSearchPaths: [] }),
-		setActiveWorkspaceFile: async () => ({ sources: [], activeProjectId: null, storageSearchPaths: [] }),
+		setStorageSearchPaths: async () => ({ sources: [], activeProjectPath: null, storageSearchPaths: [] }),
+		setActiveWorkspaceFile: async () => ({ sources: [], activeProjectPath: null, storageSearchPaths: [] }),
 		createBoard: async () => ({ project: {} as never, metadata: {} as never, git: {} as never, board: { id: "default", version: 1, name: "Board", columns: [], customFields: [] }, boards: [], tracks: [], cards: [] }),
 		deleteBoard: async () => ({ project: {} as never, metadata: {} as never, git: {} as never, board: { id: "default", version: 1, name: "Board", columns: [], customFields: [] }, boards: [], tracks: [], cards: [] }),
 		openWorkspaceFile: async () => null,
 		chooseProject: async () => null,
 		locateProject: async () => null,
 		removeProject: async () => null,
-		switchProject: async () => ({ snapshot: null, view: { sources: [], activeProjectId: null, storageSearchPaths: [] }, worktrees: [], selectedWorktreeId: null, selectedBoardId: null }),
+		switchProject: async () => ({ snapshot: null, view: { sources: [], activeProjectPath: null, storageSearchPaths: [] }, worktrees: [], selectedWorktreeId: null, selectedBoardId: null }),
 		createCard: async () => ({
 			id: "card_1",
 			boardId: "default",
@@ -68,10 +68,7 @@ function createTrackboiBridge(overrides: Partial<TrackboiBridgeApi> = {}): Track
 		updateBoard: async () => ({ id: "default", version: 1, name: "Board", columns: [], customFields: [] }),
 		updateProjectPeople: async () => ({
 			version: 1,
-			projectId: "project_1",
 			name: "Project",
-			storagePath: ".trackboi",
-			createdAt: "2026-04-18T10:00:00.000Z",
 			people: [],
 		}),
 		addCardComment: async () => ({
@@ -261,14 +258,11 @@ describe("electron adapters", () => {
 	test("desktop facade refreshes listeners when project-changed events arrive", async () => {
 		let onProjectChangedListener: (() => void) | null = null;
 		const getActiveProject = mock(async () => ({
-			project: { id: "project_1", name: "Trackboi", path: "/tmp/project" },
+			project: { name: "Trackboi", path: "/tmp/project" },
 			metadata: {
 				version: 1,
-				projectId: "project_1",
 				name: "Trackboi",
-				storagePath: ".trackboi",
-				createdAt: "2026-04-18T10:00:00.000Z",
-				customFields: [],
+				people: [],
 			},
 			git: { isGitRepo: true, root: "/tmp/project", branch: "master", detached: false, dirty: false },
 			board: { version: 1, name: "Trackboi", columns: [], customFields: [] },

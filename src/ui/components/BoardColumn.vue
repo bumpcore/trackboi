@@ -49,7 +49,6 @@ let suppressActivation = false;
 let activationResetTimer: number | null = null;
 let moveMenuCloseTimer: number | null = null;
 let emptyStateResetTimer: number | null = null;
-let dragPointer: { x: number; y: number } | null = null;
 
 const showEmptyState = computed(() => !hasCards.value && !hideEmptyState.value);
 
@@ -94,11 +93,6 @@ function clearEmptyStateResetTimer() {
 	}
 }
 
-function updateDragPointer(event: Event) {
-	if (!(event instanceof MouseEvent)) return;
-	dragPointer = { x: event.clientX, y: event.clientY };
-}
-
 function hideEmptyStateOptimistically() {
 	hideEmptyState.value = true;
 	clearEmptyStateResetTimer();
@@ -112,11 +106,8 @@ function hideEmptyStateOptimistically() {
 
 function beginDrag() {
 	suppressActivation = true;
-	dragPointer = null;
 	clearActivationResetTimer();
 	closeContextMenu();
-	window.addEventListener("pointermove", updateDragPointer, true);
-	window.addEventListener("mousemove", updateDragPointer, true);
 }
 
 function endDrag() {
@@ -126,9 +117,6 @@ function endDrag() {
 		activationResetTimer = null;
 	}, 120);
 	cleanupGlobalDragArtifacts();
-	dragPointer = null;
-	window.removeEventListener("pointermove", updateDragPointer, true);
-	window.removeEventListener("mousemove", updateDragPointer, true);
 }
 
 function nextCardIdAfter(item: HTMLElement): string | null {
@@ -159,22 +147,12 @@ function cardElementsForList(list: HTMLElement, draggedCardId?: string) {
 	return elements;
 }
 
-function listAtPointer(clientX: number, clientY: number) {
-	const element = document.elementFromPoint(clientX, clientY);
-	if (!element) return null;
-	return (
-		element.closest<HTMLElement>("[data-column-list]")
-		?? element.closest<HTMLElement>("[data-column-id]")?.querySelector<HTMLElement>("[data-column-list]")
-		?? null
-	);
-}
-
-function beforeCardIdAtPointer(list: HTMLElement, clientY: number, draggedCardId?: string) {
+function beforeCardIdAtPointer(list: HTMLElement, clientY: number, draggedCardId?: string): string | null {
 	for (const element of cardElementsForList(list, draggedCardId)) {
 		const cardId = element.dataset.cardId;
 		if (!cardId) continue;
 		const rect = element.getBoundingClientRect();
-		if (clientY <= rect.top + rect.height / 2) {
+		if (clientY <= rect.top + (rect.height / 2)) {
 			return cardId;
 		}
 	}
@@ -185,22 +163,37 @@ function emitMoveFromDrop(event: SortableEvent) {
 	const item = event.item as HTMLElement | null;
 	const cardId = item?.dataset.cardId;
 	if (!cardId) return;
+	const previousIndex = event.oldDraggableIndex ?? event.oldIndex;
+	const nextIndex = event.newDraggableIndex ?? event.newIndex;
+	if (event.from === event.to && previousIndex != null && nextIndex != null && previousIndex === nextIndex) {
+		return;
+	}
 
-	const originalEvent = (event as SortableEvent & { originalEvent?: Event }).originalEvent;
-	const pointer = dragPointer ?? (originalEvent instanceof MouseEvent ? { x: originalEvent.clientX, y: originalEvent.clientY } : null);
-	const targetList = pointer
-		? listAtPointer(pointer.x, pointer.y) ?? (event.to as HTMLElement | null)
-		: (event.to as HTMLElement | null);
+	const targetList = event.to as HTMLElement | null;
 	const columnId = targetList?.closest<HTMLElement>("[data-column-id]")?.dataset.columnId;
 	if (!targetList || !columnId) {
 		emitMoveFromItem(item);
 		return;
 	}
 
-	const beforeCardId = pointer
-		? beforeCardIdAtPointer(targetList, pointer.y, cardId)
+	const originalEvent = (event as SortableEvent & { originalEvent?: Event }).originalEvent;
+	const beforeCardId = originalEvent instanceof MouseEvent
+		? beforeCardIdAtPointer(targetList, originalEvent.clientY, cardId)
 		: nextCardIdAfter(item);
 	emit("move", cardId, columnId, beforeCardId);
+}
+
+function pointerWithinDropZone(list: HTMLElement, event: Event | undefined): boolean {
+	if (!(event instanceof MouseEvent)) return true;
+	const rect = list.getBoundingClientRect();
+	const horizontalPadding = 18;
+	const verticalPadding = props.cards.length === 0 ? 14 : 8;
+	return (
+		event.clientX >= rect.left + horizontalPadding
+		&& event.clientX <= rect.right - horizontalPadding
+		&& event.clientY >= rect.top + verticalPadding
+		&& event.clientY <= rect.bottom - verticalPadding
+	);
 }
 
 function mountSortable() {
@@ -212,29 +205,23 @@ function mountSortable() {
 		direction: "vertical",
 		dataIdAttr: "data-card-id",
 		draggable: "[data-card-id]",
-		forceFallback: true,
-		fallbackOnBody: true,
-		fallbackTolerance: 3,
+		chosenClass: "card-chosen",
+		fallbackTolerance: 4,
 		fallbackClass: "card-fallback",
 		ghostClass: "card-ghost",
 		dragClass: "card-dragging",
-		emptyInsertThreshold: 220,
+		emptyInsertThreshold: 48,
+		invertSwap: true,
+		swapThreshold: 0.6,
 		filter: "[data-sortable-ignore]",
 		preventOnFilter: false,
 		onStart() {
 			beginDrag();
 		},
-		onMove(_event, originalEvent) {
-			updateDragPointer(originalEvent);
-			if (!(originalEvent instanceof MouseEvent)) return true;
-			const hoveredList = listAtPointer(originalEvent.clientX, originalEvent.clientY);
-			if (!hoveredList) return true;
-			const hoveredColumnId = hoveredList.closest<HTMLElement>("[data-column-id]")?.dataset.columnId;
-			const targetColumnId = (_event.to as HTMLElement | null)?.closest<HTMLElement>("[data-column-id]")?.dataset.columnId;
-			if (hoveredColumnId && targetColumnId && hoveredColumnId !== targetColumnId) {
-				return false;
-			}
-			return true;
+		onMove(event, originalEvent) {
+			const targetList = event.to as HTMLElement | null;
+			if (!targetList) return true;
+			return pointerWithinDropZone(targetList, originalEvent);
 		},
 		onAdd() {
 			hideEmptyStateOptimistically();
@@ -387,8 +374,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
 	window.removeEventListener("pointerdown", handlePointerDown);
-	window.removeEventListener("pointermove", updateDragPointer, true);
-	window.removeEventListener("mousemove", updateDragPointer, true);
 	sortableInstance?.destroy();
 	clearActivationResetTimer();
 	clearEmptyStateResetTimer();

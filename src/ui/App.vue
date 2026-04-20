@@ -302,9 +302,9 @@ usePanelShortcuts({
 
 useThemeMode(themeMode);
 
-async function switchProjectFromRail(projectId: string) {
+async function switchProjectFromRail(projectPath: string) {
 	shell.setLeftView("explorer");
-	await switchProject(projectId);
+	await switchProject(projectPath);
 }
 
 async function createColumnFromBoard() {
@@ -385,7 +385,7 @@ onBeforeUnmount(() => {
 		<main class="relative grid min-h-0 overflow-hidden" :style="shellGridStyle">
 			<LeftRail
 				:active-view="shell.leftView.value"
-				:active-project-id="view.activeProjectId"
+				:active-project-path="view.activeProjectPath"
 				:projects="allEntries"
 				@select="shell.setLeftView"
 				@switch-project="switchProjectFromRail"

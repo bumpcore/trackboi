@@ -62,6 +62,9 @@ const referenceDraft = reactive({
 const activityBody = ref("");
 const fileName = ref("");
 const fileContent = ref("");
+const editingDecisionId = ref<string | null>(null);
+const editingReferenceId = ref<string | null>(null);
+const editingActivityId = ref<string | null>(null);
 
 const sourceOptions: SelectOption[] = [
 	{ value: "manual", label: "Manual" },
@@ -153,6 +156,32 @@ function addDecision() {
 	decisionDraft.status = "proposed";
 }
 
+function startDecisionEdit(decision: TrackDecision) {
+	editingDecisionId.value = decision.id;
+	decisionDraft.title = decision.title;
+	decisionDraft.body = decision.body;
+	decisionDraft.status = decision.status;
+}
+
+function saveDecisionEdit() {
+	if (!editingDecisionId.value || !decisionDraft.title.trim()) return;
+	decisions.value = decisions.value.map((decision) => decision.id === editingDecisionId.value ? {
+		...decision,
+		title: decisionDraft.title.trim(),
+		body: decisionDraft.body.trim(),
+		status: decisionDraft.status,
+		updatedAt: new Date().toISOString(),
+	} : decision);
+	cancelDecisionEdit();
+}
+
+function cancelDecisionEdit() {
+	editingDecisionId.value = null;
+	decisionDraft.title = "";
+	decisionDraft.body = "";
+	decisionDraft.status = "proposed";
+}
+
 function addReference() {
 	if (!referenceDraft.label.trim() || !referenceDraft.value.trim()) return;
 	references.value = [
@@ -164,6 +193,31 @@ function addReference() {
 			value: referenceDraft.value.trim(),
 		},
 	];
+	referenceDraft.label = "";
+	referenceDraft.value = "";
+	referenceDraft.kind = "path";
+}
+
+function startReferenceEdit(reference: TrackReference) {
+	editingReferenceId.value = reference.id;
+	referenceDraft.label = reference.label;
+	referenceDraft.value = reference.value;
+	referenceDraft.kind = reference.kind;
+}
+
+function saveReferenceEdit() {
+	if (!editingReferenceId.value || !referenceDraft.label.trim() || !referenceDraft.value.trim()) return;
+	references.value = references.value.map((reference) => reference.id === editingReferenceId.value ? {
+		...reference,
+		label: referenceDraft.label.trim(),
+		value: referenceDraft.value.trim(),
+		kind: referenceDraft.kind,
+	} : reference);
+	cancelReferenceEdit();
+}
+
+function cancelReferenceEdit() {
+	editingReferenceId.value = null;
 	referenceDraft.label = "";
 	referenceDraft.value = "";
 	referenceDraft.kind = "path";
@@ -187,6 +241,26 @@ function addActivity() {
 	activityBody.value = "";
 }
 
+function startActivityEdit(entry: CardComment) {
+	editingActivityId.value = entry.id;
+	activityBody.value = entry.body;
+}
+
+function saveActivityEdit() {
+	if (!editingActivityId.value || !activityBody.value.trim()) return;
+	activity.value = activity.value.map((entry) => entry.id === editingActivityId.value ? {
+		...entry,
+		body: activityBody.value.trim(),
+		updatedAt: new Date().toISOString(),
+	} : entry);
+	cancelActivityEdit();
+}
+
+function cancelActivityEdit() {
+	editingActivityId.value = null;
+	activityBody.value = "";
+}
+
 function saveTrack() {
 	if (!title.value.trim()) return;
 	const source: TrackSource = sourceKind.value === "branch" && sourceRef.value.trim()
@@ -202,6 +276,21 @@ function saveTrack() {
 		references: references.value,
 		activity: activity.value,
 	});
+}
+
+function linkedCardSubtitle(card: TrackboiCard) {
+	const label = card.assignee ? ` · ${card.assignee}` : "";
+	return `${card.column}${label}`;
+}
+
+function formatTimestamp(value?: string) {
+	if (!value) return "Unknown";
+	return new Intl.DateTimeFormat(undefined, {
+		month: "short",
+		day: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	}).format(new Date(value));
 }
 
 defineExpose({
@@ -251,6 +340,7 @@ defineExpose({
 		<section class="shell-section">
 			<div>
 				<p class="shell-section-title">Decisions</p>
+				<p class="mt-1 text-sm text-muted-foreground">Capture important choices without rewriting the whole track narrative.</p>
 			</div>
 			<div v-if="decisions.length > 0" class="grid gap-2">
 				<div
@@ -262,12 +352,16 @@ defineExpose({
 						<span class="text-sm font-medium text-foreground">{{ decision.title }}</span>
 						<div class="flex items-center gap-2">
 							<Badge variant="outline">{{ decision.status }}</Badge>
+							<Button variant="ghost" size="icon" type="button" @click="startDecisionEdit(decision)">
+								<Save class="h-4 w-4" />
+							</Button>
 							<Button variant="ghost" size="icon" type="button" @click="decisions = decisions.filter((entry) => entry.id !== decision.id)">
 								<Trash2 class="h-4 w-4" />
 							</Button>
 						</div>
 					</div>
 					<p v-if="decision.body" class="mt-2 text-xs text-muted-foreground">{{ decision.body }}</p>
+					<p class="mt-2 font-mono text-[10px] text-muted-foreground">{{ formatTimestamp(decision.updatedAt) }}</p>
 				</div>
 			</div>
 			<div class="rounded-md border border-dashed border-border/75 bg-background/20 p-3">
@@ -275,9 +369,12 @@ defineExpose({
 				<Input v-model="decisionDraft.body" class="mt-2" autocomplete="off" placeholder="Why this matters" />
 				<div class="mt-2 flex items-center gap-2">
 					<Select v-model="decisionDraft.status" :options="decisionStatusOptions" class="w-36" />
-					<Button type="button" :disabled="!decisionDraft.title.trim()" @click="addDecision">
+					<Button v-if="editingDecisionId" variant="outline" type="button" @click="cancelDecisionEdit">
+						Cancel
+					</Button>
+					<Button type="button" :disabled="!decisionDraft.title.trim()" @click="editingDecisionId ? saveDecisionEdit() : addDecision()">
 						<Plus class="h-4 w-4" />
-						Add
+						{{ editingDecisionId ? "Save" : "Add" }}
 					</Button>
 				</div>
 			</div>
@@ -286,6 +383,7 @@ defineExpose({
 		<section class="shell-section">
 			<div>
 				<p class="shell-section-title">References</p>
+				<p class="mt-1 text-sm text-muted-foreground">Keep repo paths, cards, branches, worktrees, and URLs close to execution.</p>
 			</div>
 			<div v-if="references.length > 0" class="grid gap-2">
 				<div
@@ -299,6 +397,9 @@ defineExpose({
 					</div>
 					<div class="flex items-center gap-2">
 						<Badge variant="outline">{{ reference.kind }}</Badge>
+						<Button variant="ghost" size="icon" type="button" @click="startReferenceEdit(reference)">
+							<Save class="h-4 w-4" />
+						</Button>
 						<Button variant="ghost" size="icon" type="button" @click="references = references.filter((entry) => entry.id !== reference.id)">
 							<Trash2 class="h-4 w-4" />
 						</Button>
@@ -310,9 +411,12 @@ defineExpose({
 				<Input v-model="referenceDraft.value" class="mt-2" autocomplete="off" placeholder="repo/path.ts or https://..." />
 				<div class="mt-2 flex items-center gap-2">
 					<Select v-model="referenceDraft.kind" :options="referenceKindOptions" class="w-40" />
-					<Button type="button" :disabled="!referenceDraft.label.trim() || !referenceDraft.value.trim()" @click="addReference">
+					<Button v-if="editingReferenceId" variant="outline" type="button" @click="cancelReferenceEdit">
+						Cancel
+					</Button>
+					<Button type="button" :disabled="!referenceDraft.label.trim() || !referenceDraft.value.trim()" @click="editingReferenceId ? saveReferenceEdit() : addReference()">
 						<Plus class="h-4 w-4" />
-						Add
+						{{ editingReferenceId ? "Save" : "Add" }}
 					</Button>
 				</div>
 			</div>
@@ -321,6 +425,7 @@ defineExpose({
 		<section class="shell-section">
 			<div>
 				<p class="shell-section-title">Activity</p>
+				<p class="mt-1 text-sm text-muted-foreground">Log handoffs, findings, and next actions as discrete entries.</p>
 			</div>
 			<div v-if="activity.length > 0" class="grid gap-2">
 				<div
@@ -329,22 +434,60 @@ defineExpose({
 					class="rounded-md border border-border/80 bg-secondary/55 px-3 py-3"
 				>
 					<div class="flex items-center justify-between gap-2">
-						<span class="text-sm font-medium text-foreground">{{ entry.createdBy }}</span>
-						<Button variant="ghost" size="icon" type="button" @click="activity = activity.filter((candidate) => candidate.id !== entry.id)">
-							<Trash2 class="h-4 w-4" />
-						</Button>
+						<div>
+							<span class="text-sm font-medium text-foreground">{{ entry.createdBy }}</span>
+							<p class="font-mono text-[10px] text-muted-foreground">{{ formatTimestamp(entry.updatedAt) }}</p>
+						</div>
+						<div class="flex items-center gap-2">
+							<Button variant="ghost" size="icon" type="button" @click="startActivityEdit(entry)">
+								<Save class="h-4 w-4" />
+							</Button>
+							<Button variant="ghost" size="icon" type="button" @click="activity = activity.filter((candidate) => candidate.id !== entry.id)">
+								<Trash2 class="h-4 w-4" />
+							</Button>
+						</div>
 					</div>
 					<MarkdownContent :value="entry.body" class="mt-2 text-sm text-foreground" />
 				</div>
 			</div>
 			<div class="rounded-md border border-dashed border-border/75 bg-background/20 p-3">
 				<MarkdownEditor v-model="activityBody" placeholder="Write a handoff or investigation note." />
-				<div class="mt-2 flex justify-end">
-					<Button type="button" :disabled="!activityBody.trim()" @click="addActivity">
+				<div class="mt-2 flex justify-end gap-2">
+					<Button v-if="editingActivityId" variant="outline" type="button" @click="cancelActivityEdit">
+						Cancel
+					</Button>
+					<Button type="button" :disabled="!activityBody.trim()" @click="editingActivityId ? saveActivityEdit() : addActivity()">
 						<Plus class="h-4 w-4" />
-						Add note
+						{{ editingActivityId ? "Save note" : "Add note" }}
 					</Button>
 				</div>
+			</div>
+		</section>
+
+		<section v-if="linkedCards.length > 0" class="shell-section">
+			<div class="flex items-center justify-between gap-3">
+				<div>
+					<p class="shell-section-title">Linked cards</p>
+					<p class="mt-1 text-xs text-muted-foreground">Cards currently executing inside this track.</p>
+				</div>
+				<Badge variant="outline">{{ linkedCards.length }}</Badge>
+			</div>
+			<div class="grid gap-2">
+				<button
+					v-for="card in linkedCards"
+					:key="card.id"
+					type="button"
+					class="rounded-md border border-border/80 bg-secondary/55 px-3 py-2 text-left transition hover:border-primary/35"
+					@click="emit('editCard', card)"
+				>
+					<div class="flex items-center justify-between gap-3">
+						<div class="min-w-0">
+							<div class="truncate text-sm font-medium text-foreground">{{ card.title }}</div>
+							<div class="mt-1 font-mono text-[10px] text-muted-foreground">{{ linkedCardSubtitle(card) }}</div>
+						</div>
+						<Badge variant="outline">{{ card.comments.length }} notes</Badge>
+					</div>
+				</button>
 			</div>
 		</section>
 
@@ -352,9 +495,9 @@ defineExpose({
 			<div class="flex items-center justify-between gap-3">
 				<div>
 					<p class="shell-section-title">Files</p>
-					<p class="mt-1 text-xs text-muted-foreground">Text-first attachment files for notes and snippets.</p>
+					<p class="mt-1 text-xs text-muted-foreground">Text-first attachment files for notes, snippets, and handoff context.</p>
 				</div>
-				<Badge variant="outline">{{ props.linkedCards.length }} linked cards</Badge>
+				<Badge variant="outline">{{ track?.files.length ?? 0 }} files</Badge>
 			</div>
 			<div v-if="track?.files.length" class="grid gap-2">
 				<button
@@ -388,24 +531,6 @@ defineExpose({
 					<Save class="h-4 w-4" />
 					Save file
 				</Button>
-			</div>
-		</section>
-
-		<section v-if="linkedCards.length > 0" class="shell-section">
-			<div>
-				<p class="shell-section-title">Linked cards</p>
-			</div>
-			<div class="grid gap-2">
-				<button
-					v-for="card in linkedCards"
-					:key="card.id"
-					type="button"
-					class="rounded-md border border-border/80 bg-secondary/55 px-3 py-2 text-left transition hover:border-primary/35"
-					@click="emit('editCard', card)"
-				>
-					<div class="text-sm font-medium text-foreground">{{ card.title }}</div>
-					<div class="mt-1 font-mono text-[10px] text-muted-foreground">{{ card.column }}</div>
-				</button>
 			</div>
 		</section>
 

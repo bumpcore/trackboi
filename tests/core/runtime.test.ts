@@ -584,11 +584,7 @@ function createRuntimeFixture() {
 			};
 			const metadata: ProjectMetadata = {
 				version: 1,
-				projectId: "fixture-project",
 				name: path.basename(projectPath),
-				storagePath,
-				createdAt: "2026-04-18T07:59:00.000Z",
-				customFields: [],
 				people: [],
 			};
 			writeJsonAtomic(path.join(storageRoot, "boards/default.json"), board);

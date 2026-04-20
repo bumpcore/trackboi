@@ -2,7 +2,7 @@ import os from "node:os";
 import path from "node:path";
 import { STORAGE_SEARCH_PATHS } from "./constants";
 import { readJson, writeJsonAtomic } from "./json";
-import type { AgentRegistration, AppSettings, EditorPreference, Project, ProjectRegistry } from "./types";
+import type { AgentContext, AgentRegistration, AppSettings, EditorPreference, Project, ProjectRegistry } from "./types";
 
 export type RegistryOptions = {
 	configPath?: string;
@@ -64,7 +64,7 @@ export function createRegistryStore(options: RegistryOptions = {}): RegistryStor
 export function defaultRegistry(): ProjectRegistry {
 	return {
 		projects: [],
-		activeProjectId: null,
+		activeProjectPath: null,
 		storageSearchPaths: [...STORAGE_SEARCH_PATHS],
 		activeWorkspaceFile: null,
 		selectedWorktreeId: null,
@@ -77,6 +77,7 @@ export function defaultAppSettings(): AppSettings {
 	return {
 		version: 1,
 		agents: [],
+		agentContexts: [],
 		editor: defaultEditorPreference(),
 	};
 }
@@ -121,7 +122,7 @@ export function sanitizeRegistry(registry: Partial<ProjectRegistry>): ProjectReg
 
 	return {
 		projects,
-		activeProjectId: registry.activeProjectId ?? projects[0]?.id ?? null,
+		activeProjectPath: registry.activeProjectPath ?? projects[0]?.path ?? null,
 		storageSearchPaths,
 		activeWorkspaceFile: typeof registry.activeWorkspaceFile === "string" ? registry.activeWorkspaceFile : null,
 		selectedWorktreeId: typeof registry.selectedWorktreeId === "string" ? registry.selectedWorktreeId : null,
@@ -134,6 +135,7 @@ function sanitizeAppSettings(value: Partial<AppSettings> | undefined): AppSettin
 	return {
 		version: 1,
 		agents: Array.isArray(value?.agents) ? value.agents.filter(isValidAgentRegistration) : [],
+		agentContexts: Array.isArray(value?.agentContexts) ? value.agentContexts.filter(isValidAgentContext) : [],
 		editor: sanitizeEditorPreference(value?.editor),
 	};
 }
@@ -155,11 +157,19 @@ function isValidAgentRegistration(agent: unknown): agent is AgentRegistration {
 		typeof agent.description === "string";
 }
 
+function isValidAgentContext(context: unknown): context is AgentContext {
+	if (typeof context !== "object" || context === null) return false;
+	if (!("agentId" in context)) return false;
+	return typeof context.agentId === "string" &&
+		(!("projectPath" in context) || context.projectPath === null || typeof context.projectPath === "string") &&
+		(!("worktreeId" in context) || context.worktreeId === null || typeof context.worktreeId === "string") &&
+		(!("boardId" in context) || context.boardId === null || typeof context.boardId === "string");
+}
+
 function isValidProject(project: unknown): project is Project {
 	if (typeof project !== "object" || project === null) return false;
-	if (!("id" in project) || !("name" in project) || !("path" in project)) return false;
-	return typeof project.id === "string" &&
-		typeof project.name === "string" &&
+	if (!("name" in project) || !("path" in project)) return false;
+	return typeof project.name === "string" &&
 		typeof project.path === "string" &&
 		(!("storagePath" in project) || project.storagePath === undefined || typeof project.storagePath === "string");
 }

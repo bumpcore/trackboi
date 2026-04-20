@@ -23,13 +23,13 @@ type RegistryReader = () => ProjectRegistry;
 type RegistryWriter = (registry: ProjectRegistry) => void;
 
 function rememberProjectStorage(
-	projectId: string,
+	projectPath: string,
 	storagePath: string,
 	readRegistry: RegistryReader,
 	writeRegistry: RegistryWriter,
 ): void {
 	const current = readRegistry();
-	const project = current.projects.find((entry) => entry.id === projectId);
+	const project = current.projects.find((entry) => entry.path === projectPath);
 	if (!project || project.storagePath === storagePath) return;
 	project.storagePath = storagePath;
 	writeRegistry(current);
@@ -52,7 +52,7 @@ export function readSnapshotForProjectPath(options: {
 
 	const store = openStore(project, readRegistry(), create);
 	ensureProjectFiles(store.project, store.rootPath, store.storagePath);
-	rememberProjectStorage(project.id, store.storagePath, readRegistry, writeRegistry);
+	rememberProjectStorage(project.path, store.storagePath, readRegistry, writeRegistry);
 	const cached = snapshotCache.get(store.rootPath);
 	if (cached) return cached;
 

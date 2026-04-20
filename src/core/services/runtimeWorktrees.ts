@@ -12,7 +12,7 @@ type RegistryReader = () => ProjectRegistry;
  * Stable cache key for one project's discovered worktree landscape.
  */
 export function projectCacheKey(project: Project): string {
-	return `${project.id}:${project.path}`;
+	return project.path;
 }
 
 /**
@@ -40,7 +40,6 @@ export function discoverWorktrees(options: {
 	const nextWorktrees = worktrees.map((entry) => {
 		const worktreePath = canonicalProjectPath(entry.path);
 		const worktreeProject: Project = {
-			id: project.id,
 			name: project.name,
 			path: worktreePath,
 			storagePath: undefined,

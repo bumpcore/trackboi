@@ -151,6 +151,12 @@ function serializeAppSettings(settings: AppSettings): AppSettings {
 			name: agent.name,
 			description: agent.description,
 		})),
+		agentContexts: settings.agentContexts.map((context) => ({
+			agentId: context.agentId,
+			projectPath: context.projectPath,
+			worktreeId: context.worktreeId,
+			boardId: context.boardId,
+		})),
 		editor: {
 			preferredEditorId: settings.editor.preferredEditorId,
 			customCommand: settings.editor.customCommand,
@@ -328,14 +334,14 @@ export function createDesktopFacade(
 	async chooseProject() {
 		return refreshAfterProjectSelection(() => trackboiApi.chooseProject(), (snapshot) => snapshot);
 	},
-	async locateProject(projectId: string) {
-		return refreshAfterProjectSelection(() => trackboiApi.locateProject(projectId), (snapshot) => snapshot);
+	async locateProject(projectPath: string) {
+		return refreshAfterProjectSelection(() => trackboiApi.locateProject(projectPath), (snapshot) => snapshot);
 	},
-	async removeProject(projectId: string) {
-		return refreshAfterProjectSelection(() => trackboiApi.removeProject(projectId), (snapshot) => snapshot);
+	async removeProject(projectPath: string) {
+		return refreshAfterProjectSelection(() => trackboiApi.removeProject(projectPath), (snapshot) => snapshot);
 	},
-	async switchProject(projectId: string) {
-		return refreshAfterProjectSelection(() => trackboiApi.switchProject(projectId), (nextState) => nextState.snapshot);
+	async switchProject(projectPath: string) {
+		return refreshAfterProjectSelection(() => trackboiApi.switchProject(projectPath), (nextState) => nextState.snapshot);
 	},
 	async createCard(input: {
 		boardId?: string;

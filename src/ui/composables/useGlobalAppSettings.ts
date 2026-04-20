@@ -13,6 +13,7 @@ export function useGlobalAppSettings() {
 	const appSettings = ref<AppSettings>({
 		version: 1,
 		agents: [],
+		agentContexts: [],
 		editor: {
 			preferredEditorId: "auto",
 			customCommand: "",

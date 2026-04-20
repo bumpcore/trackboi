@@ -77,7 +77,7 @@ export function openStore(project: Project, registry: ProjectRegistry, create: b
 /**
  * Creates the minimum repo-local Trackboi database files for a project.
  */
-export function ensureProjectFiles(project: Project, rootPath: string, storagePath: string): void {
+export function ensureProjectFiles(project: Project, rootPath: string, _storagePath: string): void {
 	mkdirSync(boardsPath(rootPath), { recursive: true });
 	mkdirSync(cardsPath(rootPath), { recursive: true });
 	mkdirSync(tracksPath(rootPath), { recursive: true });
@@ -86,10 +86,7 @@ export function ensureProjectFiles(project: Project, rootPath: string, storagePa
 	if (!existsSync(metadataPath)) {
 		writeJsonAtomic<ProjectMetadata>(metadataPath, {
 			version: 1,
-			projectId: project.id,
 			name: project.name,
-			storagePath,
-			createdAt: now(),
 			people: [],
 		});
 	}
@@ -106,13 +103,10 @@ export function ensureProjectFiles(project: Project, rootPath: string, storagePa
 	}
 }
 
-export function normalizeProjectMetadata(metadata: ProjectMetadata, project: Project, storagePath: string): ProjectMetadata {
+export function normalizeProjectMetadata(metadata: ProjectMetadata, project: Project, _storagePath: string): ProjectMetadata {
 	return {
 		version: 1,
-		projectId: typeof metadata.projectId === "string" ? metadata.projectId : project.id,
 		name: typeof metadata.name === "string" ? metadata.name : project.name,
-		storagePath: typeof metadata.storagePath === "string" ? metadata.storagePath : storagePath,
-		createdAt: typeof metadata.createdAt === "string" ? metadata.createdAt : now(),
 		people: Array.isArray(metadata.people) ? metadata.people : [],
 	};
 }
@@ -151,7 +145,6 @@ export function projectFromMetadata(store: ProjectStore): Project {
 	try {
 		const metadata = readJson<ProjectMetadata>(projectMetadataPath(store.rootPath));
 		return {
-			id: metadata.projectId,
 			name: metadata.name,
 			path: store.project.path,
 			storagePath: store.storagePath,

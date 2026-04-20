@@ -1,3 +1,6 @@
+import os from "node:os";
+import path from "node:path";
+import { mkdtempSync, rmSync } from "node:fs";
 import { createRuntime, stripInternalSnapshotFields, type RuntimeOptions } from "./runtime";
 import type {
 	AppSettings,
@@ -25,6 +28,7 @@ import type {
 	TrackPatch,
 	TrackboiActions,
 	TrackboiRuntime,
+	ScopedTrackboiContext,
 } from "./types";
 
 export type TrackboiSystemDialogs = {
@@ -40,6 +44,7 @@ export type NodeFsTrackboiActions = TrackboiActions & {
 	activeSnapshot(): ProjectSnapshot | null;
 	activeSnapshotWithInternals(): ProjectSnapshotWithInternals | null;
 	invalidateCache(): void;
+	withScopedContext<T>(context: ScopedTrackboiContext, action: (actions: NodeFsTrackboiActions) => Promise<T>): Promise<T>;
 };
 
 type NodeFsTrackboiActionsOptions = {
@@ -91,6 +96,28 @@ class NodeFsTrackboiActionsImpl implements NodeFsTrackboiActions {
 
 	invalidateCache(): void {
 		this.runtime.invalidateCache();
+	}
+
+	async withScopedContext<T>(context: ScopedTrackboiContext, action: (actions: NodeFsTrackboiActions) => Promise<T>): Promise<T> {
+		const tempDir = mkdtempSync(path.join(os.tmpdir(), "trackboi-mcp-"));
+		const scopedConfigPath = path.join(tempDir, "config.json");
+		try {
+			const scoped = createNodeFsTrackboiActions({
+				runtimeOptions: {
+					configPath: scopedConfigPath,
+				},
+			});
+			const registry = this.readRegistry();
+			scoped.writeRegistry({
+				...registry,
+				activeProjectPath: context.projectPath,
+				selectedWorktreeId: context.worktreeId,
+				selectedBoardId: context.boardId,
+			});
+			return await action(scoped);
+		} finally {
+			rmSync(tempDir, { recursive: true, force: true });
+		}
 	}
 
 	async getActiveProject(): Promise<ProjectSnapshot | null> {
@@ -194,20 +221,20 @@ class NodeFsTrackboiActionsImpl implements NodeFsTrackboiActions {
 		return this.getActiveProject();
 	}
 
-	async locateProject(projectId: string): Promise<ProjectSnapshot | null> {
+	async locateProject(currentProjectPath: string): Promise<ProjectSnapshot | null> {
 		const projectPath = await this.dialogs.chooseProjectDirectory();
 		if (!projectPath) return this.getActiveProject();
-		this.runtime.locateProjectPath(projectId, projectPath);
+		this.runtime.locateProjectPath(currentProjectPath, projectPath);
 		return this.getActiveProject();
 	}
 
-	async removeProject(projectId: string): Promise<ProjectSnapshot | null> {
-		this.runtime.removeProject(projectId);
+	async removeProject(projectPath: string): Promise<ProjectSnapshot | null> {
+		this.runtime.removeProject(projectPath);
 		return this.getActiveProject();
 	}
 
-	async switchProject(projectId: string): Promise<DesktopState> {
-		return this.runtime.switchProject(projectId);
+	async switchProject(projectPath: string): Promise<DesktopState> {
+		return this.runtime.switchProject(projectPath);
 	}
 
 	async createCard(input: CreateCardInput): Promise<Card> {

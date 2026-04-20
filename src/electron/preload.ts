@@ -51,13 +51,13 @@ const trackboiApi: TrackboiBridgeApi = {
 	),
 	openWorkspaceFile: () => ipcRenderer.invoke(ipcChannels.trackboi.openWorkspaceFile),
 	chooseProject: () => ipcRenderer.invoke(ipcChannels.trackboi.chooseProject),
-	locateProject: (projectId) => (
-		ipcRenderer.invoke(ipcChannels.trackboi.locateProject, projectId)
+	locateProject: (projectPath) => (
+		ipcRenderer.invoke(ipcChannels.trackboi.locateProject, projectPath)
 	),
-	removeProject: (projectId) => (
-		ipcRenderer.invoke(ipcChannels.trackboi.removeProject, projectId)
+	removeProject: (projectPath) => (
+		ipcRenderer.invoke(ipcChannels.trackboi.removeProject, projectPath)
 	),
-	switchProject: (projectId) => ipcRenderer.invoke(ipcChannels.trackboi.switchProject, projectId),
+	switchProject: (projectPath) => ipcRenderer.invoke(ipcChannels.trackboi.switchProject, projectPath),
 	createCard: (input) => ipcRenderer.invoke(ipcChannels.trackboi.createCard, input),
 	updateCard: (cardId, patch) => (
 		ipcRenderer.invoke(ipcChannels.trackboi.updateCard, cardId, patch)

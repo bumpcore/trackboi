@@ -127,7 +127,7 @@ onBeforeUnmount(() => {
 			@pointerdown.self="emit('close')"
 		>
 			<aside
-				class="modal-panel grid h-[min(760px,calc(100vh-72px))] w-[min(860px,96vw)] grid-cols-[200px_minmax(0,1fr)] overflow-hidden rounded-xl border border-border/60 bg-card shadow-2xl"
+				class="modal-panel grid h-[min(760px,calc(100vh-72px))] w-[min(860px,96vw)] grid-cols-[200px_minmax(0,1fr)] overflow-hidden border border-border/60 bg-card shadow-2xl"
 			>
 				<!-- Sidebar -->
 				<div class="grid content-start gap-6 border-r border-border/35 bg-background/32 p-4">
@@ -142,7 +142,7 @@ onBeforeUnmount(() => {
 							<div class="grid gap-0.5">
 								<button
 									type="button"
-									class="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition-colors"
+									class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors"
 									:class="activeSection === 'storage'
 										? 'bg-secondary/80 font-medium text-foreground'
 										: 'font-normal text-muted-foreground hover:bg-secondary/45 hover:text-foreground'"
@@ -153,7 +153,7 @@ onBeforeUnmount(() => {
 								</button>
 								<button
 									type="button"
-									class="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition-colors"
+									class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors"
 									:class="activeSection === 'appearance'
 										? 'bg-secondary/80 font-medium text-foreground'
 										: 'font-normal text-muted-foreground hover:bg-secondary/45 hover:text-foreground'"
@@ -170,7 +170,7 @@ onBeforeUnmount(() => {
 							<div class="grid gap-0.5">
 								<button
 									type="button"
-									class="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition-colors"
+									class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors"
 									:class="activeSection === 'shortcuts'
 										? 'bg-secondary/80 font-medium text-foreground'
 										: 'font-normal text-muted-foreground hover:bg-secondary/45 hover:text-foreground'"
@@ -181,7 +181,7 @@ onBeforeUnmount(() => {
 								</button>
 								<button
 									type="button"
-									class="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition-colors"
+									class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors"
 									:class="activeSection === 'agents'
 										? 'bg-secondary/80 font-medium text-foreground'
 										: 'font-normal text-muted-foreground hover:bg-secondary/45 hover:text-foreground'"
@@ -192,7 +192,7 @@ onBeforeUnmount(() => {
 								</button>
 								<button
 									type="button"
-									class="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition-colors"
+									class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors"
 									:class="activeSection === 'editor'
 										? 'bg-secondary/80 font-medium text-foreground'
 										: 'font-normal text-muted-foreground hover:bg-secondary/45 hover:text-foreground'"
@@ -214,14 +214,14 @@ onBeforeUnmount(() => {
 							<h2 class="mt-1 text-xl font-semibold tracking-tight">{{ sectionMeta[activeSection].title }}</h2>
 							<p class="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{{ sectionMeta[activeSection].description }}</p>
 						</div>
-						<Button variant="ghost" size="icon" type="button" @click="emit('close')">
+						<Button variant="ghost" size="icon" type="button" class="rounded-none" @click="emit('close')">
 							<X class="h-4 w-4" />
 						</Button>
 					</header>
 
 					<!-- Storage -->
 					<section v-if="activeSection === 'storage'" class="grid gap-4">
-						<section class="grid gap-0 overflow-hidden rounded-lg bg-background/12">
+						<section class="grid gap-0 overflow-hidden bg-background/12">
 							<div class="border-b border-border/60 px-4 py-3">
 								<h3 class="text-sm font-semibold text-foreground">Path priority</h3>
 								<p class="mt-1 text-sm leading-6 text-muted-foreground">
@@ -246,7 +246,7 @@ onBeforeUnmount(() => {
 										size="icon"
 										type="button"
 										:disabled="busy"
-										class="text-muted-foreground hover:text-destructive"
+										class="rounded-none text-muted-foreground hover:text-destructive"
 										@click="emit('remove', path)"
 									>
 										<Trash2 class="h-4 w-4" />
@@ -255,7 +255,7 @@ onBeforeUnmount(() => {
 							</div>
 						</section>
 
-						<section class="grid gap-4 rounded-lg bg-background/12 p-4">
+						<section class="grid gap-4 bg-background/12 p-4">
 							<div>
 								<h3 class="text-sm font-semibold text-foreground">Add a path</h3>
 								<p class="mt-1 text-sm leading-6 text-muted-foreground">
@@ -269,13 +269,13 @@ onBeforeUnmount(() => {
 									<Input v-model="draft" autocomplete="off" placeholder=".etc/.trackboi" />
 								</label>
 								<div class="flex flex-wrap gap-2">
-									<Button type="submit" :disabled="busy || !draft.trim()">
+									<Button type="submit" class="rounded-none" :disabled="busy || !draft.trim()">
 										<ListPlus class="h-4 w-4" />
-										Add path
+										Add
 									</Button>
-									<Button variant="outline" type="button" :disabled="busy" @click="emit('reset')">
+									<Button variant="outline" type="button" class="rounded-none" :disabled="busy" @click="emit('reset')">
 										<RotateCcw class="h-4 w-4" />
-										Restore defaults
+										Reset
 									</Button>
 								</div>
 							</form>
@@ -284,7 +284,7 @@ onBeforeUnmount(() => {
 
 					<!-- Appearance -->
 					<section v-else-if="activeSection === 'appearance'" class="grid gap-4">
-						<section class="grid gap-4 rounded-lg bg-background/12 p-4">
+						<section class="grid gap-4 bg-background/12 p-4">
 							<div>
 								<h3 class="text-sm font-semibold text-foreground">Color theme</h3>
 								<p class="mt-1 text-sm leading-6 text-muted-foreground">
@@ -297,7 +297,7 @@ onBeforeUnmount(() => {
 									v-for="option in themeOptions"
 									:key="option.value"
 									type="button"
-									class="flex items-start gap-3 rounded-md border px-3 py-3 text-left transition-colors"
+									class="flex items-start gap-3 border px-3 py-3 text-left transition-colors"
 									:class="themeMode === option.value
 										? 'border-primary/35 bg-primary/10 text-foreground'
 										: 'border-border/70 bg-secondary/55 text-foreground hover:border-border/90 hover:bg-secondary/78'"
@@ -312,9 +312,9 @@ onBeforeUnmount(() => {
 							</div>
 
 							<div>
-								<Button variant="outline" type="button" @click="emit('resetTheme')">
+								<Button variant="outline" type="button" class="rounded-none" @click="emit('resetTheme')">
 									<RotateCcw class="h-4 w-4" />
-									Restore default
+									Reset
 								</Button>
 							</div>
 						</section>
@@ -322,7 +322,7 @@ onBeforeUnmount(() => {
 
 					<!-- Shortcuts -->
 					<section v-else-if="activeSection === 'shortcuts'" class="grid gap-4">
-						<section class="grid gap-4 rounded-lg bg-background/12 p-4">
+						<section class="grid gap-4 bg-background/12 p-4">
 							<div>
 								<h3 class="text-sm font-semibold text-foreground">Command center</h3>
 								<p class="mt-1 text-sm leading-6 text-muted-foreground">
@@ -335,7 +335,7 @@ onBeforeUnmount(() => {
 									Navigate
 									<button
 										type="button"
-										class="trackboi-mono-font flex h-8 w-full items-center rounded-[5px] border border-input/82 bg-secondary/72 px-2.5 py-1 text-left text-[13px] text-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.02)] transition-colors hover:bg-secondary/88 focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+										class="trackboi-mono-font flex h-8 w-full items-center border border-input/82 bg-secondary/72 px-2.5 py-1 text-left text-[13px] text-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.02)] transition-colors hover:bg-secondary/88 focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
 										:class="captureArmed === 'navigate' ? 'border-primary/35 ring-1 ring-ring' : ''"
 										@click="captureArmed = 'navigate'"
 										@focus="captureArmed = 'navigate'"
@@ -350,7 +350,7 @@ onBeforeUnmount(() => {
 									Command mode
 									<button
 										type="button"
-										class="trackboi-mono-font flex h-8 w-full items-center rounded-[5px] border border-input/82 bg-secondary/72 px-2.5 py-1 text-left text-[13px] text-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.02)] transition-colors hover:bg-secondary/88 focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+										class="trackboi-mono-font flex h-8 w-full items-center border border-input/82 bg-secondary/72 px-2.5 py-1 text-left text-[13px] text-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.02)] transition-colors hover:bg-secondary/88 focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
 										:class="captureArmed === 'command' ? 'border-primary/35 ring-1 ring-ring' : ''"
 										@click="captureArmed = 'command'"
 										@focus="captureArmed = 'command'"
@@ -363,7 +363,7 @@ onBeforeUnmount(() => {
 							</div>
 						</section>
 
-						<section class="grid gap-4 rounded-lg bg-background/12 p-4">
+						<section class="grid gap-4 bg-background/12 p-4">
 							<div>
 								<h3 class="text-sm font-semibold text-foreground">Panel toggles</h3>
 								<p class="mt-1 text-sm leading-6 text-muted-foreground">
@@ -376,7 +376,7 @@ onBeforeUnmount(() => {
 									Left panel
 									<button
 										type="button"
-										class="trackboi-mono-font flex h-8 w-full items-center rounded-[5px] border border-input/82 bg-secondary/72 px-2.5 py-1 text-left text-[13px] text-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.02)] transition-colors hover:bg-secondary/88 focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+										class="trackboi-mono-font flex h-8 w-full items-center border border-input/82 bg-secondary/72 px-2.5 py-1 text-left text-[13px] text-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.02)] transition-colors hover:bg-secondary/88 focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
 										:class="captureArmed === 'left' ? 'border-primary/35 ring-1 ring-ring' : ''"
 										@click="captureArmed = 'left'"
 										@focus="captureArmed = 'left'"
@@ -391,7 +391,7 @@ onBeforeUnmount(() => {
 									Right panel
 									<button
 										type="button"
-										class="trackboi-mono-font flex h-8 w-full items-center rounded-[5px] border border-input/82 bg-secondary/72 px-2.5 py-1 text-left text-[13px] text-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.02)] transition-colors hover:bg-secondary/88 focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+										class="trackboi-mono-font flex h-8 w-full items-center border border-input/82 bg-secondary/72 px-2.5 py-1 text-left text-[13px] text-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.02)] transition-colors hover:bg-secondary/88 focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
 										:class="captureArmed === 'right' ? 'border-primary/35 ring-1 ring-ring' : ''"
 										@click="captureArmed = 'right'"
 										@focus="captureArmed = 'right'"
@@ -404,9 +404,9 @@ onBeforeUnmount(() => {
 							</div>
 
 							<div>
-								<Button variant="outline" type="button" @click="emit('resetShortcuts')">
+								<Button variant="outline" type="button" class="rounded-none" @click="emit('resetShortcuts')">
 									<RotateCcw class="h-4 w-4" />
-									Restore defaults
+									Reset
 								</Button>
 							</div>
 						</section>
@@ -414,7 +414,7 @@ onBeforeUnmount(() => {
 
 					<!-- Agents -->
 					<section v-else-if="activeSection === 'agents'" class="grid gap-4">
-						<section class="grid gap-4 rounded-lg bg-background/12 p-4">
+						<section class="grid gap-4 bg-background/12 p-4">
 							<div>
 								<h3 class="text-sm font-semibold text-foreground">Registered agents</h3>
 								<p class="mt-1 text-sm leading-6 text-muted-foreground">
@@ -426,7 +426,7 @@ onBeforeUnmount(() => {
 								<div
 									v-for="agent in agents"
 									:key="agent.id"
-									class="flex items-center justify-between gap-3 rounded-md border border-border/70 bg-secondary/55 px-3 py-3"
+									class="flex items-center justify-between gap-3 border border-border/70 bg-secondary/55 px-3 py-3"
 								>
 									<div class="min-w-0">
 										<div class="trackboi-mono-font text-[12px] text-foreground">{{ agent.name }}</div>
@@ -436,7 +436,7 @@ onBeforeUnmount(() => {
 										variant="ghost"
 										size="icon"
 										type="button"
-										class="text-muted-foreground hover:text-destructive"
+										class="rounded-none text-muted-foreground hover:text-destructive"
 										@click="emit('removeAgent', agent.id)"
 									>
 										<Trash2 class="h-4 w-4" />
@@ -444,7 +444,7 @@ onBeforeUnmount(() => {
 								</div>
 							</div>
 
-							<div v-else class="rounded-md border border-dashed border-border/75 bg-background/20 px-4 py-4 text-sm text-muted-foreground">
+							<div v-else class="border border-dashed border-border/75 bg-background/20 px-4 py-4 text-sm text-muted-foreground">
 								No agents registered yet.
 							</div>
 
@@ -460,9 +460,9 @@ onBeforeUnmount(() => {
 									</label>
 								</div>
 								<div>
-									<Button type="submit" :disabled="!agentNameDraft.trim()" @click="emit('registerAgent')">
+									<Button type="submit" class="rounded-none" :disabled="!agentNameDraft.trim()" @click="emit('registerAgent')">
 										<ListPlus class="h-4 w-4" />
-										Register agent
+										Register
 									</Button>
 								</div>
 							</form>
@@ -471,7 +471,7 @@ onBeforeUnmount(() => {
 
 					<!-- Editor -->
 					<section v-else-if="activeSection === 'editor'" class="grid gap-4">
-						<section class="grid gap-4 rounded-lg bg-background/12 p-4">
+						<section class="grid gap-4 bg-background/12 p-4">
 							<div>
 								<h3 class="text-sm font-semibold text-foreground">Preferred editor</h3>
 								<p class="mt-1 text-sm leading-6 text-muted-foreground">
@@ -484,7 +484,7 @@ onBeforeUnmount(() => {
 									v-for="option in editorOptions"
 									:key="option.id"
 									type="button"
-									class="flex items-start gap-3 rounded-md border px-3 py-3 text-left transition-colors"
+									class="flex items-start gap-3 border px-3 py-3 text-left transition-colors"
 									:class="preferredEditorId === option.id
 										? 'border-primary/35 bg-primary/10 text-foreground'
 										: 'border-border/70 bg-secondary/55 text-foreground hover:border-border/90 hover:bg-secondary/78'"
@@ -503,7 +503,7 @@ onBeforeUnmount(() => {
 							</label>
 
 							<div>
-								<Button type="button" @click="emit('saveEditor')">
+								<Button type="button" class="rounded-none" @click="emit('saveEditor')">
 									Save
 								</Button>
 							</div>

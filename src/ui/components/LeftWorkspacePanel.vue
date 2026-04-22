@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Plus } from "lucide-vue-next";
+import { Plus, Settings } from "lucide-vue-next";
 import type { ProjectSnapshot, Track, WorktreeContext } from "@/core/types";
 import Button from "@/ui/components/Button.vue";
 import Tooltip from "@/ui/components/Tooltip.vue";
@@ -64,9 +64,9 @@ function trackSourceLabel(track: Track) {
 							@click="emit('selectTrack', '__all__')"
 						>
 							<span class="inline-flex h-2 w-2 rounded-full bg-foreground" />
-							<div class="min-w-0 flex-1">
-								<div class="truncate text-foreground">All Work</div>
-								<div class="trackboi-mono-font text-[10px] text-muted-foreground">board-wide</div>
+							<div class="w-0 flex-1 overflow-hidden">
+								<div class="w-full truncate text-foreground">All Work</div>
+								<div class="w-full truncate trackboi-mono-font text-[10px] text-muted-foreground">board-wide</div>
 							</div>
 							<span class="shell-count">{{ snapshot?.cards.filter((card) => !card.parentId).length ?? 0 }}</span>
 						</button>
@@ -81,9 +81,9 @@ function trackSourceLabel(track: Track) {
 							@click="emit('selectTrack', track.id)"
 						>
 							<span class="mt-1 inline-flex h-2 w-2 rounded-full bg-primary/90" />
-							<div class="min-w-0 flex-1">
-								<div class="truncate text-foreground">{{ track.title }}</div>
-								<div class="trackboi-mono-font text-[10px] text-muted-foreground">{{ trackSourceLabel(track) }}</div>
+							<div class="w-0 flex-1 overflow-hidden">
+								<div class="w-full truncate text-foreground">{{ track.title }}</div>
+								<div class="w-full truncate trackboi-mono-font text-[10px] text-muted-foreground">{{ trackSourceLabel(track) }}</div>
 							</div>
 							<span class="shell-count">{{ trackCounts[track.id] ?? 0 }}</span>
 						</button>
@@ -108,9 +108,9 @@ function trackSourceLabel(track: Track) {
 								@click="emit('selectWorktree', worktree.id)"
 							>
 								<span class="mt-1 inline-flex h-2 w-2 rounded-full bg-primary/90" />
-								<div class="min-w-0 flex-1">
-									<div class="truncate text-foreground">{{ worktree.name }}</div>
-									<div class="font-mono text-[10px] text-muted-foreground">switch workspace context · {{ worktree.branch ?? worktree.path }}</div>
+								<div class="w-0 flex-1 overflow-hidden">
+									<div class="w-full truncate text-foreground">{{ worktree.name }}</div>
+									<div class="w-full truncate font-mono text-[10px] text-muted-foreground">switch workspace context · {{ worktree.branch ?? worktree.path }}</div>
 								</div>
 							</button>
 						</Tooltip>
@@ -121,17 +121,21 @@ function trackSourceLabel(track: Track) {
 
 		<footer class="border-t border-border/70 px-4 py-3">
 			<div class="flex items-center justify-between gap-3">
-				<div class="font-mono text-[10px] text-muted-foreground">
+				<div class="min-w-0 truncate font-mono text-[10px] text-muted-foreground">
 					{{ snapshot?.project.storagePath ?? ".trackboi" }}
 				</div>
-				<button
-					type="button"
-					class="trackboi-mono-font text-[10px] text-muted-foreground transition-colors hover:text-foreground"
-					data-testid="project-settings-button"
-					@click="emit('openProjectSettings')"
-				>
-					Project settings
-				</button>
+				<Tooltip content="Project settings" side="top">
+					<Button
+						variant="ghost"
+						size="icon"
+						type="button"
+						class="shrink-0"
+						data-testid="project-settings-button"
+						@click="emit('openProjectSettings')"
+					>
+						<Settings class="h-4 w-4" />
+					</Button>
+				</Tooltip>
 			</div>
 		</footer>
 	</aside>

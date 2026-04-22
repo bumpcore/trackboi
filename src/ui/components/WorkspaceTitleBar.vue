@@ -16,9 +16,9 @@ const emit = defineEmits<{
 </script>
 
 <template>
-	<header class="relative z-10 grid h-11 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 bg-card/95 pl-3 pr-0 before:pointer-events-none before:absolute before:inset-x-0 before:bottom-0 before:h-px before:bg-border/90">
+	<header class="relative z-10 grid h-9 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 bg-card/95 pl-2.5 pr-0 before:pointer-events-none before:absolute before:inset-x-0 before:bottom-0 before:h-px before:bg-border/90">
 		<div
-			class="flex min-w-0 items-center gap-2 overflow-hidden pl-3 pr-1 font-mono text-[11px] text-muted-foreground"
+			class="flex min-w-0 items-center gap-1.5 overflow-hidden pl-2.5 pr-1 font-mono text-[10px] text-muted-foreground"
 			data-electron-drag-region
 			@dblclick="emit('toggleMaximize', $event)"
 			@pointerdown="emit('drag', $event)"
@@ -38,28 +38,28 @@ const emit = defineEmits<{
 			<Tooltip content="Minimize" side="bottom">
 				<button
 					type="button"
-					class="grid h-full w-10 place-items-center text-muted-foreground transition-colors hover:bg-secondary/85 hover:text-foreground"
+					class="grid h-full w-9 place-items-center text-muted-foreground transition-colors hover:bg-secondary/85 hover:text-foreground"
 					@click="emit('minimize')"
 				>
-					<Minus class="h-4 w-4" />
+					<Minus class="h-3.5 w-3.5" />
 				</button>
 			</Tooltip>
 			<Tooltip content="Maximize" side="bottom">
 				<button
 					type="button"
-					class="grid h-full w-10 place-items-center text-muted-foreground transition-colors hover:bg-secondary/85 hover:text-foreground"
+					class="grid h-full w-9 place-items-center text-muted-foreground transition-colors hover:bg-secondary/85 hover:text-foreground"
 					@click="emit('toggleMaximize', $event)"
 				>
-					<Maximize2 class="h-3.5 w-3.5" />
+					<Maximize2 class="h-3 w-3" />
 				</button>
 			</Tooltip>
 			<Tooltip content="Close" side="bottom">
 				<button
 					type="button"
-					class="grid h-full w-10 place-items-center text-muted-foreground transition-colors hover:bg-destructive/24 hover:text-destructive-foreground"
+					class="grid h-full w-9 place-items-center text-muted-foreground transition-colors hover:bg-destructive/24 hover:text-destructive-foreground"
 					@click="emit('close')"
 				>
-					<X class="h-4 w-4" />
+					<X class="h-3.5 w-3.5" />
 				</button>
 			</Tooltip>
 		</div>

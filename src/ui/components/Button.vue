@@ -15,24 +15,24 @@ const props = withDefaults(
 );
 
 const variants = {
-	default: "border border-primary/40 bg-primary/12 text-primary hover:border-primary/55 hover:bg-primary/18",
-	secondary: "border border-border/75 bg-secondary/76 text-muted-foreground hover:border-border/90 hover:bg-secondary/88 hover:text-foreground",
-	ghost: "border border-transparent bg-transparent text-muted-foreground hover:border-border/70 hover:bg-accent/72 hover:text-foreground",
-	outline: "border border-border/75 bg-background/24 text-muted-foreground hover:border-border/95 hover:bg-accent/76 hover:text-foreground",
-	destructive: "border border-destructive/40 bg-destructive/14 text-destructive hover:border-destructive/60 hover:bg-destructive/22",
+	default: "border border-primary/34 bg-primary/11 text-primary hover:border-primary/46 hover:bg-primary/16",
+	secondary: "border border-border/84 bg-secondary/64 text-muted-foreground hover:border-border/96 hover:bg-secondary/82 hover:text-foreground",
+	ghost: "border border-transparent bg-transparent text-muted-foreground shadow-none hover:border-border/74 hover:bg-secondary/56 hover:text-foreground",
+	outline: "border border-border/84 bg-background/16 text-muted-foreground hover:border-border/96 hover:bg-secondary/68 hover:text-foreground",
+	destructive: "border border-destructive/34 bg-destructive/11 text-destructive hover:border-destructive/48 hover:bg-destructive/17",
 };
 
 const sizes = {
-	default: "h-7 px-2.5 text-[11px]",
+	default: "h-[26px] px-2.5 text-[11px]",
 	sm: "h-6 px-2 text-[10px]",
-	icon: "h-7 w-7",
+	icon: "h-[26px] w-[26px]",
 };
 </script>
 
 <template>
 	<button
 		:class="cn(
-			'trackboi-mono-font inline-flex items-center justify-center gap-1.25 whitespace-nowrap rounded-[4px] leading-none tracking-[0.01em] transition-colors [&_svg]:h-3.5 [&_svg]:w-3.5 disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+			'trackboi-mono-font inline-flex items-center justify-center gap-1.25 whitespace-nowrap rounded-[4px] font-normal leading-none tracking-[-0.01em] shadow-[inset_0_1px_0_hsl(0_0%_100%/0.03)] transition-[border-color,background-color,color,box-shadow] duration-120 [&_svg]:h-3.5 [&_svg]:w-3.5 disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
 			variants[props.variant],
 			sizes[props.size],
 			props.class,

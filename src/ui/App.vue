@@ -772,7 +772,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-	<div class="grid h-screen grid-rows-[44px_minmax(0,1fr)] overflow-hidden bg-background text-foreground">
+	<div class="grid h-screen grid-rows-[36px_minmax(0,1fr)] overflow-hidden bg-background text-foreground">
 		<div
 			v-for="edge in resizeEdges"
 			:key="edge"

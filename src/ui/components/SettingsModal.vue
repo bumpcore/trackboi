@@ -1,20 +1,25 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import { Bot, Code2, HardDrive, Keyboard, ListPlus, Monitor, Moon, Palette, RotateCcw, Sun, Trash2, X } from "lucide-vue-next";
+import { Bot, Code2, HardDrive, Keyboard, ListPlus, Monitor, Moon, Palette, RotateCcw, SlidersHorizontal, Sun, Trash2, X } from "lucide-vue-next";
+import type { AgentRegistration, PersonAlias, ProjectSnapshot } from "@/core/types";
 import Button from "@/ui/components/Button.vue";
 import Input from "@/ui/components/Input.vue";
+import ProjectSettingsPanel from "@/ui/components/ProjectSettingsPanel.vue";
 import { shortcutFromKeyboardEvent } from "@/ui/lib/keyboardShortcuts";
-import type { AgentRegistration } from "@/core/types";
 import type { ThemeMode } from "@/ui/composables/useAppPreferences";
+import type { SettingsSection } from "@/ui/viewTypes";
 
 const props = defineProps<{
 	open: boolean;
 	paths: string[];
 	busy: boolean;
 	agents: AgentRegistration[];
+	snapshot: ProjectSnapshot | null;
+	people: PersonAlias[];
 	detectedEditors: Array<{ id: string; label: string; command: string }>;
 }>();
 
+const activeSection = defineModel<SettingsSection>("section", { required: true });
 const draft = defineModel<string>("draft", { required: true });
 const leftPanelShortcut = defineModel<string>("leftPanelShortcut", { required: true });
 const rightPanelShortcut = defineModel<string>("rightPanelShortcut", { required: true });
@@ -25,6 +30,9 @@ const preferredEditorId = defineModel<string>("preferredEditorId", { required: t
 const customEditorCommand = defineModel<string>("customEditorCommand", { required: true });
 const agentNameDraft = defineModel<string>("agentNameDraft", { required: true });
 const agentDescriptionDraft = defineModel<string>("agentDescriptionDraft", { required: true });
+const personDisplayNameDraft = defineModel<string>("personDisplayNameDraft", { required: true });
+const personEmailsDraft = defineModel<string>("personEmailsDraft", { required: true });
+const personNamesDraft = defineModel<string>("personNamesDraft", { required: true });
 
 const emit = defineEmits<{
 	close: [];
@@ -36,18 +44,15 @@ const emit = defineEmits<{
 	registerAgent: [];
 	removeAgent: [agentId: string];
 	saveEditor: [];
+	addPersonAlias: [];
+	removePersonAlias: [personId: string];
 }>();
-
-type SettingsSection = "storage" | "appearance" | "shortcuts" | "agents" | "editor";
-
-const activeSection = ref<SettingsSection>("storage");
 const captureArmed = ref<"left" | "right" | "navigate" | "command" | null>(null);
 
 watch(
 	() => props.open,
 	(open) => {
 		if (open) {
-			activeSection.value = "storage";
 			captureArmed.value = null;
 		}
 	},
@@ -59,6 +64,7 @@ const sectionMeta: Record<SettingsSection, { group: string; title: string; descr
 	shortcuts:  { group: "Workspace", title: "Keyboard shortcuts", description: "Bind key combinations for the command center and side panels. Shortcuts won't fire while you're typing inside an input or editor." },
 	agents:     { group: "Workspace", title: "Agents",             description: "Agents registered here are attributed as the actor on card changes made through the MCP interface." },
 	editor:     { group: "Workspace", title: "Code editor",        description: "Choose which editor Trackboi launches when you open a card's source file." },
+	project:    { group: "Current project", title: "Project settings", description: "Manage people aliases and project-scoped configuration for the active worktree project." },
 };
 
 const themeOptions: Array<{ value: ThemeMode; label: string; description: string; icon: typeof Sun }> = [
@@ -200,6 +206,18 @@ onBeforeUnmount(() => {
 								>
 									<Code2 class="h-4 w-4 shrink-0" />
 									Editor
+								</button>
+								<button
+									v-if="snapshot"
+									type="button"
+									class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors"
+									:class="activeSection === 'project'
+										? 'bg-secondary/80 font-medium text-foreground'
+										: 'font-normal text-muted-foreground hover:bg-secondary/45 hover:text-foreground'"
+									@click="activeSection = 'project'"
+								>
+									<SlidersHorizontal class="h-4 w-4 shrink-0" />
+									Current project
 								</button>
 							</div>
 						</div>
@@ -506,6 +524,27 @@ onBeforeUnmount(() => {
 								<Button type="button" class="rounded-none" @click="emit('saveEditor')">
 									Save
 								</Button>
+							</div>
+						</section>
+					</section>
+
+					<!-- Project -->
+					<section v-else-if="activeSection === 'project'" class="grid gap-4">
+						<section v-if="snapshot" class="grid gap-4 bg-background/12 p-4">
+							<ProjectSettingsPanel
+								v-model:person-display-name-draft="personDisplayNameDraft"
+								v-model:person-emails-draft="personEmailsDraft"
+								v-model:person-names-draft="personNamesDraft"
+								:snapshot="snapshot"
+								:people="people"
+								:busy="busy"
+								@add-person-alias="emit('addPersonAlias')"
+								@remove-person-alias="emit('removePersonAlias', $event)"
+							/>
+						</section>
+						<section v-else class="grid gap-4 bg-background/12 p-4">
+							<div class="border border-dashed border-border/75 bg-background/20 px-4 py-4 text-sm text-muted-foreground">
+								Open a project first to configure project-scoped settings.
 							</div>
 						</section>
 					</section>

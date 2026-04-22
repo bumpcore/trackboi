@@ -1,17 +1,14 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { FolderOpen, Plus, Settings2 } from "lucide-vue-next";
-import type { BoardDescriptor, Card as TrackboiCard, Column, CustomField, ProjectEntry, ProjectSnapshot, Track, WorktreeContext } from "@/core/types";
+import { FolderOpen, Plus } from "lucide-vue-next";
+import type { Card as TrackboiCard, Column, CustomField, ProjectEntry, ProjectSnapshot, Track, WorktreeContext } from "@/core/types";
 import BoardColumn from "@/ui/components/BoardColumn.vue";
 import Button from "@/ui/components/Button.vue";
 import UiCard from "@/ui/components/Card.vue";
-import Select, { type SelectOption } from "@/ui/components/Select.vue";
-import Tooltip from "@/ui/components/Tooltip.vue";
 import type { ChildProgress } from "@/ui/viewTypes";
 
 const props = defineProps<{
 	activeProject: ProjectEntry | null;
-	boards: BoardDescriptor[];
 	busy: boolean;
 	cardsByColumn: Record<string, TrackboiCard[]>;
 	childProgress: Record<string, ChildProgress>;
@@ -21,7 +18,6 @@ const props = defineProps<{
 	hasProjects: boolean;
 	loading: boolean;
 	scopeEmptyMessage: string | null;
-	selectedBoardId: string | null;
 	selectedTrack: Track | null;
 	selectedWorktree: WorktreeContext | null;
 	snapshot: ProjectSnapshot | null;
@@ -32,8 +28,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
 	chooseProject: [];
-	selectBoard: [boardId: string];
-	openBoardSettings: [];
 	createCard: [columnId?: string];
 	createColumn: [];
 	editColumn: [column: Column];
@@ -56,20 +50,8 @@ const boardSubtitle = computed(() => {
 	return `Current workspace context · ${props.visibleCardCount} visible cards`;
 });
 
-const boardOptions = computed<SelectOption[]>(() => (
-	props.boards.map((board) => ({
-		value: board.id,
-		label: board.status === "stale" ? `${board.name} (stale)` : board.name,
-	}))
-));
-
 function forwardMove(cardId: string, toColumn: string, beforeCardId: string | null) {
 	emit("moveCard", cardId, toColumn, beforeCardId);
-}
-
-function forwardBoardSelection(boardId: string | undefined) {
-	if (!boardId) return;
-	emit("selectBoard", boardId);
 }
 
 function clearCardSelectionFromBackground(event: PointerEvent) {
@@ -95,37 +77,16 @@ function clearCardSelectionFromBackground(event: PointerEvent) {
 				</div>
 
 				<div class="flex shrink-0 items-center gap-2">
-					<Select
+					<Button
 						v-if="snapshot"
-						:model-value="selectedBoardId ?? snapshot.board.id"
-						:options="boardOptions"
-						class="w-[220px]"
-						data-testid="board-switcher"
-						@update:model-value="forwardBoardSelection"
-					/>
-					<Tooltip v-if="snapshot" content="Board settings" side="left">
-						<Button
-							type="button"
-							size="icon"
-							variant="outline"
-							:disabled="busy"
-							data-testid="board-settings-button"
-							@click="emit('openBoardSettings')"
-						>
-							<Settings2 class="h-4 w-4" />
-						</Button>
-					</Tooltip>
-					<Tooltip v-if="snapshot" content="New card" side="left">
-						<Button
-							type="button"
-							size="icon"
-							:disabled="busy"
-							data-testid="board-new-card"
-							@click="emit('createCard')"
-						>
-							<Plus class="h-4 w-4" />
-						</Button>
-					</Tooltip>
+						type="button"
+						size="icon"
+						:disabled="busy"
+						data-testid="board-new-card"
+						@click="emit('createCard')"
+					>
+						<Plus class="h-4 w-4" />
+					</Button>
 				</div>
 			</div>
 		</header>

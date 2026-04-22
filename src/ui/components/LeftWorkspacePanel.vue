@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Plus, Settings } from "lucide-vue-next";
-import type { ProjectSnapshot, Track, WorktreeContext } from "@/core/types";
+import { Layers3, Plus, Settings } from "lucide-vue-next";
+import type { BoardDescriptor, ProjectSnapshot, Track, WorktreeContext } from "@/core/types";
 import Button from "@/ui/components/Button.vue";
 import Tooltip from "@/ui/components/Tooltip.vue";
 
 const props = defineProps<{
+	boards: BoardDescriptor[];
 	busy: boolean;
+	selectedBoardId: string | null;
 	selectedTrackId: string | null;
 	selectedTrack: Track | null;
 	snapshot: ProjectSnapshot | null;
@@ -17,10 +19,12 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+	selectBoard: [boardId: string];
 	selectWorktree: [worktreeId: string];
 	selectTrack: [trackId: string];
+	createBoard: [];
 	createTrack: [];
-	openProjectSettings: [];
+	openBoardSettings: [boardId: string];
 }>();
 
 const shouldShowWorktrees = computed(() => props.worktrees.length > 1);
@@ -31,6 +35,10 @@ function worktreeTooltip(worktree: WorktreeContext) {
 
 function trackSourceLabel(track: Track) {
 	return track.source.kind === "branch" ? track.source.ref : "manual";
+}
+
+function boardStatusLabel(board: BoardDescriptor) {
+	return board.status === "stale" ? "stale" : "active in current workspace";
 }
 </script>
 
@@ -47,7 +55,86 @@ function trackSourceLabel(track: Track) {
 					</div>
 				</section>
 
-				<section class="border-b border-border/70 px-4 py-3" data-testid="track-list">
+				<section v-if="shouldShowWorktrees" class="px-3 py-3" data-testid="worktree-list">
+					<div class="mb-2 px-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Worktrees</div>
+					<div class="space-y-1.5">
+						<Tooltip
+							v-for="worktree in worktrees"
+							:key="worktree.id"
+							:content="worktreeTooltip(worktree)"
+							side="right"
+							wrapper-class="w-full"
+						>
+							<button
+								type="button"
+								class="shell-sidebar-item w-full !items-start"
+								:class="{ 'is-active': selectedWorktreeId === worktree.id }"
+								:data-testid="`worktree-${worktree.id}`"
+								@click="emit('selectWorktree', worktree.id)"
+							>
+								<span class="mt-1 inline-flex h-2 w-2 rounded-full bg-primary/90" />
+								<div class="w-0 flex-1 overflow-hidden">
+									<div class="w-full truncate text-foreground">{{ worktree.name }}</div>
+									<div class="w-full truncate font-mono text-[10px] text-muted-foreground">switch workspace context · {{ worktree.branch ?? worktree.path }}</div>
+								</div>
+							</button>
+						</Tooltip>
+					</div>
+				</section>
+
+				<section v-if="snapshot" class="border-t border-border/70 px-4 py-3" data-testid="board-list">
+					<div class="mb-2 flex items-center justify-between gap-3">
+						<div class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Boards</div>
+						<Tooltip content="New board" side="right">
+							<Button
+								variant="ghost"
+								size="icon"
+								type="button"
+								:disabled="busy"
+								data-testid="board-create-button"
+								@click="emit('createBoard')"
+							>
+								<Plus class="h-4 w-4" />
+							</Button>
+						</Tooltip>
+					</div>
+					<div class="space-y-1.5">
+						<div
+							v-for="board in boards"
+							:key="board.id"
+							class="flex items-start gap-1.5"
+						>
+							<button
+								type="button"
+								class="shell-sidebar-item w-full !items-start"
+								:class="{ 'is-active': (selectedBoardId ?? snapshot.board.id) === board.id }"
+								:data-testid="`board-${board.id}`"
+								@click="emit('selectBoard', board.id)"
+							>
+								<Layers3 class="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+								<div class="w-0 flex-1 overflow-hidden">
+									<div class="w-full truncate text-foreground">{{ board.name }}</div>
+									<div class="w-full truncate trackboi-mono-font text-[10px] text-muted-foreground">{{ boardStatusLabel(board) }}</div>
+								</div>
+							</button>
+							<Tooltip content="Board settings" side="right">
+								<Button
+									variant="ghost"
+									size="icon"
+									type="button"
+									class="shrink-0"
+									:disabled="busy"
+									:data-testid="`board-settings-${board.id}`"
+									@click.stop="emit('openBoardSettings', board.id)"
+								>
+									<Settings class="h-4 w-4" />
+								</Button>
+							</Tooltip>
+						</div>
+					</div>
+				</section>
+
+				<section class="border-t border-border/70 px-4 py-3" data-testid="track-list">
 					<div class="mb-2 flex items-center justify-between gap-3">
 						<div class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Tracks</div>
 						<Button variant="outline" size="sm" type="button" data-testid="create-track-button" :disabled="busy" @click="emit('createTrack')">
@@ -89,53 +176,12 @@ function trackSourceLabel(track: Track) {
 						</button>
 					</div>
 				</section>
-
-				<section v-if="shouldShowWorktrees" class="px-3 py-3" data-testid="worktree-list">
-					<div class="mb-2 px-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Worktrees</div>
-					<div class="space-y-1.5">
-						<Tooltip
-							v-for="worktree in worktrees"
-							:key="worktree.id"
-							:content="worktreeTooltip(worktree)"
-							side="right"
-							wrapper-class="w-full"
-						>
-							<button
-								type="button"
-								class="shell-sidebar-item w-full !items-start"
-								:class="{ 'is-active': selectedWorktreeId === worktree.id }"
-								:data-testid="`worktree-${worktree.id}`"
-								@click="emit('selectWorktree', worktree.id)"
-							>
-								<span class="mt-1 inline-flex h-2 w-2 rounded-full bg-primary/90" />
-								<div class="w-0 flex-1 overflow-hidden">
-									<div class="w-full truncate text-foreground">{{ worktree.name }}</div>
-									<div class="w-full truncate font-mono text-[10px] text-muted-foreground">switch workspace context · {{ worktree.branch ?? worktree.path }}</div>
-								</div>
-							</button>
-						</Tooltip>
-					</div>
-				</section>
 			</div>
 		</div>
 
 		<footer class="border-t border-border/70 px-4 py-3">
-			<div class="flex items-center justify-between gap-3">
-				<div class="min-w-0 truncate font-mono text-[10px] text-muted-foreground">
-					{{ snapshot?.project.storagePath ?? ".trackboi" }}
-				</div>
-				<Tooltip content="Project settings" side="top">
-					<Button
-						variant="ghost"
-						size="icon"
-						type="button"
-						class="shrink-0"
-						data-testid="project-settings-button"
-						@click="emit('openProjectSettings')"
-					>
-						<Settings class="h-4 w-4" />
-					</Button>
-				</Tooltip>
+			<div class="min-w-0 truncate font-mono text-[10px] text-muted-foreground">
+				{{ snapshot?.project.storagePath ?? ".trackboi" }}
 			</div>
 		</footer>
 	</aside>

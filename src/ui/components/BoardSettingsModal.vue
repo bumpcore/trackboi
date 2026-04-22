@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, watch } from "vue";
-import { Layers3, ListPlus, Save, SlidersHorizontal, Trash2, X } from "lucide-vue-next";
-import type { BoardDescriptor, CustomField, FieldType, ProjectSnapshot } from "@/core/types";
-import Badge from "@/ui/components/Badge.vue";
+import { Layers3, Save, SlidersHorizontal, Trash2, X } from "lucide-vue-next";
+import type { CustomField, FieldType, ProjectSnapshot } from "@/core/types";
 import Button from "@/ui/components/Button.vue";
 import Input from "@/ui/components/Input.vue";
 import Select, { type SelectOption } from "@/ui/components/Select.vue";
@@ -11,22 +10,19 @@ const props = defineProps<{
 	open: boolean;
 	busy: boolean;
 	snapshot: ProjectSnapshot | null;
-	boards: BoardDescriptor[];
+	boardCount: number;
 	customFields: CustomField[];
 	fieldTypeOptions: SelectOption[];
 }>();
 
 const boardNameDraft = defineModel<string>("boardNameDraft", { required: true });
-const boardCreateNameDraft = defineModel<string>("boardCreateNameDraft", { required: true });
 const fieldNameDraft = defineModel<string>("fieldNameDraft", { required: true });
 const fieldTypeDraft = defineModel<FieldType>("fieldTypeDraft", { required: true });
 const fieldOptionsDraft = defineModel<string>("fieldOptionsDraft", { required: true });
 
 const emit = defineEmits<{
 	close: [];
-	selectBoard: [boardId: string];
-	createBoard: [];
-	deleteBoard: [boardId: string];
+	deleteBoard: [];
 	saveBoardName: [];
 	addCustomField: [];
 	removeCustomField: [fieldId: string];
@@ -63,9 +59,9 @@ onBeforeUnmount(() => {
 				<header class="flex items-start justify-between gap-3 border-b border-border/30 px-6 py-5">
 					<div>
 						<p class="text-xs font-semibold uppercase tracking-wide text-primary">Board</p>
-						<h2 class="mt-1 text-xl font-semibold tracking-tight text-foreground">Board settings</h2>
+						<h2 class="mt-1 text-xl font-semibold tracking-tight text-foreground">{{ snapshot?.board.name ?? "Board settings" }}</h2>
 						<p class="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-							Switch boards, shape their columns, and keep board-level work separate from project-scoped settings.
+							Adjust this board's name and custom fields. Column structure lives in the board canvas and right panel.
 						</p>
 					</div>
 					<Button variant="ghost" size="icon" type="button" @click="emit('close')">
@@ -75,55 +71,6 @@ onBeforeUnmount(() => {
 
 				<div class="app-scroll min-h-0 overflow-y-auto p-6">
 					<div v-if="snapshot" class="grid content-start gap-5">
-						<section class="shell-section">
-							<div class="flex items-start gap-3">
-								<div class="grid h-9 w-9 place-items-center rounded-md border border-border/80 bg-secondary/55 text-muted-foreground">
-									<Layers3 class="h-4 w-4" />
-								</div>
-								<div>
-									<p class="shell-section-title">Boards</p>
-									<p class="mt-1 text-sm text-muted-foreground">Boards live inside the project and stay explicit even when worktree state lags.</p>
-								</div>
-							</div>
-
-							<div class="grid gap-2">
-								<button
-									v-for="board in boards"
-									:key="board.id"
-									type="button"
-									class="flex items-center justify-between gap-3 rounded-md border px-3 py-3 text-left transition-colors"
-									:class="board.id === snapshot.board.id ? 'border-primary/45 bg-secondary/58' : 'border-border/70 bg-background/25 hover:bg-secondary/35'"
-									@click="emit('selectBoard', board.id)"
-								>
-									<div class="min-w-0">
-										<p class="truncate text-sm font-medium text-foreground">{{ board.name }}</p>
-										<p class="mt-1 trackboi-mono-font text-[11px] text-muted-foreground">{{ board.id }}</p>
-									</div>
-									<div class="flex items-center gap-2">
-										<Badge v-if="board.status === 'stale'" variant="outline">stale</Badge>
-										<Button
-											v-if="boards.length > 1"
-											variant="outline"
-											size="icon"
-											type="button"
-											:disabled="busy"
-											@click.stop="emit('deleteBoard', board.id)"
-										>
-											<Trash2 class="h-4 w-4" />
-										</Button>
-									</div>
-								</button>
-							</div>
-
-							<form class="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]" @submit.prevent="emit('createBoard')">
-								<Input v-model="boardCreateNameDraft" autocomplete="off" placeholder="New board" />
-								<Button type="submit" :disabled="busy || !boardCreateNameDraft.trim()">
-									<ListPlus class="h-4 w-4" />
-									Add board
-								</Button>
-							</form>
-						</section>
-
 						<section class="shell-section">
 							<div class="flex items-start gap-3">
 								<div class="grid h-9 w-9 place-items-center rounded-md border border-border/80 bg-secondary/55 text-muted-foreground">
@@ -140,10 +87,22 @@ onBeforeUnmount(() => {
 									Board name
 									<Input v-model="boardNameDraft" autocomplete="off" />
 								</label>
-								<Button type="submit" :disabled="busy || !boardNameDraft.trim()">
-									<Save class="h-4 w-4" />
-									Save
-								</Button>
+								<div class="flex items-end gap-2">
+									<Button type="submit" :disabled="busy || !boardNameDraft.trim()">
+										<Save class="h-4 w-4" />
+										Save
+									</Button>
+									<Button
+										v-if="boardCount > 1"
+										variant="outline"
+										type="button"
+										:disabled="busy"
+										@click="emit('deleteBoard')"
+									>
+										<Trash2 class="h-4 w-4" />
+										Delete
+									</Button>
+								</div>
 							</form>
 						</section>
 

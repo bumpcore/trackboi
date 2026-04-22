@@ -17,7 +17,7 @@ import type {
 } from "@/core/types";
 import { desktop } from "@/electron/renderer";
 import type { DesktopStorePatch } from "@/electron/bridge";
-import type { Confirmation } from "@/ui/viewTypes";
+import type { Confirmation, SettingsSection } from "@/ui/viewTypes";
 
 type ConfirmationRequester = (confirmation: Confirmation) => void;
 type WorktreeMemory = Record<string, string | null>;
@@ -39,7 +39,7 @@ type DesktopProjectState = {
 	busy: Readonly<Ref<boolean>>;
 	error: Ref<string | null>;
 	settingsOpen: Ref<boolean>;
-	projectSettingsOpen: Ref<boolean>;
+	settingsSection: Ref<SettingsSection>;
 	storagePathDraft: Ref<string>;
 	run(action: () => Promise<void>, options?: RunOptions): Promise<void>;
 	setError(errorValue: unknown): void;
@@ -67,9 +67,9 @@ type DesktopProjectState = {
 	switchProject(projectPath: string): Promise<void>;
 	selectWorktree(worktreeId: string): Promise<void>;
 	selectBoard(boardId: string): Promise<void>;
+	openSettings(section?: SettingsSection): void;
 	closeSettings(): void;
 	openProjectSettings(): void;
-	closeProjectSettings(): void;
 	allEntries: ComputedRef<ProjectEntry[]>;
 	activeProject: ComputedRef<ProjectEntry | null>;
 	canRemoveActiveProject: ComputedRef<boolean>;
@@ -187,7 +187,7 @@ function createDesktopProjectState(): InternalDesktopProjectState {
 	const globalPendingCount = ref(0);
 	const error = ref<string | null>(null);
 	const settingsOpen = ref(false);
-	const projectSettingsOpen = ref(false);
+	const settingsSection = ref<SettingsSection>("storage");
 	const storagePathDraft = ref("");
 	const busy = computed(() => globalPendingCount.value > 0);
 	let patchListenerStarted = false;
@@ -670,16 +670,17 @@ function createDesktopProjectState(): InternalDesktopProjectState {
 		});
 	}
 
+	function openSettings(section: SettingsSection = "storage") {
+		settingsSection.value = section;
+		settingsOpen.value = true;
+	}
+
 	function closeSettings() {
 		settingsOpen.value = false;
 	}
 
 	function openProjectSettings() {
-		projectSettingsOpen.value = true;
-	}
-
-	function closeProjectSettings() {
-		projectSettingsOpen.value = false;
+		openSettings("project");
 	}
 
 	return {
@@ -692,7 +693,7 @@ function createDesktopProjectState(): InternalDesktopProjectState {
 		busy,
 		error,
 		settingsOpen,
-		projectSettingsOpen,
+		settingsSection,
 		storagePathDraft,
 		run,
 		setError,
@@ -720,9 +721,9 @@ function createDesktopProjectState(): InternalDesktopProjectState {
 		switchProject,
 		selectWorktree,
 		selectBoard,
+		openSettings,
 		closeSettings,
 		openProjectSettings,
-		closeProjectSettings,
 		allEntries,
 		activeProject,
 		canRemoveActiveProject,

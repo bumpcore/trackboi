@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import BoardSettingsModal from "@/ui/components/BoardSettingsModal.vue";
+import BoardCreateModal from "@/ui/components/BoardCreateModal.vue";
 import BoardWorkspace from "@/ui/components/BoardWorkspace.vue";
 import CommandCenter from "@/ui/components/CommandCenter.vue";
 import ConfirmDialog from "@/ui/components/ConfirmDialog.vue";
 import LeftRail from "@/ui/components/LeftRail.vue";
 import LeftWorkspacePanel from "@/ui/components/LeftWorkspacePanel.vue";
 import PanelResizer from "@/ui/components/PanelResizer.vue";
-import ProjectSettingsModal from "@/ui/components/ProjectSettingsModal.vue";
 import RightWorkspacePanel from "@/ui/components/RightWorkspacePanel.vue";
 import SettingsModal from "@/ui/components/SettingsModal.vue";
 import WorkspaceTitleBar from "@/ui/components/WorkspaceTitleBar.vue";
@@ -49,6 +49,7 @@ const {
 } = useConfirmation();
 
 const boardScopeMode = ref<BoardScopeMode>("all");
+const boardCreateModalOpen = ref(false);
 
 const {
 	snapshot,
@@ -60,7 +61,7 @@ const {
 	busy,
 	error,
 	settingsOpen,
-	projectSettingsOpen,
+	settingsSection,
 	storagePathDraft,
 	run,
 	setError,
@@ -83,9 +84,9 @@ const {
 	removeCard,
 	addCardComment,
 	optimisticMoveCard,
+	openSettings,
 	closeSettings,
 	openProjectSettings,
-	closeProjectSettings,
 	activeProject,
 	allEntries,
 	hasProjects,
@@ -299,10 +300,6 @@ function ensureRightPanelOpen() {
 	if (shell.rightCollapsed.value) shell.rightCollapsed.value = false;
 }
 
-function openSettings() {
-	settingsOpen.value = true;
-}
-
 function focusTrack(trackId: string) {
 	selectTrack(trackId);
 	ensureRightPanelOpen();
@@ -355,12 +352,26 @@ function openColumnPanel(columnId: string) {
 	shell.setRightView("column");
 }
 
-function openBoardSettings() {
+async function openBoardSettings(boardId?: string) {
+	if (boardId && snapshot.value?.board.id !== boardId) await focusBoard(boardId);
 	boardSettingsOpen.value = true;
 }
 
 function closeBoardSettings() {
 	boardSettingsOpen.value = false;
+}
+
+function openBoardCreateModal() {
+	boardCreateModalOpen.value = true;
+}
+
+function closeBoardCreateModal() {
+	boardCreateModalOpen.value = false;
+}
+
+async function submitCreateBoard() {
+	await createBoard();
+	if (!boardCreateNameDraft.value.trim()) boardCreateModalOpen.value = false;
 }
 
 async function focusBoard(boardId: string) {
@@ -803,7 +814,9 @@ onBeforeUnmount(() => {
 			<div class="min-h-0 overflow-hidden border-r border-border/70">
 				<LeftWorkspacePanel
 					v-if="!shell.leftCollapsed.value"
+					:boards="boards"
 					:busy="busy"
+					:selected-board-id="selectedBoardId"
 					:selected-track-id="selectedTrackId"
 					:selected-track="selectedTrack"
 					:snapshot="snapshot"
@@ -811,10 +824,12 @@ onBeforeUnmount(() => {
 					:tracks="tracks"
 					:selected-worktree-id="selectedWorktreeId"
 					:worktrees="worktrees"
+					@select-board="selectBoard"
 					@select-worktree="selectWorktree"
 					@select-track="handleTrackSelection"
+					@create-board="openBoardCreateModal"
 					@create-track="createTrackFromShell"
-					@open-project-settings="openProjectSettings"
+					@open-board-settings="openBoardSettings"
 				/>
 			</div>
 
@@ -828,9 +843,7 @@ onBeforeUnmount(() => {
 				:fresh-card-ids="freshCardIds"
 				:has-projects="hasProjects"
 				:loading="loading"
-				:boards="boards"
 				:scope-empty-message="scopeEmptyMessage"
-				:selected-board-id="selectedBoardId"
 				:selected-card-id="selectedCard?.id ?? null"
 				:selected-track="selectedTrack"
 				:selected-worktree="selectedWorktree"
@@ -838,8 +851,6 @@ onBeforeUnmount(() => {
 				:track-labels="trackLabels"
 				:visible-card-count="visibleCardCount"
 				@choose-project="chooseProject"
-				@select-board="selectBoard"
-				@open-board-settings="openBoardSettings"
 				@create-column="createColumnFromBoard"
 				@edit-column="editColumnFromBoard"
 				@create-card="openCardPanel"
@@ -918,6 +929,7 @@ onBeforeUnmount(() => {
 			/>
 
 			<SettingsModal
+				v-model:section="settingsSection"
 				v-model:draft="storagePathDraft"
 				v-model:left-panel-shortcut="leftPanelShortcut"
 				v-model:right-panel-shortcut="rightPanelShortcut"
@@ -928,9 +940,14 @@ onBeforeUnmount(() => {
 				v-model:custom-editor-command="appSettings.editor.customCommand"
 				v-model:agent-name-draft="agentNameDraft"
 				v-model:agent-description-draft="agentDescriptionDraft"
+				v-model:person-display-name-draft="personDisplayNameDraft"
+				v-model:person-emails-draft="personEmailsDraft"
+				v-model:person-names-draft="personNamesDraft"
 				:open="settingsOpen"
 				:paths="view.storageSearchPaths"
 				:agents="appSettings.agents"
+				:snapshot="snapshot"
+				:people="people"
 				:detected-editors="detectedEditors"
 				:busy="busy"
 				@close="closeSettings"
@@ -942,6 +959,8 @@ onBeforeUnmount(() => {
 				@register-agent="handleRegisterAgent"
 				@remove-agent="removeAgent"
 				@save-editor="saveEditorSettings"
+				@add-person-alias="addPersonAlias"
+				@remove-person-alias="removePersonAlias"
 			/>
 
 			<CommandCenter
@@ -957,21 +976,7 @@ onBeforeUnmount(() => {
 				@select-index="commandCenter.selectIndex"
 			/>
 
-			<ProjectSettingsModal
-				v-model:person-display-name-draft="personDisplayNameDraft"
-				v-model:person-emails-draft="personEmailsDraft"
-				v-model:person-names-draft="personNamesDraft"
-				:open="projectSettingsOpen"
-				:busy="busy"
-				:snapshot="snapshot"
-				:people="people"
-				@close="closeProjectSettings"
-				@add-person-alias="addPersonAlias"
-				@remove-person-alias="removePersonAlias"
-			/>
-
 			<BoardSettingsModal
-				v-model:board-create-name-draft="boardCreateNameDraft"
 				v-model:board-name-draft="boardNameDraft"
 				v-model:field-name-draft="fieldNameDraft"
 				v-model:field-type-draft="fieldTypeDraft"
@@ -979,16 +984,22 @@ onBeforeUnmount(() => {
 				:open="boardSettingsOpen"
 				:busy="busy"
 				:snapshot="snapshot"
-				:boards="boards"
+				:board-count="boards.length"
 				:custom-fields="customFields"
 				:field-type-options="fieldTypeOptions"
 				@close="closeBoardSettings"
-				@select-board="selectBoard"
-				@create-board="createBoard"
-				@delete-board="deleteBoard"
+				@delete-board="snapshot && deleteBoard(snapshot.board.id)"
 				@save-board-name="saveBoardName"
 				@add-custom-field="addCustomField"
 				@remove-custom-field="removeCustomField"
+			/>
+
+			<BoardCreateModal
+				v-model:board-create-name-draft="boardCreateNameDraft"
+				:open="boardCreateModalOpen"
+				:busy="busy"
+				@close="closeBoardCreateModal"
+				@create="submitCreateBoard"
 			/>
 		</main>
 

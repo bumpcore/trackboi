@@ -75,7 +75,7 @@ function projectMonogram(name: string) {
 						<CircleHelp class="h-4 w-4" />
 					</Button>
 				</Tooltip>
-				<Tooltip content="Global settings" side="right">
+				<Tooltip content="Settings" side="right">
 					<Button variant="ghost" size="icon" type="button" data-testid="app-settings-button" @click="emit('settings')">
 						<Settings class="h-4 w-4" />
 					</Button>

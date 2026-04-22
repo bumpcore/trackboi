@@ -5,6 +5,8 @@ const APP_PREFERENCES_KEY = "trackboi:app-settings:v1";
 
 export const DEFAULT_LEFT_PANEL_SHORTCUT = "Ctrl+B";
 export const DEFAULT_RIGHT_PANEL_SHORTCUT = "Ctrl+Shift+X";
+export const DEFAULT_COMMAND_CENTER_NAVIGATE_SHORTCUT = "Ctrl+P";
+export const DEFAULT_COMMAND_CENTER_COMMAND_SHORTCUT = "Ctrl+Shift+P";
 export const DEFAULT_THEME_MODE = "dark";
 
 export type ThemeMode = "dark" | "light" | "system";
@@ -12,6 +14,8 @@ export type ThemeMode = "dark" | "light" | "system";
 type PersistedAppPreferences = {
 	leftPanelShortcut: string;
 	rightPanelShortcut: string;
+	commandCenterNavigateShortcut: string;
+	commandCenterCommandShortcut: string;
 	themeMode: ThemeMode;
 };
 
@@ -26,6 +30,8 @@ function normalizeThemeMode(value: unknown): ThemeMode {
 export function useAppPreferences() {
 	const leftPanelShortcut = ref(DEFAULT_LEFT_PANEL_SHORTCUT);
 	const rightPanelShortcut = ref(DEFAULT_RIGHT_PANEL_SHORTCUT);
+	const commandCenterNavigateShortcut = ref(DEFAULT_COMMAND_CENTER_NAVIGATE_SHORTCUT);
+	const commandCenterCommandShortcut = ref(DEFAULT_COMMAND_CENTER_COMMAND_SHORTCUT);
 	const themeMode = ref<ThemeMode>(DEFAULT_THEME_MODE);
 
 	function readPreferences(): PersistedAppPreferences {
@@ -33,6 +39,8 @@ export function useAppPreferences() {
 			return {
 				leftPanelShortcut: DEFAULT_LEFT_PANEL_SHORTCUT,
 				rightPanelShortcut: DEFAULT_RIGHT_PANEL_SHORTCUT,
+				commandCenterNavigateShortcut: DEFAULT_COMMAND_CENTER_NAVIGATE_SHORTCUT,
+				commandCenterCommandShortcut: DEFAULT_COMMAND_CENTER_COMMAND_SHORTCUT,
 				themeMode: DEFAULT_THEME_MODE,
 			};
 		}
@@ -43,6 +51,8 @@ export function useAppPreferences() {
 				return {
 					leftPanelShortcut: DEFAULT_LEFT_PANEL_SHORTCUT,
 					rightPanelShortcut: DEFAULT_RIGHT_PANEL_SHORTCUT,
+					commandCenterNavigateShortcut: DEFAULT_COMMAND_CENTER_NAVIGATE_SHORTCUT,
+					commandCenterCommandShortcut: DEFAULT_COMMAND_CENTER_COMMAND_SHORTCUT,
 					themeMode: DEFAULT_THEME_MODE,
 				};
 			}
@@ -51,12 +61,16 @@ export function useAppPreferences() {
 			return {
 				leftPanelShortcut: normalizeShortcut(parsed.leftPanelShortcut ?? "") ?? DEFAULT_LEFT_PANEL_SHORTCUT,
 				rightPanelShortcut: normalizeShortcut(parsed.rightPanelShortcut ?? "") ?? DEFAULT_RIGHT_PANEL_SHORTCUT,
+				commandCenterNavigateShortcut: normalizeShortcut(parsed.commandCenterNavigateShortcut ?? "") ?? DEFAULT_COMMAND_CENTER_NAVIGATE_SHORTCUT,
+				commandCenterCommandShortcut: normalizeShortcut(parsed.commandCenterCommandShortcut ?? "") ?? DEFAULT_COMMAND_CENTER_COMMAND_SHORTCUT,
 				themeMode: normalizeThemeMode(parsed.themeMode),
 			};
 		} catch {
 			return {
 				leftPanelShortcut: DEFAULT_LEFT_PANEL_SHORTCUT,
 				rightPanelShortcut: DEFAULT_RIGHT_PANEL_SHORTCUT,
+				commandCenterNavigateShortcut: DEFAULT_COMMAND_CENTER_NAVIGATE_SHORTCUT,
+				commandCenterCommandShortcut: DEFAULT_COMMAND_CENTER_COMMAND_SHORTCUT,
 				themeMode: DEFAULT_THEME_MODE,
 			};
 		}
@@ -67,6 +81,8 @@ export function useAppPreferences() {
 		const payload: PersistedAppPreferences = {
 			leftPanelShortcut: normalizeShortcut(leftPanelShortcut.value) ?? DEFAULT_LEFT_PANEL_SHORTCUT,
 			rightPanelShortcut: normalizeShortcut(rightPanelShortcut.value) ?? DEFAULT_RIGHT_PANEL_SHORTCUT,
+			commandCenterNavigateShortcut: normalizeShortcut(commandCenterNavigateShortcut.value) ?? DEFAULT_COMMAND_CENTER_NAVIGATE_SHORTCUT,
+			commandCenterCommandShortcut: normalizeShortcut(commandCenterCommandShortcut.value) ?? DEFAULT_COMMAND_CENTER_COMMAND_SHORTCUT,
 			themeMode: normalizeThemeMode(themeMode.value),
 		};
 		window.localStorage.setItem(APP_PREFERENCES_KEY, JSON.stringify(payload));
@@ -75,6 +91,8 @@ export function useAppPreferences() {
 	function resetPanelShortcuts() {
 		leftPanelShortcut.value = DEFAULT_LEFT_PANEL_SHORTCUT;
 		rightPanelShortcut.value = DEFAULT_RIGHT_PANEL_SHORTCUT;
+		commandCenterNavigateShortcut.value = DEFAULT_COMMAND_CENTER_NAVIGATE_SHORTCUT;
+		commandCenterCommandShortcut.value = DEFAULT_COMMAND_CENTER_COMMAND_SHORTCUT;
 	}
 
 	function resetThemeMode() {
@@ -84,15 +102,19 @@ export function useAppPreferences() {
 	const persisted = readPreferences();
 	leftPanelShortcut.value = persisted.leftPanelShortcut;
 	rightPanelShortcut.value = persisted.rightPanelShortcut;
+	commandCenterNavigateShortcut.value = persisted.commandCenterNavigateShortcut;
+	commandCenterCommandShortcut.value = persisted.commandCenterCommandShortcut;
 	themeMode.value = persisted.themeMode;
 
-	watch([leftPanelShortcut, rightPanelShortcut, themeMode], () => {
+	watch([leftPanelShortcut, rightPanelShortcut, commandCenterNavigateShortcut, commandCenterCommandShortcut, themeMode], () => {
 		writePreferences();
 	});
 
 	return {
 		leftPanelShortcut,
 		rightPanelShortcut,
+		commandCenterNavigateShortcut,
+		commandCenterCommandShortcut,
 		themeMode,
 		resetPanelShortcuts,
 		resetThemeMode,

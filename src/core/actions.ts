@@ -44,6 +44,7 @@ export type NodeFsTrackboiActions = TrackboiActions & {
 	activeSnapshot(): ProjectSnapshot | null;
 	activeSnapshotWithInternals(): ProjectSnapshotWithInternals | null;
 	invalidateCache(): void;
+	invalidateStorageRoot(rootPath: string): void;
 	withScopedContext<T>(context: ScopedTrackboiContext, action: (actions: NodeFsTrackboiActions) => Promise<T>): Promise<T>;
 };
 
@@ -96,6 +97,10 @@ class NodeFsTrackboiActionsImpl implements NodeFsTrackboiActions {
 
 	invalidateCache(): void {
 		this.runtime.invalidateCache();
+	}
+
+	invalidateStorageRoot(rootPath: string): void {
+		this.runtime.invalidateStorageRoot(rootPath);
 	}
 
 	async withScopedContext<T>(context: ScopedTrackboiContext, action: (actions: NodeFsTrackboiActions) => Promise<T>): Promise<T> {

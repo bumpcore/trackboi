@@ -82,11 +82,50 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 	const desktopStateCache: DesktopStateCache = new Map();
 	const snapshotCache = new Map<string, ProjectSnapshotWithInternals>();
 	const worktreeCache = new Map<string, WorktreeStore[]>();
+	let projectViewCache: ProjectView | null = null;
 
-	function invalidateCache(): void {
+	function invalidateSnapshotCaches(): void {
 		desktopStateCache.clear();
 		snapshotCache.clear();
+	}
+
+	function invalidateAllCaches(): void {
+		invalidateSnapshotCaches();
 		worktreeCache.clear();
+		projectViewCache = null;
+	}
+
+	function invalidateProjectDesktopState(projectPath: string): void {
+		desktopStateCache.delete(projectPath);
+	}
+
+	function invalidateProjectWorktrees(projectPath: string): void {
+		worktreeCache.delete(projectPath);
+	}
+
+	function invalidateProjectState(projectPath: string, options: {
+		rootPath?: string | null;
+		worktrees?: boolean;
+		view?: boolean;
+	} = {}): void {
+		invalidateProjectDesktopState(projectPath);
+		if (options.rootPath) snapshotCache.delete(options.rootPath);
+		if (options.worktrees) invalidateProjectWorktrees(projectPath);
+		if (options.view) projectViewCache = null;
+	}
+
+	function invalidateCache(): void {
+		invalidateSnapshotCaches();
+	}
+
+	function invalidateStorageRoot(rootPath: string): void {
+		snapshotCache.delete(rootPath);
+		projectViewCache = null;
+		for (const [projectKey, worktrees] of worktreeCache.entries()) {
+			if (!worktrees.some((worktree) => worktree.storageRoot === rootPath)) continue;
+			desktopStateCache.delete(projectKey);
+			worktreeCache.delete(projectKey);
+		}
 	}
 
 	function readSnapshotForPath(project: Project, projectPath: string, create: boolean): ProjectSnapshotWithInternals | null {
@@ -105,6 +144,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 	}
 
 	function listView(): ProjectView {
+		if (projectViewCache) return projectViewCache;
 		const current = registry.readRegistry();
 		const seen = new Set<string>();
 		const sources: ProjectSource[] = [];
@@ -129,11 +169,12 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			sources.push({ ...source, entries });
 		}
 
-		return {
+		projectViewCache = {
 			sources,
 			activeProjectPath: current.activeProjectPath,
 			storageSearchPaths: storageCandidates(current),
 		};
+		return projectViewCache;
 	}
 
 	function discoverWorktrees(project: Project): WorktreeStore[] {
@@ -321,6 +362,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		const current = registry.readRegistry();
 		current.appSettings = settings;
 		registry.writeRegistry(current);
+		projectViewCache = null;
 		return current.appSettings;
 	}
 
@@ -438,12 +480,13 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		const existing = findExistingBranchTrack(ref);
 		if (existing) return existing;
 
-		const created = createTrackInStore(openTargetStore(true), {
+		const store = openTargetStore(true);
+		const created = createTrackInStore(store, {
 			title,
 			boardId: requireActiveBoard().id,
 			source: { kind: "branch", ref },
 		});
-		invalidateCache();
+		invalidateProjectState(requireActiveProject().path, { rootPath: store.rootPath });
 		return created;
 	}
 
@@ -467,6 +510,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		if (input.source?.kind === "branch") {
 			return materializeBranchTrack(input.source.ref, input.title);
 		}
+		const project = requireActiveProject();
 		const store = openTargetStore(true);
 		const worktree = requireSelectedWorktree();
 		const track = createTrackInStore(store, {
@@ -474,7 +518,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			boardId: input.boardId ?? requireActiveBoard().id,
 			actorId: resolveDesktopActorId(store, worktree.path, input.actorId),
 		});
-		invalidateCache();
+		invalidateProjectState(project.path, { rootPath: store.rootPath });
 		return track;
 	}
 
@@ -504,7 +548,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			...patch,
 			actorId: resolveDesktopActorId(store, origin.worktreePath, patch.actorId),
 		});
-		invalidateCache();
+		invalidateProjectState(project.path, { rootPath: store.rootPath });
 		return next;
 	}
 
@@ -512,14 +556,14 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		const project = requireActiveProject();
 		const track = getTrack(trackId);
 		const selectedWorktree = requireSelectedWorktree();
-		const snapshot = readSnapshotForPath(project, selectedWorktree.path, false);
-		if (snapshot) {
+		const selectedSnapshot = readSnapshotForPath(project, selectedWorktree.path, false);
+		if (selectedSnapshot) {
 			const store = openStore({
 				...project,
 				path: selectedWorktree.path,
 				storagePath: undefined,
 			}, registry.readRegistry(), false);
-			for (const card of snapshot.cards) {
+			for (const card of selectedSnapshot.cards) {
 				const matchesRealTrack = card.trackId === trackId;
 				const matchesLegacyBranch = !card.trackId &&
 					track.source.kind === "branch" &&
@@ -541,9 +585,12 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 				storagePath: undefined,
 			}, registry.readRegistry(), false);
 			deleteTrackInStore(store, trackId);
+			invalidateProjectState(project.path, { rootPath: store.rootPath });
 		}
 
-		invalidateCache();
+		invalidateProjectState(project.path, {
+			rootPath: selectedSnapshot?.storageRoot ?? null,
+		});
 		return { ok: true };
 	}
 
@@ -575,7 +622,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			storagePath: undefined,
 		}, registry.readRegistry(), false);
 		const file = writeTrackFileInStore(store, { ...input, trackId: realTrackId });
-		invalidateCache();
+		invalidateProjectState(project.path, { rootPath: store.rootPath });
 		return file;
 	}
 
@@ -592,7 +639,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			storagePath: undefined,
 		}, registry.readRegistry(), false);
 		const result = deleteTrackFileInStore(store, realTrackId, fileName);
-		invalidateCache();
+		invalidateProjectState(project.path, { rootPath: store.rootPath });
 		return result;
 	}
 
@@ -604,7 +651,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			current.activeProjectPath = existing.path;
 			current.selectedWorktreeId = canonicalPath;
 			registry.writeRegistry(current);
-			invalidateCache();
+			invalidateAllCaches();
 			return stripInternalSnapshotFields(aggregateSnapshot(existing, true).snapshotBase)!;
 		}
 
@@ -618,7 +665,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		current.activeProjectPath = project.path;
 		current.selectedWorktreeId = canonicalPath;
 		registry.writeRegistry(current);
-		invalidateCache();
+		invalidateAllCaches();
 		return stripInternalSnapshotFields(aggregateSnapshot(project, true).snapshotBase)!;
 	}
 
@@ -633,7 +680,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		current.activeProjectPath = project.path;
 		current.selectedWorktreeId = canonicalPath;
 		registry.writeRegistry(current);
-		invalidateCache();
+		invalidateAllCaches();
 		return stripInternalSnapshotFields(aggregateSnapshot(project, true).snapshotBase)!;
 	}
 
@@ -647,7 +694,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			current.selectedWorktreeId = current.projects[0]?.path ?? null;
 		}
 		registry.writeRegistry(current);
-		invalidateCache();
+		invalidateAllCaches();
 		return activeSnapshot();
 	}
 
@@ -658,6 +705,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		current.activeProjectPath = projectPath;
 		current.selectedWorktreeId = project.path;
 		registry.writeRegistry(current);
+		projectViewCache = null;
 		return toDesktopState(getCachedDesktopState(true));
 	}
 
@@ -688,7 +736,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		const current = registry.readRegistry();
 		current.selectedBoardId = boardId;
 		registry.writeRegistry(current);
-		invalidateCache();
+		invalidateProjectState(store.project.path, { rootPath: store.rootPath });
 		return stripInternalSnapshotFields(activeSnapshotWithInternals())!;
 	}
 
@@ -708,7 +756,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			current.selectedBoardId = descriptors.find((board) => board.id !== boardId)?.id ?? null;
 			registry.writeRegistry(current);
 		}
-		invalidateCache();
+		invalidateProjectState(store.project.path, { rootPath: store.rootPath });
 		return stripInternalSnapshotFields(activeSnapshotWithInternals())!;
 	}
 
@@ -716,7 +764,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		const current = registry.readRegistry();
 		current.storageSearchPaths = normalizeStorageSearchPaths(paths);
 		registry.writeRegistry(current);
-		invalidateCache();
+		invalidateAllCaches();
 		return listView();
 	}
 
@@ -724,7 +772,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		const current = registry.readRegistry();
 		current.activeWorkspaceFile = filePath || null;
 		registry.writeRegistry(current);
-		invalidateCache();
+		projectViewCache = null;
 		return listView();
 	}
 
@@ -734,7 +782,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		const metadata = normalizeProjectMetadata(readJson<ProjectMetadata>(filePath), store.project, store.storagePath);
 		const nextMetadata = { ...metadata, people };
 		writeJsonAtomic(filePath, nextMetadata);
-		invalidateCache();
+		invalidateProjectState(store.project.path, { rootPath: store.rootPath });
 		return nextMetadata;
 	}
 
@@ -753,7 +801,11 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			scope: { kind: "project", ref: "global" },
 			actorId,
 		});
-		invalidateCache();
+		invalidateProjectState(project.path, {
+			rootPath: store.rootPath,
+			worktrees: true,
+			view: true,
+		});
 		return {
 			...card,
 			originWorktreeId: worktree.id,
@@ -792,7 +844,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			...toStoredCardPatch(patch, trackId),
 			actorId,
 		} as CardPatch);
-		invalidateCache();
+		invalidateProjectState(project.path, { rootPath: store.rootPath });
 		return card;
 	}
 
@@ -811,7 +863,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			...input,
 			actorId,
 		});
-		invalidateCache();
+		invalidateProjectState(project.path, { rootPath: store.rootPath });
 		return comment;
 	}
 
@@ -826,14 +878,14 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			storagePath: undefined,
 		}, registry.readRegistry(), false);
 		const card = moveCardInStore(store, snapshot, input);
-		invalidateCache();
+		invalidateProjectState(project.path, { rootPath: store.rootPath });
 		return card;
 	}
 
 	function updateBoard(board: Board): Board {
 		const store = openTargetStore(true);
 		writeJsonAtomic(boardPath(store.rootPath, board.id), board);
-		invalidateCache();
+		invalidateProjectState(store.project.path, { rootPath: store.rootPath });
 		return board;
 	}
 
@@ -846,7 +898,11 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			storagePath: undefined,
 		}, registry.readRegistry(), false);
 		const result = deleteCardInStore(store, cardId);
-		invalidateCache();
+		invalidateProjectState(project.path, {
+			rootPath: store.rootPath,
+			worktrees: true,
+			view: true,
+		});
 		return result;
 	}
 
@@ -860,6 +916,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		readDesktopState,
 		prewarmProjects,
 		invalidateCache,
+		invalidateStorageRoot,
 		setSelectedWorktree,
 		listBoards,
 		setActiveBoard,

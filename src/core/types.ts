@@ -362,6 +362,7 @@ export type TrackboiRuntime = {
 	readDesktopState(): DesktopState;
 	prewarmProjects(): void;
 	invalidateCache(): void;
+	invalidateStorageRoot(rootPath: string): void;
 	setSelectedWorktree(worktreeId: string | null): DesktopState;
 	listBoards(): BoardDescriptor[];
 	setActiveBoard(boardId: string): DesktopState;

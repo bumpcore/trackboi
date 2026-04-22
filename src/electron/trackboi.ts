@@ -44,7 +44,7 @@ export function createIpcTrackboiActions(api: TrackboiBridgeApi): IpcTrackboiAct
 		addCardComment: (input) => api.addCardComment(input),
 		moveCard: (cardId, toColumn, beforeCardId) => api.moveCard(cardId, toColumn, beforeCardId),
 		deleteCard: (cardId) => api.deleteCard(cardId),
-		onProjectChanged: (listener) => api.onProjectChanged(listener),
+		onDesktopStorePatch: (listener) => api.onDesktopStorePatch(listener),
 	};
 }
 

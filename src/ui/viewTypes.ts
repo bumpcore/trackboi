@@ -6,9 +6,9 @@ export type BoardScopeMode = "all" | "global";
 
 export type ScopeMode = "track" | "global" | "existing";
 
-export type LeftPanelView = "explorer" | "agents";
+export type LeftPanelView = "explorer";
 
-export type RightPanelView = "card" | "track" | "activity" | "context";
+export type RightPanelView = "card" | "track" | "activity" | "context" | "column";
 
 export type WorkspaceShellPrefs = {
 	leftWidth: number;
@@ -17,6 +17,41 @@ export type WorkspaceShellPrefs = {
 	rightCollapsed: boolean;
 	leftView: LeftPanelView;
 	rightView: RightPanelView;
+};
+
+/**
+ * Tracks whether the command center is currently acting as a navigator or a
+ * pure command launcher.
+ */
+export type CommandCenterMode = "navigate" | "command";
+
+/**
+ * Distinguishes navigation targets from executable shell commands inside the
+ * unified command-center result list.
+ */
+export type CommandCenterItemKind =
+	| "project"
+	| "worktree"
+	| "board"
+	| "track"
+	| "card"
+	| "comment"
+	| "command";
+
+/**
+ * One row in the command center. Each item owns its own execution handler so
+ * the shell can reuse existing workflows without reinterpreting result types.
+ */
+export type CommandCenterItem = {
+	id: string;
+	mode: CommandCenterMode;
+	kind: CommandCenterItemKind;
+	section: string;
+	title: string;
+	subtitle?: string;
+	keywords?: string[];
+	icon?: string;
+	run: () => void | Promise<void>;
 };
 
 export type Confirmation = {

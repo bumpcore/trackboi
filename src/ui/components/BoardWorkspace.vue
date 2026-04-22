@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { FolderOpen, Plus, Settings2 } from "lucide-vue-next";
-import type { BoardDescriptor, Card as TrackboiCard, CustomField, ProjectEntry, ProjectSnapshot, Track, WorktreeContext } from "@/core/types";
+import type { BoardDescriptor, Card as TrackboiCard, Column, CustomField, ProjectEntry, ProjectSnapshot, Track, WorktreeContext } from "@/core/types";
 import BoardColumn from "@/ui/components/BoardColumn.vue";
 import Button from "@/ui/components/Button.vue";
 import UiCard from "@/ui/components/Card.vue";
@@ -36,6 +36,8 @@ const emit = defineEmits<{
 	openBoardSettings: [];
 	createCard: [columnId?: string];
 	createColumn: [];
+	editColumn: [column: Column];
+	clearCardSelection: [];
 	selectCard: [card: TrackboiCard];
 	editCard: [card: TrackboiCard];
 	deleteCard: [card: TrackboiCard];
@@ -68,6 +70,13 @@ function forwardMove(cardId: string, toColumn: string, beforeCardId: string | nu
 function forwardBoardSelection(boardId: string | undefined) {
 	if (!boardId) return;
 	emit("selectBoard", boardId);
+}
+
+function clearCardSelectionFromBackground(event: PointerEvent) {
+	const target = event.target;
+	if (!(target instanceof HTMLElement)) return;
+	if (target.closest("[data-card-id]")) return;
+	emit("clearCardSelection");
 }
 </script>
 
@@ -147,7 +156,7 @@ function forwardBoardSelection(boardId: string | undefined) {
 			</UiCard>
 
 			<div v-else class="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-4">
-				<div class="app-scroll min-h-0 overflow-x-auto overflow-y-hidden">
+				<div class="app-scroll min-h-0 overflow-x-auto overflow-y-hidden" @pointerdown="clearCardSelectionFromBackground">
 					<div class="grid h-full min-w-max grid-flow-col auto-cols-[356px] items-stretch gap-4 px-5">
 						<BoardColumn
 							v-for="column in snapshot.board.columns"
@@ -162,6 +171,7 @@ function forwardBoardSelection(boardId: string | undefined) {
 							:track-labels="trackLabels"
 							@move="forwardMove"
 							@create="emit('createCard', $event)"
+							@edit-column="emit('editColumn', $event)"
 							@select="emit('selectCard', $event)"
 							@edit="emit('editCard', $event)"
 							@delete="emit('deleteCard', $event)"

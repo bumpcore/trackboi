@@ -40,6 +40,9 @@ export function useCardWorkflow(options: {
 	selectedTrackId: Ref<string | null>;
 	run(action: () => Promise<void>): Promise<void>;
 	requestConfirmation: ConfirmationRequester;
+	upsertCard(card: TrackboiCard): void;
+	removeCard(cardId: string): void;
+	addCardComment(comment: TrackboiCard["comments"][number]): void;
 }): CardWorkflow {
 	const panelMode = ref<CardPanelMode>("closed");
 	const selectedCard = ref<TrackboiCard | null>(null);
@@ -128,12 +131,12 @@ export function useCardWorkflow(options: {
 
 		if (panelMode.value === "create") {
 			await options.run(async () => {
-				await desktop.createCard({
+				options.upsertCard(await desktop.createCard({
 					title,
 					description: draft.value.description,
 					column: draft.value.column,
 					trackId: trackId.value === NO_TRACK_SELECT_VALUE ? null : trackId.value,
-				});
+				}));
 				resetDraft(draft.value.column);
 				panelMode.value = "closed";
 			});
@@ -144,14 +147,14 @@ export function useCardWorkflow(options: {
 		const cardId = selectedCard.value.id;
 		const shouldMove = draft.value.column !== selectedCard.value.column;
 		await options.run(async () => {
-			await desktop.updateCard(cardId, {
+			options.upsertCard(await desktop.updateCard(cardId, {
 				title,
 				description: draft.value.description,
 				trackId: trackId.value === NO_TRACK_SELECT_VALUE ? null : trackId.value,
 				fieldValues: fieldValues.value,
-			});
+			}));
 			if (shouldMove) {
-				await desktop.moveCard(cardId, draft.value.column, null);
+				options.upsertCard(await desktop.moveCard(cardId, draft.value.column, null));
 			}
 		});
 	}
@@ -162,10 +165,10 @@ export function useCardWorkflow(options: {
 		if (!body) return;
 
 		await options.run(async () => {
-			await desktop.addCardComment({
+			options.addCardComment(await desktop.addCardComment({
 				cardId: selectedCard.value!.id,
 				body,
-			});
+			}));
 			commentBody.value = "";
 		});
 	}
@@ -179,6 +182,7 @@ export function useCardWorkflow(options: {
 			onConfirm: async () => {
 				await options.run(async () => {
 					await desktop.deleteCard(card.id);
+					options.removeCard(card.id);
 					if (selectedCard.value?.id === card.id) closeCardPanel();
 				});
 			},
@@ -191,13 +195,13 @@ export function useCardWorkflow(options: {
 		if (!title) return;
 		const parent = selectedCard.value;
 		await options.run(async () => {
-			await desktop.createCard({
+			options.upsertCard(await desktop.createCard({
 				title,
 				description: "",
 				parentId: parent.id,
 				column: parent.column,
 				trackId: parent.trackId,
-			});
+			}));
 			subtaskTitle.value = "";
 		});
 	}

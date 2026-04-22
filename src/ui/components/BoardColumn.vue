@@ -24,6 +24,7 @@ const props = defineProps<{
 const emit = defineEmits<{
 	move: [cardId: string, toColumn: string, beforeCardId: string | null];
 	create: [columnId: string];
+	editColumn: [column: Column];
 	select: [card: TrackboiCard];
 	edit: [card: TrackboiCard];
 	delete: [card: TrackboiCard];
@@ -43,14 +44,15 @@ const CONTEXT_MENU_WIDTH = 208;
 const CONTEXT_MENU_HEIGHT = 180;
 const CONTEXT_MENU_MARGIN = 8;
 const hasCards = computed(() => props.cards.length > 0);
-const hideEmptyState = ref(false);
+const showDraggedSourceEmptyState = ref(false);
 let sortableInstance: Sortable | null = null;
 let suppressActivation = false;
 let activationResetTimer: number | null = null;
 let moveMenuCloseTimer: number | null = null;
-let emptyStateResetTimer: number | null = null;
 
-const showEmptyState = computed(() => !hasCards.value && !hideEmptyState.value);
+const showEmptyState = computed(() => (
+	!hasCards.value || showDraggedSourceEmptyState.value
+));
 
 function cleanupLaneArtifacts() {
 	const list = listElement.value;
@@ -79,6 +81,21 @@ function cleanupGlobalDragArtifacts() {
 	}
 }
 
+function clearActiveDragTargets() {
+	for (const column of Array.from(document.querySelectorAll<HTMLElement>(".column-shell[data-drag-target='true']"))) {
+		delete column.dataset.dragTarget;
+	}
+}
+
+function setActiveDragTarget(list: HTMLElement | null) {
+	for (const column of Array.from(document.querySelectorAll<HTMLElement>(".column-shell[data-drag-target='true']"))) {
+		delete column.dataset.dragTarget;
+	}
+	const column = list?.closest<HTMLElement>(".column-shell");
+	if (!column) return;
+	column.dataset.dragTarget = "true";
+}
+
 function clearActivationResetTimer() {
 	if (activationResetTimer !== null) {
 		window.clearTimeout(activationResetTimer);
@@ -86,26 +103,10 @@ function clearActivationResetTimer() {
 	}
 }
 
-function clearEmptyStateResetTimer() {
-	if (emptyStateResetTimer !== null) {
-		window.clearTimeout(emptyStateResetTimer);
-		emptyStateResetTimer = null;
-	}
-}
-
-function hideEmptyStateOptimistically() {
-	hideEmptyState.value = true;
-	clearEmptyStateResetTimer();
-	// Snapshot refreshes are async, so hide the empty affordance immediately
-	// after a drop instead of letting it linger and fight the pointer.
-	emptyStateResetTimer = window.setTimeout(() => {
-		hideEmptyState.value = false;
-		emptyStateResetTimer = null;
-	}, 1600);
-}
-
-function beginDrag() {
+function beginDrag(sourceList?: HTMLElement | null) {
 	suppressActivation = true;
+	clearActiveDragTargets();
+	showDraggedSourceEmptyState.value = sourceList === listElement.value && props.cards.length === 1;
 	clearActivationResetTimer();
 	closeContextMenu();
 }
@@ -116,6 +117,8 @@ function endDrag() {
 		suppressActivation = false;
 		activationResetTimer = null;
 	}, 120);
+	showDraggedSourceEmptyState.value = false;
+	clearActiveDragTargets();
 	cleanupGlobalDragArtifacts();
 }
 
@@ -184,10 +187,11 @@ function emitMoveFromDrop(event: SortableEvent) {
 }
 
 function pointerWithinDropZone(list: HTMLElement, event: Event | undefined): boolean {
+	if (props.cards.length === 0) return true;
 	if (!(event instanceof MouseEvent)) return true;
 	const rect = list.getBoundingClientRect();
 	const horizontalPadding = 18;
-	const verticalPadding = props.cards.length === 0 ? 14 : 8;
+	const verticalPadding = 8;
 	return (
 		event.clientX >= rect.left + horizontalPadding
 		&& event.clientX <= rect.right - horizontalPadding
@@ -215,16 +219,14 @@ function mountSortable() {
 		swapThreshold: 0.6,
 		filter: "[data-sortable-ignore]",
 		preventOnFilter: false,
-		onStart() {
-			beginDrag();
+		onStart(event) {
+			beginDrag(event.from as HTMLElement | null);
 		},
 		onMove(event, originalEvent) {
 			const targetList = event.to as HTMLElement | null;
 			if (!targetList) return true;
+			setActiveDragTarget(targetList);
 			return pointerWithinDropZone(targetList, originalEvent);
-		},
-		onAdd() {
-			hideEmptyStateOptimistically();
 		},
 		onEnd(event) {
 			emitMoveFromDrop(event);
@@ -353,30 +355,16 @@ watch(
 	},
 );
 
-watch(hasCards, (nextHasCards) => {
-	if (nextHasCards) {
-		hideEmptyState.value = false;
-		clearEmptyStateResetTimer();
-		return;
-	}
-
-	if (!hideEmptyState.value) return;
-	clearEmptyStateResetTimer();
-	emptyStateResetTimer = window.setTimeout(() => {
-		hideEmptyState.value = false;
-		emptyStateResetTimer = null;
-	}, 1600);
-});
-
 onMounted(() => {
 	mountSortable();
 });
 
 onBeforeUnmount(() => {
+	showDraggedSourceEmptyState.value = false;
+	clearActiveDragTargets();
 	window.removeEventListener("pointerdown", handlePointerDown);
 	sortableInstance?.destroy();
 	clearActivationResetTimer();
-	clearEmptyStateResetTimer();
 	cleanupGlobalDragArtifacts();
 	if (moveMenuCloseTimer !== null) {
 		window.clearTimeout(moveMenuCloseTimer);
@@ -391,13 +379,17 @@ onBeforeUnmount(() => {
 		:data-testid="`column-${column.id}`"
 	>
 		<header class="flex items-start justify-between gap-3 border-b border-border/55 px-4 py-3">
-			<div class="min-w-0">
+			<button
+				type="button"
+				class="min-w-0 flex-1 text-left"
+				@click="emit('editColumn', column)"
+			>
 				<div class="flex items-center gap-2">
 					<span class="h-2 w-2 rounded-full bg-primary/90" aria-hidden="true" />
 					<h2 class="truncate text-[13px] font-semibold uppercase tracking-[0.08em] text-foreground/94">{{ column.name }}</h2>
 				</div>
 				<p class="mt-2 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{{ props.cards.length }} cards</p>
-			</div>
+			</button>
 			<div class="flex items-center gap-2">
 				<Tooltip content="Add card" side="left">
 					<Button
@@ -415,10 +407,10 @@ onBeforeUnmount(() => {
 		</header>
 
 		<div class="app-scroll column-card-list min-h-0 overflow-y-auto">
-			<div class="relative min-h-full">
+			<div class="relative h-full min-h-full">
 				<div
 					ref="listElement"
-					class="flex min-h-full flex-col gap-2.5 px-2.5 py-3"
+					class="flex h-full min-h-full flex-col gap-2.5 px-2.5 py-3"
 					data-column-list="true"
 					:data-testid="`column-${column.id}-list`"
 				>

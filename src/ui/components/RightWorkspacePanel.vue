@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, useTemplateRef } from "vue";
-import { FileText, Layers3, Route, SquarePen } from "lucide-vue-next";
-import type { Card as TrackboiCard, CustomField, Track, TrackPatch } from "@/core/types";
+import { Columns3, FileText, Layers3, Route, SquarePen } from "lucide-vue-next";
+import type { Card as TrackboiCard, Column, CustomField, Track, TrackPatch } from "@/core/types";
 import Badge from "@/ui/components/Badge.vue";
 import Button from "@/ui/components/Button.vue";
 import CardEditorPanel from "@/ui/components/CardEditorPanel.vue";
+import ColumnEditorPanel from "@/ui/components/ColumnEditorPanel.vue";
 import MarkdownContent from "@/ui/components/MarkdownContent.vue";
 import TrackEditorPanel from "@/ui/components/TrackEditorPanel.vue";
 import Tooltip from "@/ui/components/Tooltip.vue";
@@ -18,6 +19,10 @@ const props = defineProps<{
 	card: TrackboiCard | null;
 	cardMode: "closed" | "create" | "edit";
 	cardTrack: Track | null;
+	column: Column | null;
+	columnMode: "closed" | "create" | "edit";
+	columnCardCount: number;
+	columnInsertAfterOptions: SelectOption[];
 	columnOptions: SelectOption[];
 	commentList: TrackboiCard["comments"];
 	currentBranch: string | null;
@@ -38,6 +43,8 @@ const trackId = defineModel<string>("trackId", { required: true });
 const fieldValues = defineModel<FieldValuesDraft>("fieldValues", { required: true });
 const commentBody = defineModel<string>("commentBody", { required: true });
 const subtaskTitle = defineModel<string>("subtaskTitle", { required: true });
+const columnName = defineModel<string>("columnName", { required: true });
+const columnInsertAfter = defineModel<string>("columnInsertAfter", { required: true });
 
 const emit = defineEmits<{
 	selectView: [view: RightPanelView];
@@ -52,14 +59,24 @@ const emit = defineEmits<{
 	writeTrackFile: [fileName: string, content: string];
 	deleteTrackFile: [fileName: string];
 	editTrackCard: [card: TrackboiCard];
+	submitColumn: [];
+	deleteColumn: [];
 }>();
 
-const rightItems: Array<{ id: RightPanelView; label: string; icon: typeof SquarePen }> = [
-	{ id: "card", label: "Card", icon: SquarePen },
-	{ id: "track", label: "Track", icon: Route },
-	{ id: "activity", label: "Activity", icon: Layers3 },
-	{ id: "context", label: "Context", icon: FileText },
-];
+const rightItems = computed<Array<{ id: RightPanelView; label: string; icon: typeof SquarePen }>>(() => {
+	const items: Array<{ id: RightPanelView; label: string; icon: typeof SquarePen }> = [
+		{ id: "card", label: "Card", icon: SquarePen },
+		{ id: "track", label: "Track", icon: Route },
+		{ id: "activity", label: "Activity", icon: Layers3 },
+		{ id: "context", label: "Context", icon: FileText },
+	];
+
+	if (props.activeView === "column") {
+		items.push({ id: "column", label: "Column", icon: Columns3 });
+	}
+
+	return items;
+});
 
 const title = computed(() => {
 	if (props.activeView === "track") {
@@ -71,6 +88,9 @@ const title = computed(() => {
 	if (props.activeView === "activity") {
 		return props.card?.title ?? props.track?.title ?? "Activity";
 	}
+	if (props.activeView === "column") {
+		return props.columnMode === "create" ? "New column" : (props.column?.name ?? "Column");
+	}
 	return props.card?.title ?? props.track?.title ?? "Context";
 });
 
@@ -79,6 +99,7 @@ const trackEditor = useTemplateRef<InstanceType<typeof TrackEditorPanel>>("track
 const showFooterActions = computed(() => (
 	(props.activeView === "card" && (props.cardMode === "create" || props.card != null))
 	|| (props.activeView === "track" && (props.trackMode === "create" || props.track != null))
+	|| (props.activeView === "column" && props.columnMode !== "closed")
 ));
 
 function forwardWriteTrackFile(fileName: string, content: string) {
@@ -137,6 +158,7 @@ function submitTrackFromFooter() {
 							<Badge v-if="card" variant="outline">{{ card.column }}</Badge>
 							<Badge v-if="cardTrack" variant="outline" class="text-primary">{{ cardTrack.title }}</Badge>
 							<Badge v-if="track?.source.kind === 'branch'" variant="outline">{{ track.source.ref }}</Badge>
+							<Badge v-if="activeView === 'column' && column" variant="outline">{{ columnCardCount }} cards</Badge>
 						</div>
 					</div>
 				</div>
@@ -213,6 +235,26 @@ function submitTrackFromFooter() {
 						<p class="text-sm font-medium text-foreground">Select a track</p>
 						<p class="mt-2 text-sm leading-6 text-muted-foreground">
 							Tracks stay first-class, but they now live in the shared right-side workspace instead of a competing drawer above the board.
+						</p>
+					</div>
+				</div>
+
+				<ColumnEditorPanel
+					v-else-if="activeView === 'column' && columnMode !== 'closed'"
+					v-model:name="columnName"
+					v-model:insert-after="columnInsertAfter"
+					:busy="busy"
+					:mode="columnMode"
+					:column="column"
+					:card-count="columnCardCount"
+					:insert-after-options="columnInsertAfterOptions"
+				/>
+
+				<div v-else-if="activeView === 'column'" class="grid place-items-center py-16 text-center">
+					<div class="max-w-xs">
+						<p class="text-sm font-medium text-foreground">Select a column</p>
+						<p class="mt-2 text-sm leading-6 text-muted-foreground">
+							Column structure opens here when you add a column or click a board header.
 						</p>
 					</div>
 				</div>
@@ -348,6 +390,27 @@ function submitTrackFromFooter() {
 							@click="submitTrackFromFooter"
 						>
 							{{ trackMode === "create" ? "Create Track" : "Save Track" }}
+						</Button>
+					</template>
+
+					<template v-else-if="activeView === 'column' && columnMode !== 'closed'">
+						<Button
+							v-if="columnMode === 'edit' && column"
+							variant="outline"
+							type="button"
+							:disabled="busy"
+							data-testid="column-delete-button"
+							@click="emit('deleteColumn')"
+						>
+							Delete
+						</Button>
+						<Button
+							type="button"
+							:disabled="busy || !columnName.trim()"
+							data-testid="column-submit-button"
+							@click="emit('submitColumn')"
+						>
+							{{ columnMode === "create" ? "Create Column" : "Save Column" }}
 						</Button>
 					</template>
 

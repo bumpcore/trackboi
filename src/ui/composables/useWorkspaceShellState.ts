@@ -49,12 +49,12 @@ type ResolvedPanelWidths = {
 	right: number;
 };
 
-function normalizeLeftView(value: unknown): LeftPanelView {
-	return value === "agents" ? "agents" : "explorer";
+function normalizeLeftView(): LeftPanelView {
+	return "explorer";
 }
 
 function normalizeRightView(value: unknown): RightPanelView {
-	return value === "track" || value === "activity" || value === "context" ? value : "card";
+	return value === "track" || value === "activity" || value === "context" || value === "column" ? value : "card";
 }
 
 /**
@@ -144,7 +144,7 @@ export function useWorkspaceShellState(): WorkspaceShellState {
 				rightWidth: typeof parsed.rightWidth === "number" ? parsed.rightWidth : DEFAULT_PREFS.rightWidth,
 				leftCollapsed: typeof parsed.leftCollapsed === "boolean" ? parsed.leftCollapsed : DEFAULT_PREFS.leftCollapsed,
 				rightCollapsed: typeof parsed.rightCollapsed === "boolean" ? parsed.rightCollapsed : DEFAULT_PREFS.rightCollapsed,
-				leftView: normalizeLeftView(parsed.leftView),
+				leftView: normalizeLeftView(),
 				rightView: normalizeRightView(parsed.rightView),
 			};
 		} catch {
@@ -175,7 +175,7 @@ export function useWorkspaceShellState(): WorkspaceShellState {
 		rightWidth.value = Math.max(RIGHT_MIN_WIDTH, prefs.rightWidth);
 		leftCollapsed.value = prefs.leftCollapsed;
 		rightCollapsed.value = prefs.rightCollapsed;
-		leftView.value = normalizeLeftView(prefs.leftView);
+		leftView.value = normalizeLeftView();
 		rightView.value = normalizeRightView(prefs.rightView);
 	}
 

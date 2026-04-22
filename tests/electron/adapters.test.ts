@@ -156,7 +156,7 @@ function createTrackboiBridge(overrides: Partial<TrackboiBridgeApi> = {}): Track
 		readTrackFile: async () => ({ name: "notes.md", contentType: "text/markdown", content: "# Notes", updatedAt: "2026-04-18T10:00:00.000Z" }),
 		writeTrackFile: async () => ({ name: "notes.md", path: "tracks/track_1/files/notes.md", contentType: "text/markdown", updatedAt: "2026-04-18T10:00:00.000Z" }),
 		deleteTrackFile: async () => ({ ok: true }),
-		onProjectChanged: () => () => {},
+		onDesktopStorePatch: () => () => {},
 		...overrides,
 	};
 }
@@ -191,11 +191,11 @@ describe("electron adapters", () => {
 			createdAt: "2026-04-18T10:00:00.000Z",
 			updatedAt: "2026-04-18T10:00:00.000Z",
 		}));
-		const onProjectChanged = mock((listener: (payload: { rootPath: string }) => void) => {
-			listener({ rootPath: "/tmp/project" });
+		const onDesktopStorePatch = mock((listener: (patch: { type: string }) => void) => {
+			listener({ type: "contextReplaced" });
 			return () => {};
 		});
-		const bridge = createTrackboiBridge({ createCard, onProjectChanged });
+		const bridge = createTrackboiBridge({ createCard, onDesktopStorePatch });
 		const trackboi = createIpcTrackboiActions(bridge);
 
 		const card = await trackboi.createCard({ title: "Created", column: "todo" });
@@ -203,9 +203,9 @@ describe("electron adapters", () => {
 		expect(createCard).toHaveBeenCalledTimes(1);
 
 		const listener = mock(() => {});
-		trackboi.onProjectChanged(listener);
-		expect(onProjectChanged).toHaveBeenCalledTimes(1);
-		expect(listener).toHaveBeenCalledWith({ rootPath: "/tmp/project" });
+		trackboi.onDesktopStorePatch(listener);
+		expect(onDesktopStorePatch).toHaveBeenCalledTimes(1);
+		expect(listener).toHaveBeenCalledWith({ type: "contextReplaced" });
 	});
 
 	test("desktop facade schedules background project prewarming after desktop reads", async () => {
@@ -218,7 +218,7 @@ describe("electron adapters", () => {
 		expect(prewarmProjects).toHaveBeenCalledTimes(1);
 	});
 
-	test("desktop facade delegates track mutations and notifies listeners", async () => {
+	test("desktop facade delegates track mutations without forcing a reread", async () => {
 		const createTrack = mock(async () => ({
 			id: "track_1",
 			boardId: "default",
@@ -233,17 +233,18 @@ describe("electron adapters", () => {
 			files: [],
 			createdAt: "2026-04-18T10:00:00.000Z",
 			updatedAt: "2026-04-18T10:00:00.000Z",
+			createdBy: "person_unknown",
+			updatedBy: "person_unknown",
 		}));
-		const trackboi = createTrackboiBridge({ createTrack });
+		const getActiveProject = mock(async () => null);
+		const trackboi = createTrackboiBridge({ createTrack, getActiveProject });
 		const desktop = createDesktopFacade(trackboi, createWindowBridge());
-		const boardChanged = mock(() => {});
-		desktop.addBoardChangedListener(boardChanged);
 
 		const track = await desktop.createTrack({ title: "Track" });
 
 		expect(track.title).toBe("Track");
 		expect(createTrack).toHaveBeenCalledTimes(1);
-		expect(boardChanged).toHaveBeenCalledTimes(1);
+		expect(getActiveProject).not.toHaveBeenCalled();
 	});
 
 	test("window shell delegates to the dedicated window bridge", async () => {
@@ -255,35 +256,30 @@ describe("electron adapters", () => {
 		expect(startResize).toHaveBeenCalledWith("se");
 	});
 
-	test("desktop facade refreshes listeners when project-changed events arrive", async () => {
-		let onProjectChangedListener: (() => void) | null = null;
-		const getActiveProject = mock(async () => ({
-			project: { name: "Trackboi", path: "/tmp/project" },
-			metadata: {
-				version: 1,
-				name: "Trackboi",
-				people: [],
-			},
-			git: { isGitRepo: true, root: "/tmp/project", branch: "master", detached: false, dirty: false },
-			board: { version: 1, name: "Trackboi", columns: [], customFields: [] },
-			tracks: [],
-			cards: [],
-		}));
+	test("desktop facade forwards desktop-store patch events", async () => {
+		let onDesktopStorePatchListener: (() => void) | null = null;
 		const trackboi = createTrackboiBridge({
-			getActiveProject,
-			onProjectChanged: (listener) => {
-				onProjectChangedListener = () => listener({ rootPath: "/tmp/project" });
+			onDesktopStorePatch: (listener) => {
+				onDesktopStorePatchListener = () => listener({ type: "contextReplaced", state: { snapshot: null, view: { sources: [], activeProjectPath: null, storageSearchPaths: [] }, worktrees: [], selectedWorktreeId: null, selectedBoardId: null } });
 				return () => {};
 			},
 		});
 
 		const desktop = createDesktopFacade(trackboi, createWindowBridge());
-		const boardChanged = mock(() => {});
-		desktop.addBoardChangedListener(boardChanged);
-		onProjectChangedListener?.();
-		await new Promise((resolve) => setTimeout(resolve, 150));
+		const patchListener = mock(() => {});
+		desktop.addDesktopStorePatchListener(patchListener);
+		onDesktopStorePatchListener?.();
 
-		expect(getActiveProject).toHaveBeenCalledTimes(1);
-		expect(boardChanged).toHaveBeenCalledTimes(1);
+		expect(patchListener).toHaveBeenCalledTimes(1);
+		expect(patchListener).toHaveBeenCalledWith({
+			type: "contextReplaced",
+			state: {
+				snapshot: null,
+				view: { sources: [], activeProjectPath: null, storageSearchPaths: [] },
+				worktrees: [],
+				selectedWorktreeId: null,
+				selectedBoardId: null,
+			},
+		});
 	});
 });

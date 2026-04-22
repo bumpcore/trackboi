@@ -139,6 +139,46 @@ describe("runtime worktree integration", () => {
 		expect(card?.worktreeIds).toEqual([checkoutId]);
 	});
 
+	test("switchProject keeps the returned view and snapshot project aligned", () => {
+		const fixture = createRuntimeFixture();
+		fixture.seedStore(fixture.mainRepo, ".trackboi", {
+			board: {
+				name: "Main board",
+				columns: [{ id: "todo", name: "To Do" }],
+			},
+			cards: [],
+		});
+
+		const secondaryRepo = path.join(fixture.root, "secondary");
+		runGit(fixture.root, ["init", "--initial-branch=master", secondaryRepo]);
+		writeFileSync(path.join(secondaryRepo, "README.md"), "# Secondary fixture\n");
+		runGit(secondaryRepo, ["config", "user.name", "Trackboi Tests"]);
+		runGit(secondaryRepo, ["config", "user.email", "tests@trackboi.local"]);
+		runGit(secondaryRepo, ["add", "."]);
+		runGit(secondaryRepo, ["commit", "-m", "Initial fixture"]);
+		fixture.seedStore(secondaryRepo, ".trackboi", {
+			board: {
+				name: "Secondary board",
+				columns: [{ id: "todo", name: "Queued" }],
+			},
+			cards: [],
+		});
+
+		const runtime = fixture.runtime();
+		runtime.chooseProjectPath(fixture.mainRepo);
+		runtime.chooseProjectPath(secondaryRepo);
+
+		const switched = runtime.switchProject(secondaryRepo);
+		expect(switched.view.activeProjectPath).toBe(secondaryRepo);
+		expect(switched.snapshot?.project.path).toBe(secondaryRepo);
+		expect(switched.snapshot?.project.name).toBe("secondary");
+
+		const switchedBack = runtime.switchProject(fixture.mainRepo);
+		expect(switchedBack.view.activeProjectPath).toBe(fixture.mainRepo);
+		expect(switchedBack.snapshot?.project.path).toBe(fixture.mainRepo);
+		expect(switchedBack.snapshot?.project.name).toBe("repo");
+	});
+
 	test("createCard uses the active selected worktree store", () => {
 		const fixture = createRuntimeFixture();
 		fixture.seedStore(fixture.checkoutWorktree, ".etc/trackboi", {
@@ -236,6 +276,77 @@ describe("runtime worktree integration", () => {
 
 		runtime.invalidateCache();
 		expect(runtime.readDesktopState().snapshot?.cards).toHaveLength(2);
+	});
+
+	test("invalidateStorageRoot refreshes only the touched project cache", () => {
+		const fixture = createRuntimeFixture();
+		fixture.seedStore(fixture.mainRepo, ".trackboi", {
+			board: {
+				name: "Main board",
+				columns: [{ id: "todo", name: "To Do" }],
+			},
+			cards: [{
+				id: "card_main_1",
+				title: "Main before",
+				description: "",
+				column: "todo",
+				rank: "a0",
+				scope: { kind: "project", ref: "global" },
+				updatedAt: "2026-04-18T10:00:00.000Z",
+			}],
+		});
+
+		const secondaryRepo = path.join(fixture.root, "secondary");
+		runGit(fixture.root, ["init", "--initial-branch=master", secondaryRepo]);
+		writeFileSync(path.join(secondaryRepo, "README.md"), "# Secondary fixture\n");
+		runGit(secondaryRepo, ["config", "user.name", "Trackboi Tests"]);
+		runGit(secondaryRepo, ["config", "user.email", "tests@trackboi.local"]);
+		runGit(secondaryRepo, ["add", "."]);
+		runGit(secondaryRepo, ["commit", "-m", "Initial fixture"]);
+		fixture.seedStore(secondaryRepo, ".trackboi", {
+			board: {
+				name: "Secondary board",
+				columns: [{ id: "todo", name: "Queued" }],
+			},
+			cards: [{
+				id: "card_secondary_1",
+				title: "Secondary before",
+				description: "",
+				column: "todo",
+				rank: "a0",
+				scope: { kind: "project", ref: "global" },
+				updatedAt: "2026-04-18T10:00:00.000Z",
+			}],
+		});
+
+		const runtime = fixture.runtime();
+		runtime.chooseProjectPath(fixture.mainRepo);
+		runtime.chooseProjectPath(secondaryRepo);
+		runtime.switchProject(fixture.mainRepo);
+
+		writeCardFile(path.join(fixture.mainRepo, ".trackboi"), {
+			id: "card_main_2",
+			title: "Main external",
+			description: "",
+			column: "todo",
+			rank: "a1",
+			scope: { kind: "project", ref: "global" },
+			updatedAt: "2026-04-18T10:01:00.000Z",
+		});
+		writeCardFile(path.join(secondaryRepo, ".trackboi"), {
+			id: "card_secondary_2",
+			title: "Secondary external",
+			description: "",
+			column: "todo",
+			rank: "a1",
+			scope: { kind: "project", ref: "global" },
+			updatedAt: "2026-04-18T10:01:00.000Z",
+		});
+
+		runtime.invalidateStorageRoot(path.join(fixture.mainRepo, ".trackboi"));
+
+		expect(runtime.switchProject(fixture.mainRepo).snapshot?.cards).toHaveLength(2);
+		expect(runtime.switchProject(secondaryRepo).snapshot?.cards).toHaveLength(1);
 	});
 
 	test("desktop card writes resolve git identities into project-scoped person aliases", () => {

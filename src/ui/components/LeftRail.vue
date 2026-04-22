@@ -1,20 +1,17 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Bot, CircleHelp, Plus, Settings } from "lucide-vue-next";
+import { CircleHelp, Plus, Settings } from "lucide-vue-next";
 import Button from "@/ui/components/Button.vue";
 import Tooltip from "@/ui/components/Tooltip.vue";
 import type { ProjectEntry } from "@/core/types";
 import { projectColorStyle } from "@/ui/lib/projectColor";
-import type { LeftPanelView } from "@/ui/viewTypes";
 
 const props = defineProps<{
-	activeView: LeftPanelView;
 	activeProjectPath: string | null;
 	projects: ProjectEntry[];
 }>();
 
 const emit = defineEmits<{
-	select: [view: LeftPanelView];
 	switchProject: [projectPath: string];
 	addProject: [];
 	settings: [];
@@ -71,18 +68,6 @@ function projectMonogram(name: string) {
 			</div>
 
 			<div class="my-1 h-px w-5 bg-border/80" />
-
-			<Tooltip content="Agents" side="right">
-				<button
-					type="button"
-					class="shell-rail-button"
-					:class="{ 'is-active': activeView === 'agents' }"
-					data-testid="agents-view-button"
-					@click="emit('select', 'agents')"
-				>
-					<Bot class="h-4 w-4" />
-				</button>
-			</Tooltip>
 
 			<div class="mt-auto flex flex-col gap-2">
 				<Tooltip content="Help" side="right">

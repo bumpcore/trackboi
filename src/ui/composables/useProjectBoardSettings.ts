@@ -4,10 +4,10 @@ import { desktop } from "@/electron/renderer";
 import type { Confirmation } from "@/ui/viewTypes";
 import type {
 	BoardDescriptor,
-	Column,
 	CustomField,
 	FieldType,
 	PersonAlias,
+	ProjectMetadata,
 	ProjectSnapshot,
 } from "@/core/types";
 
@@ -19,8 +19,6 @@ type ProjectBoardSettings = {
 	fieldOptionsDraft: Ref<string>;
 	boardCreateNameDraft: Ref<string>;
 	boardNameDraft: Ref<string>;
-	columnNameDrafts: Ref<Record<string, string>>;
-	newColumnName: Ref<string>;
 	personDisplayNameDraft: Ref<string>;
 	personEmailsDraft: Ref<string>;
 	personNamesDraft: Ref<string>;
@@ -32,9 +30,6 @@ type ProjectBoardSettings = {
 	createBoard(): Promise<void>;
 	deleteBoard(boardId: string): Promise<void>;
 	saveBoardName(): Promise<void>;
-	addColumn(nameOverride?: string): Promise<void>;
-	renameColumn(column: Column): Promise<void>;
-	removeColumn(column: Column): void;
 	addCustomField(): Promise<void>;
 	removeCustomField(fieldId: string): Promise<void>;
 	addPersonAlias(): Promise<void>;
@@ -47,19 +42,19 @@ type ProjectBoardSettings = {
  */
 export function useProjectBoardSettings(options: {
 	snapshot: Ref<ProjectSnapshot | null>;
-	columnCardCounts: ComputedRef<Record<string, number>>;
 	run(action: () => Promise<void>): Promise<void>;
-	refreshDesktopState(): Promise<void>;
 	setError(errorValue: unknown): void;
 	requestConfirmation: ConfirmationRequester;
+	replaceSnapshot(snapshot: ProjectSnapshot | null): void;
+	replaceBoard(board: ProjectSnapshot["board"]): void;
+	replaceMetadata(metadata: ProjectMetadata): void;
+	selectBoard(boardId: string): Promise<void>;
 }): ProjectBoardSettings {
 	const fieldNameDraft = ref("");
 	const fieldTypeDraft = ref<FieldType>("text");
 	const fieldOptionsDraft = ref("");
 	const boardCreateNameDraft = ref("");
 	const boardNameDraft = ref("");
-	const columnNameDrafts = ref<Record<string, string>>({});
-	const newColumnName = ref("");
 	const personDisplayNameDraft = ref("");
 	const personEmailsDraft = ref("");
 	const personNamesDraft = ref("");
@@ -79,9 +74,6 @@ export function useProjectBoardSettings(options: {
 		() => options.snapshot.value,
 		(nextSnapshot) => {
 			boardNameDraft.value = nextSnapshot?.board.name ?? "";
-			columnNameDrafts.value = Object.fromEntries(
-				nextSnapshot?.board.columns.map((column) => [column.id, column.name]) ?? [],
-			);
 		},
 		{ immediate: true },
 	);
@@ -96,38 +88,23 @@ export function useProjectBoardSettings(options: {
 		return `${slug || "field"}-${newId("field").slice(-8)}`;
 	}
 
-	function columnIdFromName(name: string) {
-		const slug = name
-			.trim()
-			.toLowerCase()
-			.replace(/[^a-z0-9]+/g, "-")
-			.replace(/^-|-$/g, "");
-
-		return slug || `column-${newId("column").slice(-8)}`;
-	}
-
 	async function updateBoard(nextBoard: ProjectSnapshot["board"]) {
 		await options.run(async () => {
-			await desktop.updateBoard(nextBoard);
-			await options.refreshDesktopState();
+			options.replaceBoard(await desktop.updateBoard(nextBoard));
 		});
 	}
 
 	async function selectBoard(boardId: string) {
 		if (!options.snapshot.value || options.snapshot.value.board.id === boardId) return;
-		await options.run(async () => {
-			await desktop.setActiveBoard(boardId);
-			await options.refreshDesktopState();
-		});
+		await options.selectBoard(boardId);
 	}
 
 	async function createBoard() {
 		const name = boardCreateNameDraft.value.trim();
 		if (!name) return;
 		await options.run(async () => {
-			await desktop.createBoard({ name });
+			options.replaceSnapshot(await desktop.createBoard({ name }));
 			boardCreateNameDraft.value = "";
-			await options.refreshDesktopState();
 		});
 	}
 
@@ -142,8 +119,7 @@ export function useProjectBoardSettings(options: {
 			destructive: true,
 			onConfirm: async () => {
 				await options.run(async () => {
-					await desktop.deleteBoard(boardId);
-					await options.refreshDesktopState();
+					options.replaceSnapshot(await desktop.deleteBoard(boardId));
 				});
 			},
 		});
@@ -160,67 +136,6 @@ export function useProjectBoardSettings(options: {
 		await updateBoard({
 			...options.snapshot.value.board,
 			name,
-		});
-	}
-
-	/**
-	 * Adds a new board column. The shell can provide an override name for
-	 * lightweight affordances such as the ghost add-column lane.
-	 */
-	async function addColumn(nameOverride?: string) {
-		if (!options.snapshot.value) return;
-		const trimmedOverride = nameOverride?.trim();
-		const name = trimmedOverride || newColumnName.value.trim();
-		if (!name) return;
-
-		let id = columnIdFromName(name);
-		const existingIds = new Set(options.snapshot.value.board.columns.map((column) => column.id));
-		if (existingIds.has(id)) id = `${id}-${newId("column").slice(-6)}`;
-
-		await updateBoard({
-			...options.snapshot.value.board,
-			columns: [...options.snapshot.value.board.columns, { id, name }],
-		});
-		if (!trimmedOverride) newColumnName.value = "";
-	}
-
-	async function renameColumn(column: Column) {
-		if (!options.snapshot.value) return;
-		const name = columnNameDrafts.value[column.id]?.trim();
-		if (!name || name === column.name) return;
-
-		await updateBoard({
-			...options.snapshot.value.board,
-			columns: options.snapshot.value.board.columns.map((candidate) => (
-				candidate.id === column.id ? { ...candidate, name } : candidate
-			)),
-		});
-	}
-
-	function removeColumn(column: Column) {
-		if (!options.snapshot.value) return;
-		const count = options.columnCardCounts.value[column.id] ?? 0;
-		if (count > 0) {
-			options.setError(`Move or delete ${count} cards before removing ${column.name}`);
-			return;
-		}
-		if (options.snapshot.value.board.columns.length <= 1) {
-			options.setError("Board needs at least one column");
-			return;
-		}
-
-		options.requestConfirmation({
-			title: `Remove ${column.name}?`,
-			description: "This removes the column from the board. Card files are not touched.",
-			confirmLabel: "Remove",
-			destructive: true,
-			onConfirm: async () => {
-				if (!options.snapshot.value) return;
-				await updateBoard({
-					...options.snapshot.value.board,
-					columns: options.snapshot.value.board.columns.filter((candidate) => candidate.id !== column.id),
-				});
-			},
 		});
 	}
 
@@ -282,18 +197,16 @@ export function useProjectBoardSettings(options: {
 		};
 
 		await options.run(async () => {
-			await desktop.updateProjectPeople([...people.value, nextPerson]);
+			options.replaceMetadata(await desktop.updateProjectPeople([...people.value, nextPerson]));
 			personDisplayNameDraft.value = "";
 			personEmailsDraft.value = "";
 			personNamesDraft.value = "";
-			await options.refreshDesktopState();
 		});
 	}
 
 	async function removePersonAlias(personId: string) {
 		await options.run(async () => {
-			await desktop.updateProjectPeople(people.value.filter((person) => person.id !== personId));
-			await options.refreshDesktopState();
+			options.replaceMetadata(await desktop.updateProjectPeople(people.value.filter((person) => person.id !== personId)));
 		});
 	}
 
@@ -303,8 +216,6 @@ export function useProjectBoardSettings(options: {
 		fieldOptionsDraft,
 		boardCreateNameDraft,
 		boardNameDraft,
-		columnNameDrafts,
-		newColumnName,
 		personDisplayNameDraft,
 		personEmailsDraft,
 		personNamesDraft,
@@ -316,9 +227,6 @@ export function useProjectBoardSettings(options: {
 		createBoard,
 		deleteBoard,
 		saveBoardName,
-		addColumn,
-		renameColumn,
-		removeColumn,
 		addCustomField,
 		removeCustomField,
 		addPersonAlias,

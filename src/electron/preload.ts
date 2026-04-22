@@ -4,7 +4,7 @@ import type {
 } from "../core";
 import type { TrackboiBridgeApi, WindowBridgeApi } from "./bridge";
 import { ipcChannels } from "./ipc";
-import type { ProjectChangedPayload } from "./bridge";
+import type { DesktopStorePatch } from "./bridge";
 
 /**
  * The only API exposed from Electron preload into the renderer.
@@ -74,10 +74,10 @@ const trackboiApi: TrackboiBridgeApi = {
 		)
 	),
 	deleteCard: (cardId) => ipcRenderer.invoke(ipcChannels.trackboi.deleteCard, cardId),
-	onProjectChanged: (listener) => {
-		const wrapped = (_event: Electron.IpcRendererEvent, payload: ProjectChangedPayload) => listener(payload);
-		ipcRenderer.on(ipcChannels.events.projectChanged, wrapped);
-		return () => ipcRenderer.off(ipcChannels.events.projectChanged, wrapped);
+	onDesktopStorePatch: (listener) => {
+		const wrapped = (_event: Electron.IpcRendererEvent, patch: DesktopStorePatch) => listener(patch);
+		ipcRenderer.on(ipcChannels.events.desktopStorePatch, wrapped);
+		return () => ipcRenderer.off(ipcChannels.events.desktopStorePatch, wrapped);
 	},
 };
 

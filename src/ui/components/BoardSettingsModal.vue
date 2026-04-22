@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, watch } from "vue";
 import { Layers3, ListPlus, Save, SlidersHorizontal, Trash2, X } from "lucide-vue-next";
-import type { BoardDescriptor, Column, CustomField, FieldType, ProjectSnapshot } from "@/core/types";
+import type { BoardDescriptor, CustomField, FieldType, ProjectSnapshot } from "@/core/types";
 import Badge from "@/ui/components/Badge.vue";
 import Button from "@/ui/components/Button.vue";
 import Input from "@/ui/components/Input.vue";
@@ -12,15 +12,12 @@ const props = defineProps<{
 	busy: boolean;
 	snapshot: ProjectSnapshot | null;
 	boards: BoardDescriptor[];
-	columnCardCounts: Record<string, number>;
 	customFields: CustomField[];
 	fieldTypeOptions: SelectOption[];
 }>();
 
 const boardNameDraft = defineModel<string>("boardNameDraft", { required: true });
 const boardCreateNameDraft = defineModel<string>("boardCreateNameDraft", { required: true });
-const columnNameDrafts = defineModel<Record<string, string>>("columnNameDrafts", { required: true });
-const newColumnName = defineModel<string>("newColumnName", { required: true });
 const fieldNameDraft = defineModel<string>("fieldNameDraft", { required: true });
 const fieldTypeDraft = defineModel<FieldType>("fieldTypeDraft", { required: true });
 const fieldOptionsDraft = defineModel<string>("fieldOptionsDraft", { required: true });
@@ -31,9 +28,6 @@ const emit = defineEmits<{
 	createBoard: [];
 	deleteBoard: [boardId: string];
 	saveBoardName: [];
-	renameColumn: [column: Column];
-	removeColumn: [column: Column];
-	addColumn: [];
 	addCustomField: [];
 	removeCustomField: [fieldId: string];
 }>();
@@ -136,8 +130,8 @@ onBeforeUnmount(() => {
 									<Layers3 class="h-4 w-4" />
 								</div>
 								<div>
-									<p class="shell-section-title">Current board structure</p>
-									<p class="mt-1 text-sm text-muted-foreground">Rename the current board and keep its workflow columns intentional.</p>
+									<p class="shell-section-title">Current board</p>
+									<p class="mt-1 text-sm text-muted-foreground">Rename the active board. Column structure now lives in the right-side workspace.</p>
 								</div>
 							</div>
 
@@ -149,37 +143,6 @@ onBeforeUnmount(() => {
 								<Button type="submit" :disabled="busy || !boardNameDraft.trim()">
 									<Save class="h-4 w-4" />
 									Save
-								</Button>
-							</form>
-
-							<div class="grid gap-3">
-								<div
-									v-for="column in snapshot.board.columns"
-									:key="column.id"
-									class="rounded-md border border-border/80 bg-secondary/55 px-4 py-4"
-								>
-									<div class="flex items-center justify-between gap-3">
-										<div class="min-w-0">
-											<p class="truncate text-sm font-medium text-foreground">{{ column.name }}</p>
-											<p class="mt-1 trackboi-mono-font text-[11px] text-muted-foreground">{{ column.id }}</p>
-										</div>
-										<Badge variant="outline">{{ columnCardCounts[column.id] ?? 0 }} cards</Badge>
-									</div>
-									<form class="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]" @submit.prevent="emit('renameColumn', column)">
-										<Input v-model="columnNameDrafts[column.id]" autocomplete="off" />
-										<Button type="submit" variant="outline" :disabled="busy || !columnNameDrafts[column.id]?.trim()">Rename</Button>
-										<Button variant="outline" type="button" :disabled="busy" @click="emit('removeColumn', column)">
-											<Trash2 class="h-4 w-4" />
-										</Button>
-									</form>
-								</div>
-							</div>
-
-							<form class="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]" @submit.prevent="emit('addColumn')">
-								<Input v-model="newColumnName" autocomplete="off" placeholder="New column" />
-								<Button type="submit" :disabled="busy || !newColumnName.trim()">
-									<ListPlus class="h-4 w-4" />
-									Add column
 								</Button>
 							</form>
 						</section>

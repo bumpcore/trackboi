@@ -18,6 +18,8 @@ const props = defineProps<{
 const draft = defineModel<string>("draft", { required: true });
 const leftPanelShortcut = defineModel<string>("leftPanelShortcut", { required: true });
 const rightPanelShortcut = defineModel<string>("rightPanelShortcut", { required: true });
+const commandCenterNavigateShortcut = defineModel<string>("commandCenterNavigateShortcut", { required: true });
+const commandCenterCommandShortcut = defineModel<string>("commandCenterCommandShortcut", { required: true });
 const themeMode = defineModel<ThemeMode>("themeMode", { required: true });
 const preferredEditorId = defineModel<string>("preferredEditorId", { required: true });
 const customEditorCommand = defineModel<string>("customEditorCommand", { required: true });
@@ -39,7 +41,7 @@ const emit = defineEmits<{
 type SettingsSection = "storage" | "appearance" | "shortcuts" | "agents" | "editor";
 
 const activeSection = ref<SettingsSection>("storage");
-const captureArmed = ref<"left" | "right" | null>(null);
+const captureArmed = ref<"left" | "right" | "navigate" | "command" | null>(null);
 
 watch(
 	() => props.open,
@@ -54,7 +56,7 @@ watch(
 const sectionMeta: Record<SettingsSection, { group: string; title: string; description: string }> = {
 	storage:    { group: "App",       title: "Storage paths",      description: "Trackboi checks these paths in order and opens the first store it finds. Earlier entries take priority over later ones." },
 	appearance: { group: "App",       title: "Appearance",         description: "Control how Trackboi looks across the desktop shell and editing surfaces." },
-	shortcuts:  { group: "Workspace", title: "Keyboard shortcuts", description: "Bind key combinations to toggle the side panels. Shortcuts won't fire while you're typing inside an input or editor." },
+	shortcuts:  { group: "Workspace", title: "Keyboard shortcuts", description: "Bind key combinations for the command center and side panels. Shortcuts won't fire while you're typing inside an input or editor." },
 	agents:     { group: "Workspace", title: "Agents",             description: "Agents registered here are attributed as the actor on card changes made through the MCP interface." },
 	editor:     { group: "Workspace", title: "Code editor",        description: "Choose which editor Trackboi launches when you open a card's source file." },
 };
@@ -75,7 +77,7 @@ const editorOptions = computed(() => [
 	{ id: "custom", label: "Custom command",  description: "Provide your own shell command. Use {path} as the file placeholder." },
 ]);
 
-function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
+function captureShortcut(target: "left" | "right" | "navigate" | "command", event: KeyboardEvent) {
 	event.preventDefault();
 	event.stopPropagation();
 
@@ -88,8 +90,10 @@ function captureShortcut(side: "left" | "right", event: KeyboardEvent) {
 	const shortcut = shortcutFromKeyboardEvent(event);
 	if (!shortcut) return;
 
-	if (side === "left") leftPanelShortcut.value = shortcut;
-	else rightPanelShortcut.value = shortcut;
+	if (target === "left") leftPanelShortcut.value = shortcut;
+	else if (target === "right") rightPanelShortcut.value = shortcut;
+	else if (target === "navigate") commandCenterNavigateShortcut.value = shortcut;
+	else commandCenterCommandShortcut.value = shortcut;
 
 	captureArmed.value = null;
 	(event.currentTarget as HTMLElement | null)?.blur();
@@ -318,6 +322,47 @@ onBeforeUnmount(() => {
 
 					<!-- Shortcuts -->
 					<section v-else-if="activeSection === 'shortcuts'" class="grid gap-4">
+						<section class="grid gap-4 rounded-lg bg-background/12 p-4">
+							<div>
+								<h3 class="text-sm font-semibold text-foreground">Command center</h3>
+								<p class="mt-1 text-sm leading-6 text-muted-foreground">
+									Use one shortcut for quick navigation and another for explicit command mode. Typing <span class="trackboi-mono-font">&gt;</span> also switches to commands inside the launcher.
+								</p>
+							</div>
+
+							<div class="grid gap-4">
+								<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+									Navigate
+									<button
+										type="button"
+										class="trackboi-mono-font flex h-8 w-full items-center rounded-[5px] border border-input/82 bg-secondary/72 px-2.5 py-1 text-left text-[13px] text-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.02)] transition-colors hover:bg-secondary/88 focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+										:class="captureArmed === 'navigate' ? 'border-primary/35 ring-1 ring-ring' : ''"
+										@click="captureArmed = 'navigate'"
+										@focus="captureArmed = 'navigate'"
+										@blur="captureArmed = null"
+										@keydown="captureShortcut('navigate', $event)"
+									>
+										{{ captureArmed === "navigate" ? "Listening for shortcut…" : commandCenterNavigateShortcut }}
+									</button>
+								</label>
+
+								<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+									Command mode
+									<button
+										type="button"
+										class="trackboi-mono-font flex h-8 w-full items-center rounded-[5px] border border-input/82 bg-secondary/72 px-2.5 py-1 text-left text-[13px] text-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.02)] transition-colors hover:bg-secondary/88 focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+										:class="captureArmed === 'command' ? 'border-primary/35 ring-1 ring-ring' : ''"
+										@click="captureArmed = 'command'"
+										@focus="captureArmed = 'command'"
+										@blur="captureArmed = null"
+										@keydown="captureShortcut('command', $event)"
+									>
+										{{ captureArmed === "command" ? "Listening for shortcut…" : commandCenterCommandShortcut }}
+									</button>
+								</label>
+							</div>
+						</section>
+
 						<section class="grid gap-4 rounded-lg bg-background/12 p-4">
 							<div>
 								<h3 class="text-sm font-semibold text-foreground">Panel toggles</h3>

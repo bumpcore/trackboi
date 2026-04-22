@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Bot, Plus, Route } from "lucide-vue-next";
+import { Plus } from "lucide-vue-next";
 import type { ProjectSnapshot, Track, WorktreeContext } from "@/core/types";
 import Button from "@/ui/components/Button.vue";
 import Tooltip from "@/ui/components/Tooltip.vue";
-import type { LeftPanelView } from "@/ui/viewTypes";
 
 const props = defineProps<{
-	activeView: LeftPanelView;
 	busy: boolean;
 	selectedTrackId: string | null;
 	selectedTrack: Track | null;
@@ -39,7 +37,7 @@ function trackSourceLabel(track: Track) {
 <template>
 	<aside class="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] bg-card/95" data-testid="left-workspace-panel">
 		<div class="app-scroll min-h-0 overflow-y-auto overflow-x-hidden">
-			<div v-if="activeView === 'explorer'" class="grid content-start">
+			<div class="grid content-start">
 				<section class="border-b border-border/70 px-4 py-4" data-testid="workspace-summary">
 					<div class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Workspace</div>
 					<div class="mt-1 text-sm font-medium text-foreground">{{ snapshot?.project.name ?? "Trackboi" }}</div>
@@ -118,27 +116,6 @@ function trackSourceLabel(track: Track) {
 						</Tooltip>
 					</div>
 				</section>
-			</div>
-
-			<div v-else class="grid content-start gap-3 px-3 py-3">
-				<div class="rounded-md border border-border/75 bg-secondary/55 px-3 py-3">
-					<div class="flex items-center gap-2 text-sm font-medium text-foreground">
-						<Bot class="h-4 w-4" style="color: hsl(var(--signal-attached));" />
-						Agent context
-					</div>
-					<p class="mt-2 text-[12px] leading-5 text-muted-foreground">
-						Keep MCP-aware context nearby without turning the desktop shell into a chat surface.
-					</p>
-				</div>
-				<div class="rounded-md border border-border/75 bg-secondary/55 px-3 py-3">
-					<div class="flex items-center gap-2 text-sm font-medium text-foreground">
-						<Route class="h-4 w-4 text-primary" />
-						Track memory
-					</div>
-					<p class="mt-2 text-[12px] leading-5 text-muted-foreground">
-						Tracks keep summary, plan, decisions, files, and activity so the next human or agent can resume work without re-asking for context.
-					</p>
-				</div>
 			</div>
 		</div>
 

@@ -1,5 +1,5 @@
 import { ipcMain, type IpcMainInvokeEvent } from "electron";
-import type { NodeFsTrackboiActions } from "../../core";
+import type { DesktopState, NodeFsTrackboiActions, ProjectView } from "../../core";
 import type { DetectedEditor } from "../bridge";
 import { ipcChannels } from "../ipc";
 
@@ -10,10 +10,20 @@ export function registerTrackboiIpcHandlers(options: {
 	trackboi: NodeFsTrackboiActions;
 	getActiveProject(): Promise<Awaited<ReturnType<NodeFsTrackboiActions["getActiveProject"]>>>;
 	readDesktopState(): Promise<Awaited<ReturnType<NodeFsTrackboiActions["readDesktopState"]>>>;
+	rememberDesktopState(state: DesktopState): void;
+	rememberProjectView(view: ProjectView): void;
 	listDetectedEditors(): DetectedEditor[];
 	openCardInEditor(cardId: string): Promise<{ ok: true }>;
 }): void {
-	const { trackboi, getActiveProject, readDesktopState, listDetectedEditors, openCardInEditor } = options;
+	const {
+		trackboi,
+		getActiveProject,
+		readDesktopState,
+		rememberDesktopState,
+		rememberProjectView,
+		listDetectedEditors,
+		openCardInEditor,
+	} = options;
 
 	ipcMain.handle(ipcChannels.trackboi.getActiveProject, () => getActiveProject());
 	ipcMain.handle(ipcChannels.trackboi.listProjects, () => trackboi.listProjects());
@@ -22,25 +32,33 @@ export function registerTrackboiIpcHandlers(options: {
 	// IPC path must also arm the filesystem watcher for external MCP writes.
 	ipcMain.handle(ipcChannels.trackboi.readDesktopState, () => readDesktopState());
 	ipcMain.handle(ipcChannels.trackboi.prewarmProjects, () => trackboi.prewarmProjects());
-	ipcMain.handle(ipcChannels.trackboi.setSelectedWorktree, (_event: IpcMainInvokeEvent, worktreeId: string | null) => (
-		trackboi.setSelectedWorktree(worktreeId)
-	));
+	ipcMain.handle(ipcChannels.trackboi.setSelectedWorktree, async (_event: IpcMainInvokeEvent, worktreeId: string | null) => {
+		const state = await trackboi.setSelectedWorktree(worktreeId);
+		rememberDesktopState(state);
+		return state;
+	});
 	ipcMain.handle(ipcChannels.trackboi.listBoards, () => trackboi.listBoards());
-	ipcMain.handle(ipcChannels.trackboi.setActiveBoard, (_event: IpcMainInvokeEvent, boardId: string) => (
-		trackboi.setActiveBoard(boardId)
-	));
+	ipcMain.handle(ipcChannels.trackboi.setActiveBoard, async (_event: IpcMainInvokeEvent, boardId: string) => {
+		const state = await trackboi.setActiveBoard(boardId);
+		rememberDesktopState(state);
+		return state;
+	});
 	ipcMain.handle(ipcChannels.trackboi.readAppSettings, () => trackboi.readAppSettings());
 	ipcMain.handle(ipcChannels.trackboi.updateAppSettings, (_event: IpcMainInvokeEvent, settings) => (
 		trackboi.updateAppSettings(settings)
 	));
 	ipcMain.handle(ipcChannels.trackboi.listDetectedEditors, () => listDetectedEditors());
 	ipcMain.handle(ipcChannels.trackboi.openCardInEditor, (_event: IpcMainInvokeEvent, cardId: string) => openCardInEditor(cardId));
-	ipcMain.handle(ipcChannels.trackboi.setStorageSearchPaths, (_event: IpcMainInvokeEvent, paths: string[]) => (
-		trackboi.setStorageSearchPaths(paths)
-	));
-	ipcMain.handle(ipcChannels.trackboi.setActiveWorkspaceFile, (_event: IpcMainInvokeEvent, filePath: string | null) => (
-		trackboi.setActiveWorkspaceFile(filePath)
-	));
+	ipcMain.handle(ipcChannels.trackboi.setStorageSearchPaths, async (_event: IpcMainInvokeEvent, paths: string[]) => {
+		const view = await trackboi.setStorageSearchPaths(paths);
+		rememberProjectView(view);
+		return view;
+	});
+	ipcMain.handle(ipcChannels.trackboi.setActiveWorkspaceFile, async (_event: IpcMainInvokeEvent, filePath: string | null) => {
+		const view = await trackboi.setActiveWorkspaceFile(filePath);
+		rememberProjectView(view);
+		return view;
+	});
 	ipcMain.handle(ipcChannels.trackboi.createBoard, (_event: IpcMainInvokeEvent, input) => trackboi.createBoard(input));
 	ipcMain.handle(ipcChannels.trackboi.deleteBoard, (_event: IpcMainInvokeEvent, boardId: string) => trackboi.deleteBoard(boardId));
 	ipcMain.handle(ipcChannels.trackboi.listTracks, () => trackboi.listTracks());
@@ -58,16 +76,26 @@ export function registerTrackboiIpcHandlers(options: {
 		trackboi.deleteTrackFile(trackId, fileName)
 	));
 	ipcMain.handle(ipcChannels.trackboi.openWorkspaceFile, () => trackboi.openWorkspaceFile());
-	ipcMain.handle(ipcChannels.trackboi.chooseProject, () => trackboi.chooseProject());
-	ipcMain.handle(ipcChannels.trackboi.locateProject, (_event: IpcMainInvokeEvent, projectPath: string) => (
-		trackboi.locateProject(projectPath)
-	));
-	ipcMain.handle(ipcChannels.trackboi.removeProject, (_event: IpcMainInvokeEvent, projectPath: string) => (
-		trackboi.removeProject(projectPath)
-	));
-	ipcMain.handle(ipcChannels.trackboi.switchProject, (_event: IpcMainInvokeEvent, projectPath: string) => (
-		trackboi.switchProject(projectPath)
-	));
+	ipcMain.handle(ipcChannels.trackboi.chooseProject, async () => {
+		const snapshot = await trackboi.chooseProject();
+		rememberDesktopState(await readDesktopState());
+		return snapshot;
+	});
+	ipcMain.handle(ipcChannels.trackboi.locateProject, async (_event: IpcMainInvokeEvent, projectPath: string) => {
+		const snapshot = await trackboi.locateProject(projectPath);
+		rememberDesktopState(await readDesktopState());
+		return snapshot;
+	});
+	ipcMain.handle(ipcChannels.trackboi.removeProject, async (_event: IpcMainInvokeEvent, projectPath: string) => {
+		const snapshot = await trackboi.removeProject(projectPath);
+		rememberDesktopState(await readDesktopState());
+		return snapshot;
+	});
+	ipcMain.handle(ipcChannels.trackboi.switchProject, async (_event: IpcMainInvokeEvent, projectPath: string) => {
+		const state = await trackboi.switchProject(projectPath);
+		rememberDesktopState(state);
+		return state;
+	});
 	ipcMain.handle(ipcChannels.trackboi.createCard, (_event: IpcMainInvokeEvent, input) => trackboi.createCard(input));
 	ipcMain.handle(ipcChannels.trackboi.updateCard, (_event: IpcMainInvokeEvent, cardId: string, patch) => (
 		trackboi.updateCard(cardId, patch)

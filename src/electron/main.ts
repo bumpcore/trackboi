@@ -2,15 +2,18 @@ import { app, BrowserWindow, dialog, type OpenDialogOptions } from "electron";
 import { findCliArgs, runCli } from "../cli/main";
 import { createNodeFsTrackboiActions } from "../core";
 import { createAppWindow } from "./main/createWindow";
+import { buildDesktopStorePatches } from "./main/desktopStorePatches";
 import { listDetectedEditors, openCardInEditor } from "./main/editorIntegration";
 import { createProjectStorageWatcher } from "./main/storageWatcher";
 import { registerTrackboiIpcHandlers } from "./main/trackboiIpc";
 import { registerWindowIpcHandlers } from "./main/windowIpc";
 import { ipcChannels } from "./ipc";
+import type { DesktopState, ProjectView } from "../core";
 
 app.setName("Trackboi");
 
 let mainWindow: BrowserWindow | null = null;
+let latestDesktopState: DesktopState | null = null;
 const trackboi = createNodeFsTrackboiActions({
 	dialogs: {
 		chooseProjectDirectory: chooseDirectory,
@@ -27,8 +30,13 @@ const storageWatcher = createProjectStorageWatcher({
 		trackFilesPath: trackboi.paths.trackFilesPath,
 	},
 	onProjectChanged(rootPath) {
-		trackboi.invalidateCache();
-		mainWindow?.webContents.send(ipcChannels.events.projectChanged, { rootPath });
+		const previousState = latestDesktopState;
+		trackboi.invalidateStorageRoot(rootPath);
+		void readDesktopState().then((state) => {
+			for (const patch of buildDesktopStorePatches(previousState, state)) {
+				mainWindow?.webContents.send(ipcChannels.events.desktopStorePatch, patch);
+			}
+		});
 	},
 });
 
@@ -65,10 +73,26 @@ async function getActiveProject() {
 
 async function readDesktopState() {
 	const desktopState = await trackboi.readDesktopState();
+	latestDesktopState = desktopState;
 	storageWatcher.refresh(desktopState.worktrees
 		.map((worktree) => worktree.storageRoot)
 		.filter((rootPath): rootPath is string => typeof rootPath === "string" && rootPath.length > 0));
 	return desktopState;
+}
+
+function rememberDesktopState(state: DesktopState): void {
+	latestDesktopState = state;
+	storageWatcher.refresh(state.worktrees
+		.map((worktree) => worktree.storageRoot)
+		.filter((rootPath): rootPath is string => typeof rootPath === "string" && rootPath.length > 0));
+}
+
+function rememberProjectView(view: ProjectView): void {
+	if (!latestDesktopState) return;
+	latestDesktopState = {
+		...latestDesktopState,
+		view,
+	};
 }
 
 async function chooseDirectory(): Promise<string | null> {
@@ -95,6 +119,8 @@ function registerIpc(): void {
 		trackboi,
 		getActiveProject,
 		readDesktopState,
+		rememberDesktopState,
+		rememberProjectView,
 		listDetectedEditors,
 		openCardInEditor: (cardId) => openCardInEditor(trackboi, cardId),
 	});

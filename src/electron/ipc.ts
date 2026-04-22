@@ -45,6 +45,6 @@ export const ipcChannels = {
 		deleteCard: "trackboi:delete-card",
 	},
 	events: {
-		projectChanged: "trackboi://project-changed",
+		desktopStorePatch: "trackboi://desktop-store-patch",
 	},
 } as const;

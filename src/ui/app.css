@@ -135,6 +135,14 @@ body {
 	font-weight: 400;
 }
 
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+summary,
+select,
+a[href] {
+	cursor: pointer;
+}
+
 .trackboi-mono-font {
 	font-family:
 		"Noto Sans Mono", ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
@@ -155,6 +163,10 @@ body.trackboi-resizing * {
 	user-select: none !important;
 	-webkit-user-select: none !important;
 	cursor: col-resize !important;
+}
+
+.column-shell[data-drag-target="true"] .column-empty-state {
+	opacity: 0;
 }
 
 #app {
@@ -256,6 +268,31 @@ body.trackboi-resizing * {
 	border-color: hsl(var(--primary) / 0.34);
 	background: hsl(var(--primary) / 0.1);
 	color: hsl(var(--foreground));
+}
+
+.command-center-scrollbar {
+	scrollbar-width: thin;
+	scrollbar-color: hsl(var(--border) / 0.85) transparent;
+}
+
+.command-center-scrollbar::-webkit-scrollbar {
+	width: 8px;
+}
+
+.command-center-scrollbar::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.command-center-scrollbar::-webkit-scrollbar-thumb {
+	border-radius: 999px;
+	border: 2px solid transparent;
+	background: hsl(var(--border) / 0.9);
+	background-clip: padding-box;
+}
+
+.command-center-scrollbar::-webkit-scrollbar-thumb:hover {
+	background: hsl(var(--muted-foreground) / 0.45);
+	background-clip: padding-box;
 }
 
 .shell-section {
@@ -687,7 +724,7 @@ select,
 @keyframes trackboi-dialog-in {
 	from {
 		opacity: 0;
-		transform: translate(-50%, -48%) scale(0.98);
+		transform: translate(-50%, -50%) scale(0.98);
 	}
 	to {
 		opacity: 1;
@@ -702,6 +739,6 @@ select,
 	}
 	to {
 		opacity: 0;
-		transform: translate(-50%, -48%) scale(0.98);
+		transform: translate(-50%, -50%) scale(0.98);
 	}
 }

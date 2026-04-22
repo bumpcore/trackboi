@@ -43,6 +43,10 @@ export function useTrackWorkflow(options: {
 	boardScopeMode: Ref<BoardScopeMode>;
 	run(action: () => Promise<void>): Promise<void>;
 	requestConfirmation: ConfirmationRequester;
+	upsertTrack(track: Track): void;
+	removeTrack(trackId: string): void;
+	updateTrackFile(trackId: string, file: Track["files"][number]): void;
+	removeTrackFile(trackId: string, fileName: string): void;
 }): TrackWorkflow {
 	const selectedTrackId = ref<string | null>(null);
 	const panelMode = ref<TrackPanelMode>("edit");
@@ -111,12 +115,13 @@ export function useTrackWorkflow(options: {
 		await options.run(async () => {
 			if (panelMode.value === "create" || !selectedTrack.value) {
 				const created = await desktop.createTrack(patch);
+				options.upsertTrack(created);
 				selectedTrackId.value = created.id;
 				panelMode.value = "edit";
 				return;
 			}
 
-			await desktop.updateTrack(selectedTrack.value.id, patch);
+			options.upsertTrack(await desktop.updateTrack(selectedTrack.value.id, patch));
 		});
 	}
 
@@ -129,6 +134,7 @@ export function useTrackWorkflow(options: {
 			onConfirm: async () => {
 				await options.run(async () => {
 					await desktop.deleteTrack(track.id);
+					options.removeTrack(track.id);
 					if (selectedTrackId.value === track.id) clearTrackSelection();
 				});
 			},
@@ -147,11 +153,12 @@ export function useTrackWorkflow(options: {
 	async function writeSelectedTrackFile(fileName: string, content: string) {
 		if (!selectedTrack.value) return;
 		await options.run(async () => {
-			await desktop.writeTrackFile({
+			const file = await desktop.writeTrackFile({
 				trackId: selectedTrack.value!.id,
 				name: fileName,
 				content,
 			});
+			options.updateTrackFile(selectedTrack.value!.id, file);
 			selectedTrackFileName.value = fileName;
 			selectedTrackFileContent.value = content;
 		});
@@ -161,6 +168,7 @@ export function useTrackWorkflow(options: {
 		if (!selectedTrack.value) return;
 		await options.run(async () => {
 			await desktop.deleteTrackFile(selectedTrack.value!.id, fileName);
+			options.removeTrackFile(selectedTrack.value!.id, fileName);
 			if (selectedTrackFileName.value === fileName) {
 				selectedTrackFileName.value = "";
 				selectedTrackFileContent.value = "";

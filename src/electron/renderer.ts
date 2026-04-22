@@ -8,7 +8,6 @@ import type {
 	CustomField,
 	DesktopState,
 	PersonAlias,
-	ProjectSnapshot,
 	TrackDecision,
 	TrackPatch,
 	TrackReference,
@@ -16,11 +15,11 @@ import type {
 	TrackFileWriteInput,
 	WorkScope,
 } from "@/core/types";
-import type { TrackboiBridgeApi, WindowBridgeApi } from "./bridge";
+import type { DesktopStorePatch, TrackboiBridgeApi, WindowBridgeApi } from "./bridge";
 import { trackboi } from "./trackboi";
 import { windowShell } from "./window";
 
-type BoardChangedListener = (snapshot: ProjectSnapshot | null) => void;
+type DesktopStorePatchListener = (patch: DesktopStorePatch) => void;
 
 function serializeCustomField(field: CustomField): CustomField {
 	return field.options
@@ -186,15 +185,8 @@ export function createDesktopFacade(
 	trackboiApi: TrackboiBridgeApi = trackboi,
 	windowApi: WindowBridgeApi = windowShell,
 ) {
-	const listeners = new Set<BoardChangedListener>();
-	let projectChangeListenerStarted = false;
-	let projectChangeRefreshQueued = false;
 	let projectPrewarmQueued = false;
 	let projectPrewarmInFlight = false;
-
-	function notifyListeners(snapshot: ProjectSnapshot | null): void {
-		for (const listener of listeners) listener(snapshot);
-	}
 
 	/**
 	 * Hydrates non-active project caches after the current interaction settles so
@@ -215,39 +207,8 @@ export function createDesktopFacade(
 		}, delayMs);
 	}
 
-	async function notifyBoardChanged() {
-		const snapshot = await trackboiApi.getActiveProject();
-		notifyListeners(snapshot);
-		return snapshot;
-	}
-
-	/**
-	 * Starts the main-to-renderer project-change subscription once and coalesces
-	 * bursty filesystem events into one snapshot refresh.
-	 */
-	function startProjectChangeListener() {
-		if (projectChangeListenerStarted) return;
-		projectChangeListenerStarted = true;
-
-		trackboiApi.onProjectChanged(() => {
-			if (projectChangeRefreshQueued) return;
-			projectChangeRefreshQueued = true;
-			globalThis.setTimeout(() => {
-				projectChangeRefreshQueued = false;
-				void notifyBoardChanged();
-			}, 120);
-		});
-	}
-
-	async function refreshAfterMutation<T>(action: () => Promise<T>): Promise<T> {
+	async function refreshAfterProjectSelection<T>(action: () => Promise<T>): Promise<T> {
 		const result = await action();
-		await notifyBoardChanged();
-		return result;
-	}
-
-	async function refreshAfterProjectSelection<T>(action: () => Promise<T>, snapshotSelector: (result: T) => ProjectSnapshot | null): Promise<T> {
-		const result = await action();
-		notifyListeners(snapshotSelector(result));
 		scheduleProjectPrewarm();
 		return result;
 	}
@@ -276,9 +237,7 @@ export function createDesktopFacade(
 		return trackboiApi.listBoards();
 	},
 	async setActiveBoard(boardId: string): Promise<DesktopState> {
-		const nextState = await trackboiApi.setActiveBoard(boardId);
-		notifyListeners(nextState.snapshot);
-		return nextState;
+		return trackboiApi.setActiveBoard(boardId);
 	},
 	async readAppSettings() {
 		return trackboiApi.readAppSettings();
@@ -299,10 +258,10 @@ export function createDesktopFacade(
 		return trackboiApi.setActiveWorkspaceFile(filePath);
 	},
 	async createBoard(input: { name: string }) {
-		return refreshAfterMutation(() => trackboiApi.createBoard(input));
+		return trackboiApi.createBoard(input);
 	},
 	async deleteBoard(boardId: string) {
-		return refreshAfterMutation(() => trackboiApi.deleteBoard(boardId));
+		return trackboiApi.deleteBoard(boardId);
 	},
 	async listTracks() {
 		return trackboiApi.listTracks();
@@ -311,37 +270,37 @@ export function createDesktopFacade(
 		return trackboiApi.getTrack(trackId);
 	},
 	async createTrack(input: CreateTrackInput) {
-		return refreshAfterMutation(() => trackboiApi.createTrack(serializeCreateTrackInput(input)));
+		return trackboiApi.createTrack(serializeCreateTrackInput(input));
 	},
 	async updateTrack(trackId: string, patch: TrackPatch) {
-		return refreshAfterMutation(() => trackboiApi.updateTrack(trackId, serializeTrackPatch(patch)));
+		return trackboiApi.updateTrack(trackId, serializeTrackPatch(patch));
 	},
 	async deleteTrack(trackId: string) {
-		return refreshAfterMutation(() => trackboiApi.deleteTrack(trackId));
+		return trackboiApi.deleteTrack(trackId);
 	},
 	async readTrackFile(trackId: string, fileName: string) {
 		return trackboiApi.readTrackFile(trackId, fileName);
 	},
 	async writeTrackFile(input: TrackFileWriteInput) {
-		return refreshAfterMutation(() => trackboiApi.writeTrackFile(input));
+		return trackboiApi.writeTrackFile(input);
 	},
 	async deleteTrackFile(trackId: string, fileName: string) {
-		return refreshAfterMutation(() => trackboiApi.deleteTrackFile(trackId, fileName));
+		return trackboiApi.deleteTrackFile(trackId, fileName);
 	},
 	async openWorkspaceFile() {
 		return trackboiApi.openWorkspaceFile();
 	},
 	async chooseProject() {
-		return refreshAfterProjectSelection(() => trackboiApi.chooseProject(), (snapshot) => snapshot);
+		return refreshAfterProjectSelection(() => trackboiApi.chooseProject());
 	},
 	async locateProject(projectPath: string) {
-		return refreshAfterProjectSelection(() => trackboiApi.locateProject(projectPath), (snapshot) => snapshot);
+		return refreshAfterProjectSelection(() => trackboiApi.locateProject(projectPath));
 	},
 	async removeProject(projectPath: string) {
-		return refreshAfterProjectSelection(() => trackboiApi.removeProject(projectPath), (snapshot) => snapshot);
+		return refreshAfterProjectSelection(() => trackboiApi.removeProject(projectPath));
 	},
 	async switchProject(projectPath: string) {
-		return refreshAfterProjectSelection(() => trackboiApi.switchProject(projectPath), (nextState) => nextState.snapshot);
+		return refreshAfterProjectSelection(() => trackboiApi.switchProject(projectPath));
 	},
 	async createCard(input: {
 		boardId?: string;
@@ -352,30 +311,30 @@ export function createDesktopFacade(
 		scope?: WorkScope;
 		trackId?: string | null;
 	}) {
-		return refreshAfterMutation(() => trackboiApi.createCard(serializeCreateCardInput(input)));
+		return trackboiApi.createCard(serializeCreateCardInput(input));
 	},
 	async updateCard(cardId: string, patch: CardPatch) {
-		return refreshAfterMutation(() => trackboiApi.updateCard(cardId, serializeCardPatch(patch)));
+		return trackboiApi.updateCard(cardId, serializeCardPatch(patch));
 	},
 	async updateBoard(board: Board) {
-		return refreshAfterMutation(() => trackboiApi.updateBoard(serializeBoard(board)));
+		return trackboiApi.updateBoard(serializeBoard(board));
 	},
 	async updateProjectPeople(people: PersonAlias[]) {
-		return refreshAfterMutation(() => trackboiApi.updateProjectPeople(people.map((person) => ({
+		return trackboiApi.updateProjectPeople(people.map((person) => ({
 			id: person.id,
 			displayName: person.displayName,
 			gitEmails: [...person.gitEmails],
 			gitNames: [...person.gitNames],
-		}))));
+		})));
 	},
 	async addCardComment(input: CreateCardCommentInput) {
-		return refreshAfterMutation(() => trackboiApi.addCardComment(serializeCreateCardCommentInput(input)));
+		return trackboiApi.addCardComment(serializeCreateCardCommentInput(input));
 	},
 	async moveCard(cardId: string, toColumn: string, beforeCardId: string | null) {
-		return refreshAfterMutation(() => trackboiApi.moveCard(cardId, toColumn, beforeCardId));
+		return trackboiApi.moveCard(cardId, toColumn, beforeCardId);
 	},
 	async deleteCard(cardId: string) {
-		return refreshAfterMutation(() => trackboiApi.deleteCard(cardId));
+		return trackboiApi.deleteCard(cardId);
 	},
 	async minimizeWindow() {
 		await windowApi.minimize();
@@ -395,9 +354,8 @@ export function createDesktopFacade(
 	async startResize(edge: string) {
 		await windowApi.startResize(edge);
 	},
-	addBoardChangedListener(listener: BoardChangedListener) {
-		startProjectChangeListener();
-		listeners.add(listener);
+	addDesktopStorePatchListener(listener: DesktopStorePatchListener) {
+		return trackboiApi.onDesktopStorePatch(listener);
 	},
 	};
 }

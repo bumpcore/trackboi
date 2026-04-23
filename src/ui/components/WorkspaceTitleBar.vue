@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Maximize2, Minus, X } from "lucide-vue-next";
 import Tooltip from "@/ui/components/Tooltip.vue";
+import trackboiLogoUrl from "../../../trackboi.svg";
 
 defineProps<{
 	projectName: string;
@@ -23,7 +24,8 @@ const emit = defineEmits<{
 			@dblclick="emit('toggleMaximize', $event)"
 			@pointerdown="emit('drag', $event)"
 		>
-			<span class="rounded-[4px] bg-secondary/88 px-1.5 py-0.5 text-foreground">trackboi</span>
+			<img :src="trackboiLogoUrl" alt="Trackboi" class="h-4 w-4 shrink-0" />
+			<span class="rounded-[4px] bg-secondary/88 px-1.5 py-0.5 text-foreground">Trackboi</span>
 			<span>/</span>
 			<span class="truncate text-foreground">{{ projectName }}</span>
 			<span

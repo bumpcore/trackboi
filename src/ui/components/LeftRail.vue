@@ -5,6 +5,7 @@ import Button from "@/ui/components/Button.vue";
 import Tooltip from "@/ui/components/Tooltip.vue";
 import type { ProjectEntry } from "@/core/types";
 import { projectColorStyle } from "@/ui/lib/projectColor";
+import trackboiLogoUrl from "../../../trackboi.svg";
 
 const props = defineProps<{
 	activeProjectPath: string | null;
@@ -32,9 +33,7 @@ function projectMonogram(name: string) {
 <template>
 	<aside class="border-r border-border/70 bg-card/90" data-testid="left-rail">
 		<div class="flex h-full flex-col items-center gap-2 py-3">
-			<div class="grid h-8 w-8 place-items-center rounded-md border border-border/70 bg-secondary/85 text-[11px] font-bold text-primary">
-				tb
-			</div>
+			<img :src="trackboiLogoUrl" alt="Trackboi" class="h-8 w-8 shrink-0" />
 
 			<div class="mt-1 flex flex-col gap-2">
 				<Tooltip

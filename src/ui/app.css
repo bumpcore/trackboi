@@ -1,8 +1,8 @@
 @import "@fontsource/inter/400.css";
 @import "@fontsource/inter/500.css";
 @import "@fontsource/inter/600.css";
-@import "@fontsource/noto-sans-mono/400.css";
-@import "@fontsource/noto-sans-mono/500.css";
+@import "@fontsource/cascadia-mono/400.css";
+@import "@fontsource/cascadia-mono/500.css";
 @import "tailwindcss";
 @import "highlight.js/styles/github-dark.css";
 @source "../components/*.vue";
@@ -30,6 +30,7 @@
 	--color-border: hsl(var(--border));
 	--color-input: hsl(var(--input));
 	--color-ring: hsl(var(--ring));
+	--font-mono: "Cascadia Mono", "Cascadia Code", ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 	--radius-md: var(--radius);
 	--radius-lg: calc(var(--radius) + 2px);
 }
@@ -144,8 +145,7 @@ a[href] {
 }
 
 .trackboi-mono-font {
-	font-family:
-		"Noto Sans Mono", ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+	font-family: var(--font-mono);
 }
 
 ::selection {
@@ -236,8 +236,7 @@ body.trackboi-resizing * {
 	border-radius: 0.25rem;
 	border: 1px solid hsl(var(--border) / 0.9);
 	padding: 0.125rem 0.375rem;
-	font-family:
-		"Noto Sans Mono", ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+	font-family: var(--font-mono);
 	font-size: 0.625rem;
 	color: hsl(var(--muted-foreground));
 }
@@ -369,8 +368,7 @@ body.trackboi-resizing * {
 	border-radius: 6px;
 	background: hsl(var(--secondary) / 0.8);
 	padding: 0.12rem 0.34rem;
-	font-family:
-		"SFMono-Regular", "Cascadia Code", Consolas, "Liberation Mono", Menlo, monospace;
+	font-family: var(--font-mono);
 	font-size: 0.92em;
 }
 
@@ -460,8 +458,7 @@ body.trackboi-resizing * {
 .note-editor-textarea {
 	min-height: 8.5rem;
 	border: 0;
-	font-family:
-		"SFMono-Regular", "Cascadia Code", Consolas, "Liberation Mono", Menlo, monospace;
+	font-family: var(--font-mono);
 	line-height: 1.6;
 	tab-size: 2;
 }

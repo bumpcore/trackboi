@@ -12,6 +12,7 @@
 		"email": "noreply@trackboi.local"
 	},
 	"scripts": {
+		"assets:brand": "bun scripts/generate-brand-icons.ts",
 		"dev": "concurrently -k \"bun run dev:ui\" \"bun run dev:electron-main\" \"bun run dev:electron-preload\" \"bun run dev:desktop\"",
 		"dev:ui": "vite --host 127.0.0.1",
 		"dev:electron-main": "esbuild src/electron/main.ts --bundle --platform=node --format=cjs --outfile=dist-node/electron/main.cjs --external:electron --watch",
@@ -28,7 +29,7 @@
 		"build:ui": "vite build",
 		"build:node": "bun run build:cli && bun run build:electron",
 		"build:cli": "esbuild src/cli/entry.ts --bundle --platform=node --format=cjs --outfile=dist-node/cli/main.cjs",
-		"build:electron": "esbuild src/electron/main.ts --bundle --platform=node --format=cjs --outfile=dist-node/electron/main.cjs --external:electron && esbuild src/electron/preload.ts --bundle --platform=node --format=cjs --outfile=dist-node/electron/preload.cjs --external:electron",
+		"build:electron": "bun run assets:brand && esbuild src/electron/main.ts --bundle --platform=node --format=cjs --outfile=dist-node/electron/main.cjs --external:electron && esbuild src/electron/preload.ts --bundle --platform=node --format=cjs --outfile=dist-node/electron/preload.cjs --external:electron",
 		"dist": "bun run build && electron-builder --linux --publish never",
 		"start": "env -u ELECTRON_RUN_AS_NODE electron dist-node/electron/main.cjs",
 		"cli": "./bin/trackboi",
@@ -39,8 +40,10 @@
 	"build": {
 		"appId": "dev.trackboi.desktop",
 		"productName": "Trackboi",
+		"artifactName": "${productName}-${version}-${arch}.${ext}",
 		"directories": {
-			"output": "release"
+			"output": "release",
+			"buildResources": "build"
 		},
 		"files": [
 			"dist/**",
@@ -48,12 +51,24 @@
 			"bin/**",
 			"package.json"
 		],
+		"extraResources": [
+			{
+				"from": "build/icon.png",
+				"to": "assets/trackboi.png"
+			},
+			{
+				"from": "trackboi.svg",
+				"to": "assets/trackboi.svg"
+			}
+		],
 		"extraMetadata": {
 			"main": "dist-node/electron/main.cjs"
 		},
 		"linux": {
 			"category": "Development",
 			"maintainer": "Trackboi <noreply@trackboi.local>",
+			"executableName": "trackboi",
+			"icon": "build/icons",
 			"target": [
 				"AppImage",
 				"rpm"
@@ -61,8 +76,8 @@
 		}
 	},
 	"dependencies": {
+		"@fontsource/cascadia-mono": "^5.2.3",
 		"@fontsource/inter": "^5.2.8",
-		"@fontsource/noto-sans-mono": "^5.2.7",
 		"@modelcontextprotocol/sdk": "^1.29.0",
 		"@tailwindcss/vite": "^4.2.2",
 		"@vueuse/core": "^14.2.1",

@@ -22,7 +22,7 @@ const variants = {
 <template>
 	<div
 		:class="cn(
-			'trackboi-mono-font inline-flex items-center rounded-[4px] border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.03em] leading-none transition-colors',
+			'trackboi-mono-font inline-flex items-center rounded-[2px] border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.03em] leading-none transition-colors',
 			variants[props.variant],
 			props.class,
 		)"

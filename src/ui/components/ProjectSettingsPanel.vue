@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ListPlus, SlidersHorizontal, Trash2 } from "lucide-vue-next";
+import { SlidersHorizontal, Trash2 } from "lucide-vue-next";
 import Button from "@/ui/components/Button.vue";
 import Input from "@/ui/components/Input.vue";
 import type { PersonAlias, ProjectSnapshot } from "@/core/types";
@@ -24,7 +24,7 @@ const emit = defineEmits<{
 	<div v-if="snapshot" class="grid content-start gap-5">
 		<section class="shell-section">
 			<div class="flex items-start gap-3">
-				<div class="grid h-9 w-9 place-items-center rounded-md border border-border/80 bg-secondary/55 text-muted-foreground">
+				<div class="grid h-9 w-9 place-items-center rounded-[2px] border border-border/80 bg-secondary/55 text-muted-foreground">
 					<SlidersHorizontal class="h-4 w-4" />
 				</div>
 				<div>
@@ -37,7 +37,7 @@ const emit = defineEmits<{
 				<div
 					v-for="person in people"
 					:key="person.id"
-					class="flex items-center justify-between gap-3 rounded-md border border-border/80 bg-secondary/55 px-3 py-3"
+					class="flex items-center justify-between gap-3 rounded-[2px] border border-border/80 bg-secondary/55 px-3 py-3"
 				>
 					<div class="min-w-0">
 						<p class="truncate text-sm font-medium text-foreground">{{ person.displayName }}</p>
@@ -48,7 +48,7 @@ const emit = defineEmits<{
 							names: {{ person.gitNames.join(", ") }}
 						</p>
 					</div>
-					<Button variant="outline" type="button" :disabled="busy" @click="emit('removePersonAlias', person.id)">
+					<Button variant="outline" size="icon" type="button" title="Remove person" aria-label="Remove person" :disabled="busy" @click="emit('removePersonAlias', person.id)">
 						<Trash2 class="h-4 w-4" />
 					</Button>
 				</div>
@@ -69,7 +69,6 @@ const emit = defineEmits<{
 				</label>
 				<div>
 					<Button type="submit" :disabled="busy || !personDisplayNameDraft.trim()">
-						<ListPlus class="h-4 w-4" />
 						Add person
 					</Button>
 				</div>

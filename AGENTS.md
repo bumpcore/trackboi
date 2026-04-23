@@ -9,6 +9,10 @@ Trackboi is organized around a small set of hard boundaries:
 
 If a change makes those boundaries blur, stop and reshape it before adding more code.
 
+## Trackboi Skill
+
+Agents working in this repository should load `.agents/skills/trackboi/SKILL.md` when work is non-trivial, stateful, or useful to track beyond the current chat. Use Trackboi MCP tools when available to orient, choose the active project/worktree/board, update cards, and leave handoff notes.
+
 ## Product Terms
 
 Use these words consistently:
@@ -17,12 +21,13 @@ Use these words consistently:
 - `Worktree`: a discovered workspace variant. It is not a separate user-added workspace, but it has explicit identity because filesystem-backed state can differ or lag there.
 - `Project`: the per-worktree project definition and identity. It owns project-scoped settings such as people aliases and future agent/workflow config.
 - `Board`: a first-class board inside a worktree project.
-- `Track`: a board-scoped work container for intent, files, references, and activity.
+- `Track`: a project-wide work container for intent, brief, files, decisions, references, and linked tasks.
 - `Task` / `Card`: a board-scoped work item that can optionally link to a track.
 
 Hierarchy:
 
-- `workspace -> worktree -> project -> board -> track -> task`
+- `workspace -> worktree -> project -> track`
+- `workspace -> worktree -> project -> board -> task`
 
 ## Layer Rules
 

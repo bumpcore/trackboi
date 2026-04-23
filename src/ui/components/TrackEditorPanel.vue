@@ -1,38 +1,37 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
-import { FileText, Plus, Save, Trash2 } from "lucide-vue-next";
+import { Save, Trash2 } from "lucide-vue-next";
 import { newId } from "@/core/id";
 import type {
 	Card as TrackboiCard,
-	CardComment,
 	Track,
 	TrackDecision,
 	TrackDecisionStatus,
 	TrackPatch,
 	TrackReference,
 	TrackReferenceKind,
-	TrackSource,
 } from "@/core/types";
 import Badge from "@/ui/components/Badge.vue";
 import Button from "@/ui/components/Button.vue";
 import Input from "@/ui/components/Input.vue";
-import MarkdownContent from "@/ui/components/MarkdownContent.vue";
 import MarkdownEditor from "@/ui/components/MarkdownEditor.vue";
 import Select from "@/ui/components/Select.vue";
 import type { SelectOption } from "@/ui/components/Select.vue";
+import { normalizeTrackDocName } from "@/ui/lib/trackDocs";
+
+type TrackEditorTab = "track" | "brief" | "decisions" | "references" | "cards" | "new-file" | `file:${string}`;
 
 const props = defineProps<{
 	busy: boolean;
 	mode: "create" | "edit";
 	track: Track | null;
-	currentBranch: string | null;
 	linkedCards: TrackboiCard[];
 	selectedFileName: string;
 	selectedFileContent: string;
 }>();
 
 const emit = defineEmits<{
-	save: [patch: Required<Pick<TrackPatch, "title" | "source" | "summary" | "plan" | "decisions" | "references" | "activity">>];
+	save: [patch: Required<Pick<TrackPatch, "title" | "summary" | "brief" | "decisions" | "references">>];
 	delete: [track: Track];
 	loadFile: [fileName: string];
 	writeFile: [fileName: string, content: string];
@@ -42,12 +41,10 @@ const emit = defineEmits<{
 
 const title = ref("");
 const summary = ref("");
-const plan = ref("");
-const sourceKind = ref<TrackSource["kind"]>("manual");
-const sourceRef = ref("");
+const brief = ref("");
 const decisions = ref<TrackDecision[]>([]);
 const references = ref<TrackReference[]>([]);
-const activity = ref<CardComment[]>([]);
+const activeTab = ref<TrackEditorTab>("track");
 
 const decisionDraft = reactive({
 	title: "",
@@ -59,16 +56,17 @@ const referenceDraft = reactive({
 	value: "",
 	kind: "path" as TrackReferenceKind,
 });
-const activityBody = ref("");
 const fileName = ref("");
 const fileContent = ref("");
 const editingDecisionId = ref<string | null>(null);
 const editingReferenceId = ref<string | null>(null);
-const editingActivityId = ref<string | null>(null);
 
-const sourceOptions: SelectOption[] = [
-	{ value: "manual", label: "Manual" },
-	{ value: "branch", label: "Branch-backed" },
+const baseTabs: Array<{ id: TrackEditorTab; label: string }> = [
+	{ id: "track", label: "Track" },
+	{ id: "brief", label: "Brief" },
+	{ id: "decisions", label: "Decisions" },
+	{ id: "references", label: "Refs" },
+	{ id: "cards", label: "Cards" },
 ];
 const decisionStatusOptions: SelectOption[] = [
 	{ value: "proposed", label: "Proposed" },
@@ -91,39 +89,19 @@ function cloneReferences(values: TrackReference[]): TrackReference[] {
 	return values.map((value) => ({ ...value }));
 }
 
-function cloneActivity(values: CardComment[]): CardComment[] {
-	return values.map((value) => ({ ...value }));
-}
-
 watch(
-	() => [props.track, props.mode, props.currentBranch] as const,
+	() => [props.track, props.mode] as const,
 	([track]) => {
 		title.value = track?.title ?? "";
 		summary.value = track?.summary ?? "";
-		plan.value = track?.plan ?? "";
-		sourceKind.value = track?.source.kind ?? "manual";
-		sourceRef.value = track?.source.kind === "branch"
-			? track.source.ref
-			: "";
+		brief.value = track?.brief ?? "";
 		decisions.value = cloneDecisions(track?.decisions ?? []);
 		references.value = cloneReferences(track?.references ?? []);
-		activity.value = cloneActivity(track?.activity ?? []);
 		fileName.value = "";
 		fileContent.value = "";
+		activeTab.value = "track";
 	},
 	{ immediate: true },
-);
-
-watch(
-	() => sourceKind.value,
-	(nextSourceKind) => {
-		if (nextSourceKind === "branch" && !sourceRef.value && props.currentBranch) {
-			sourceRef.value = props.currentBranch;
-		}
-		if (nextSourceKind === "manual") {
-			sourceRef.value = "";
-		}
-	},
 );
 
 watch(
@@ -132,10 +110,37 @@ watch(
 		if (!nextName) return;
 		fileName.value = nextName;
 		fileContent.value = nextContent;
+		activeTab.value = `file:${nextName}`;
 	},
 );
 
 const canWriteFiles = computed(() => props.mode === "edit" && props.track != null);
+const fileTabs = computed(() => props.track?.files ?? []);
+
+function selectTab(tab: TrackEditorTab) {
+	activeTab.value = tab;
+	if (tab.startsWith("file:")) {
+		emit("loadFile", tab.slice("file:".length));
+	}
+	if (tab === "new-file") {
+		fileName.value = "";
+		fileContent.value = "";
+	}
+}
+
+function saveCurrentFile() {
+	if (!canWriteFiles.value || !fileName.value.trim()) return;
+	const nextName = normalizeTrackDocName(fileName.value);
+	fileName.value = nextName;
+	emit("writeFile", nextName, fileContent.value);
+	activeTab.value = `file:${nextName}`;
+}
+
+function deleteCurrentFile() {
+	if (!canWriteFiles.value || !fileName.value.trim()) return;
+	emit("deleteFile", fileName.value);
+	activeTab.value = "track";
+}
 
 function addDecision() {
 	if (!decisionDraft.title.trim()) return;
@@ -223,58 +228,15 @@ function cancelReferenceEdit() {
 	referenceDraft.kind = "path";
 }
 
-function addActivity() {
-	if (!activityBody.value.trim()) return;
-	const timestamp = new Date().toISOString();
-	activity.value = [
-		...activity.value,
-		{
-			id: newId("comment"),
-			cardId: props.track?.id ?? "track_activity",
-			body: activityBody.value.trim(),
-			createdAt: timestamp,
-			updatedAt: timestamp,
-			createdBy: props.track?.updatedBy ?? props.track?.createdBy ?? "person_unknown",
-			updatedBy: props.track?.updatedBy ?? props.track?.createdBy ?? "person_unknown",
-		},
-	];
-	activityBody.value = "";
-}
-
-function startActivityEdit(entry: CardComment) {
-	editingActivityId.value = entry.id;
-	activityBody.value = entry.body;
-}
-
-function saveActivityEdit() {
-	if (!editingActivityId.value || !activityBody.value.trim()) return;
-	activity.value = activity.value.map((entry) => entry.id === editingActivityId.value ? {
-		...entry,
-		body: activityBody.value.trim(),
-		updatedAt: new Date().toISOString(),
-	} : entry);
-	cancelActivityEdit();
-}
-
-function cancelActivityEdit() {
-	editingActivityId.value = null;
-	activityBody.value = "";
-}
-
 function saveTrack() {
 	if (!title.value.trim()) return;
-	const source: TrackSource = sourceKind.value === "branch" && sourceRef.value.trim()
-		? { kind: "branch", ref: sourceRef.value.trim() }
-		: { kind: "manual" };
 
 	emit("save", {
 		title: title.value.trim(),
-		source,
 		summary: summary.value,
-		plan: plan.value,
+		brief: brief.value,
 		decisions: decisions.value,
 		references: references.value,
-		activity: activity.value,
 	});
 }
 
@@ -299,8 +261,49 @@ defineExpose({
 </script>
 
 <template>
-	<div class="grid content-start gap-5" data-testid="track-editor">
-		<section class="shell-section">
+	<div class="grid content-start gap-4" data-testid="track-editor">
+		<div class="app-scroll -mx-1 flex gap-1 overflow-x-auto px-1 pb-1" role="tablist" aria-label="Track editor sections">
+			<button
+				v-for="tab in baseTabs"
+				:key="tab.id"
+				type="button"
+				class="shell-tab-button shrink-0"
+				:class="{ 'is-active': activeTab === tab.id }"
+				role="tab"
+				:aria-selected="activeTab === tab.id"
+				@click="selectTab(tab.id)"
+			>
+				{{ tab.label }}
+				<span v-if="tab.id === 'decisions' && decisions.length" class="shell-count">{{ decisions.length }}</span>
+				<span v-if="tab.id === 'references' && references.length" class="shell-count">{{ references.length }}</span>
+				<span v-if="tab.id === 'cards' && linkedCards.length" class="shell-count">{{ linkedCards.length }}</span>
+			</button>
+			<button
+				v-for="file in fileTabs"
+				:key="file.name"
+				type="button"
+				class="shell-tab-button shrink-0"
+				:class="{ 'is-active': activeTab === `file:${file.name}` }"
+				role="tab"
+				:aria-selected="activeTab === `file:${file.name}`"
+				@click="selectTab(`file:${file.name}`)"
+			>
+				<span class="max-w-32 truncate">{{ file.name }}</span>
+			</button>
+			<button
+				type="button"
+				class="shell-tab-button shrink-0"
+				:class="{ 'is-active': activeTab === 'new-file' }"
+				role="tab"
+				:aria-selected="activeTab === 'new-file'"
+				:disabled="!canWriteFiles"
+				@click="selectTab('new-file')"
+			>
+				Doc
+			</button>
+		</div>
+
+		<section v-if="activeTab === 'track'" class="shell-section">
 			<div>
 				<p class="shell-section-title">Track</p>
 				<p class="mt-1 text-sm text-muted-foreground">Tracks hold durable context above the card layer.</p>
@@ -309,35 +312,21 @@ defineExpose({
 				Title
 				<Input v-model="title" autocomplete="off" placeholder="Inspector rewrite" />
 			</label>
-			<div class="grid gap-3 md:grid-cols-[120px_minmax(0,1fr)]">
-				<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-					Source
-					<Select v-model="sourceKind" :options="sourceOptions" />
-				</label>
-				<label v-if="sourceKind === 'branch'" class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-					Branch ref
-					<Input v-model="sourceRef" autocomplete="off" placeholder="feature/track-context" />
-				</label>
+			<div class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+				<span>Summary</span>
+				<MarkdownEditor v-model="summary" placeholder="What is this track trying to accomplish?" />
 			</div>
 		</section>
 
-		<section class="shell-section">
+		<section v-else-if="activeTab === 'brief'" class="shell-section">
 			<div>
-				<p class="shell-section-title">Summary</p>
-				<p class="mt-1 text-sm text-muted-foreground">Problem framing and current intent.</p>
+				<p class="shell-section-title">Brief</p>
+				<p class="mt-1 text-sm text-muted-foreground">Durable context, goals, constraints, and desired end state.</p>
 			</div>
-			<MarkdownEditor v-model="summary" placeholder="What is this track trying to accomplish?" />
+			<MarkdownEditor v-model="brief" placeholder="Write the track brief in markdown." />
 		</section>
 
-		<section class="shell-section">
-			<div>
-				<p class="shell-section-title">Plan</p>
-				<p class="mt-1 text-sm text-muted-foreground">Keep the next steps and decisions close to the board.</p>
-			</div>
-			<MarkdownEditor v-model="plan" placeholder="Write the track-level plan in markdown." />
-		</section>
-
-		<section class="shell-section">
+		<section v-else-if="activeTab === 'decisions'" class="shell-section">
 			<div>
 				<p class="shell-section-title">Decisions</p>
 				<p class="mt-1 text-sm text-muted-foreground">Capture important choices without rewriting the whole track narrative.</p>
@@ -346,16 +335,16 @@ defineExpose({
 				<div
 					v-for="decision in decisions"
 					:key="decision.id"
-					class="rounded-md border border-border/80 bg-secondary/55 px-3 py-3"
+					class="rounded-[2px] border border-border/80 bg-secondary/55 px-3 py-3"
 				>
 					<div class="flex items-center justify-between gap-2">
 						<span class="text-sm font-medium text-foreground">{{ decision.title }}</span>
 						<div class="flex items-center gap-2">
 							<Badge variant="outline">{{ decision.status }}</Badge>
-							<Button variant="ghost" size="icon" type="button" @click="startDecisionEdit(decision)">
+							<Button variant="ghost" size="icon" type="button" title="Edit decision" aria-label="Edit decision" @click="startDecisionEdit(decision)">
 								<Save class="h-4 w-4" />
 							</Button>
-							<Button variant="ghost" size="icon" type="button" @click="decisions = decisions.filter((entry) => entry.id !== decision.id)">
+							<Button variant="ghost" size="icon" type="button" title="Remove decision" aria-label="Remove decision" @click="decisions = decisions.filter((entry) => entry.id !== decision.id)">
 								<Trash2 class="h-4 w-4" />
 							</Button>
 						</div>
@@ -364,7 +353,7 @@ defineExpose({
 					<p class="mt-2 font-mono text-[10px] text-muted-foreground">{{ formatTimestamp(decision.updatedAt) }}</p>
 				</div>
 			</div>
-			<div class="rounded-md border border-dashed border-border/75 bg-background/20 p-3">
+			<div class="rounded-[2px] border border-dashed border-border/75 bg-background/20 p-3">
 				<Input v-model="decisionDraft.title" autocomplete="off" placeholder="Decision title" />
 				<Input v-model="decisionDraft.body" class="mt-2" autocomplete="off" placeholder="Why this matters" />
 				<div class="mt-2 flex items-center gap-2">
@@ -373,14 +362,13 @@ defineExpose({
 						Cancel
 					</Button>
 					<Button type="button" :disabled="!decisionDraft.title.trim()" @click="editingDecisionId ? saveDecisionEdit() : addDecision()">
-						<Plus class="h-4 w-4" />
 						{{ editingDecisionId ? "Save" : "Add" }}
 					</Button>
 				</div>
 			</div>
 		</section>
 
-		<section class="shell-section">
+		<section v-else-if="activeTab === 'references'" class="shell-section">
 			<div>
 				<p class="shell-section-title">References</p>
 				<p class="mt-1 text-sm text-muted-foreground">Keep repo paths, cards, branches, worktrees, and URLs close to execution.</p>
@@ -389,7 +377,7 @@ defineExpose({
 				<div
 					v-for="reference in references"
 					:key="reference.id"
-					class="flex items-center justify-between gap-3 rounded-md border border-border/80 bg-secondary/55 px-3 py-2"
+					class="flex items-center justify-between gap-3 rounded-[2px] border border-border/80 bg-secondary/55 px-3 py-2"
 				>
 					<div class="min-w-0">
 						<p class="truncate text-sm font-medium text-foreground">{{ reference.label }}</p>
@@ -397,16 +385,16 @@ defineExpose({
 					</div>
 					<div class="flex items-center gap-2">
 						<Badge variant="outline">{{ reference.kind }}</Badge>
-						<Button variant="ghost" size="icon" type="button" @click="startReferenceEdit(reference)">
+						<Button variant="ghost" size="icon" type="button" title="Edit reference" aria-label="Edit reference" @click="startReferenceEdit(reference)">
 							<Save class="h-4 w-4" />
 						</Button>
-						<Button variant="ghost" size="icon" type="button" @click="references = references.filter((entry) => entry.id !== reference.id)">
+						<Button variant="ghost" size="icon" type="button" title="Remove reference" aria-label="Remove reference" @click="references = references.filter((entry) => entry.id !== reference.id)">
 							<Trash2 class="h-4 w-4" />
 						</Button>
 					</div>
 				</div>
 			</div>
-			<div class="rounded-md border border-dashed border-border/75 bg-background/20 p-3">
+			<div class="rounded-[2px] border border-dashed border-border/75 bg-background/20 p-3">
 				<Input v-model="referenceDraft.label" autocomplete="off" placeholder="Reference label" />
 				<Input v-model="referenceDraft.value" class="mt-2" autocomplete="off" placeholder="repo/path.ts or https://..." />
 				<div class="mt-2 flex items-center gap-2">
@@ -415,56 +403,13 @@ defineExpose({
 						Cancel
 					</Button>
 					<Button type="button" :disabled="!referenceDraft.label.trim() || !referenceDraft.value.trim()" @click="editingReferenceId ? saveReferenceEdit() : addReference()">
-						<Plus class="h-4 w-4" />
 						{{ editingReferenceId ? "Save" : "Add" }}
 					</Button>
 				</div>
 			</div>
 		</section>
 
-		<section class="shell-section">
-			<div>
-				<p class="shell-section-title">Activity</p>
-				<p class="mt-1 text-sm text-muted-foreground">Log handoffs, findings, and next actions as discrete entries.</p>
-			</div>
-			<div v-if="activity.length > 0" class="grid gap-2">
-				<div
-					v-for="entry in activity"
-					:key="entry.id"
-					class="rounded-md border border-border/80 bg-secondary/55 px-3 py-3"
-				>
-					<div class="flex items-center justify-between gap-2">
-						<div>
-							<span class="text-sm font-medium text-foreground">{{ entry.createdBy }}</span>
-							<p class="font-mono text-[10px] text-muted-foreground">{{ formatTimestamp(entry.updatedAt) }}</p>
-						</div>
-						<div class="flex items-center gap-2">
-							<Button variant="ghost" size="icon" type="button" @click="startActivityEdit(entry)">
-								<Save class="h-4 w-4" />
-							</Button>
-							<Button variant="ghost" size="icon" type="button" @click="activity = activity.filter((candidate) => candidate.id !== entry.id)">
-								<Trash2 class="h-4 w-4" />
-							</Button>
-						</div>
-					</div>
-					<MarkdownContent :value="entry.body" class="mt-2 text-sm text-foreground" />
-				</div>
-			</div>
-			<div class="rounded-md border border-dashed border-border/75 bg-background/20 p-3">
-				<MarkdownEditor v-model="activityBody" placeholder="Write a handoff or investigation note." />
-				<div class="mt-2 flex justify-end gap-2">
-					<Button v-if="editingActivityId" variant="outline" type="button" @click="cancelActivityEdit">
-						Cancel
-					</Button>
-					<Button type="button" :disabled="!activityBody.trim()" @click="editingActivityId ? saveActivityEdit() : addActivity()">
-						<Plus class="h-4 w-4" />
-						{{ editingActivityId ? "Save note" : "Add note" }}
-					</Button>
-				</div>
-			</div>
-		</section>
-
-		<section v-if="linkedCards.length > 0" class="shell-section">
+		<section v-else-if="activeTab === 'cards'" class="shell-section">
 			<div class="flex items-center justify-between gap-3">
 				<div>
 					<p class="shell-section-title">Linked cards</p>
@@ -472,12 +417,12 @@ defineExpose({
 				</div>
 				<Badge variant="outline">{{ linkedCards.length }}</Badge>
 			</div>
-			<div class="grid gap-2">
+			<div v-if="linkedCards.length > 0" class="grid gap-2">
 				<button
 					v-for="card in linkedCards"
 					:key="card.id"
 					type="button"
-					class="rounded-md border border-border/80 bg-secondary/55 px-3 py-2 text-left transition hover:border-primary/35"
+					class="rounded-[2px] border border-border/80 bg-secondary/55 px-3 py-2 text-left transition hover:border-primary/35"
 					@click="emit('editCard', card)"
 				>
 					<div class="flex items-center justify-between gap-3">
@@ -489,50 +434,40 @@ defineExpose({
 					</div>
 				</button>
 			</div>
+			<div v-else class="rounded-[2px] border border-dashed border-border/70 bg-background/20 px-3 py-8 text-center text-sm text-muted-foreground">
+				No cards are linked to this track yet.
+			</div>
 		</section>
 
-		<section class="shell-section">
+		<section v-else class="shell-section">
 			<div class="flex items-center justify-between gap-3">
 				<div>
-					<p class="shell-section-title">Files</p>
-					<p class="mt-1 text-xs text-muted-foreground">Text-first attachment files for notes, snippets, and handoff context.</p>
+					<p class="shell-section-title">{{ activeTab === "new-file" ? "New doc" : fileName || "Track doc" }}</p>
+					<p class="mt-1 text-xs text-muted-foreground">Free-form markdown docs for notes, snippets, and handoff context.</p>
 				</div>
-				<Badge variant="outline">{{ track?.files.length ?? 0 }} files</Badge>
+				<Badge variant="outline">{{ fileTabs.length }} files</Badge>
 			</div>
-			<div v-if="track?.files.length" class="grid gap-2">
-				<button
-					v-for="file in track.files"
-					:key="file.name"
-					type="button"
-					class="flex items-center justify-between gap-3 rounded-md border border-border/80 bg-secondary/55 px-3 py-2 text-left transition hover:border-primary/35"
-					@click="emit('loadFile', file.name)"
-				>
-					<div class="min-w-0">
-						<p class="truncate text-sm text-foreground">{{ file.name }}</p>
-						<p class="font-mono text-[10px] text-muted-foreground">{{ file.updatedAt }}</p>
-					</div>
-					<FileText class="h-4 w-4 text-muted-foreground" />
-				</button>
+			<div v-if="!canWriteFiles" class="rounded-[2px] border border-dashed border-border/70 bg-background/20 px-3 py-8 text-center text-sm text-muted-foreground">
+				Save the track before adding markdown docs.
 			</div>
-			<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-				File name
-				<Input v-model="fileName" autocomplete="off" placeholder="notes/context.md" :disabled="!canWriteFiles" />
-			</label>
-			<div class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-				<span>File content</span>
-				<MarkdownEditor v-model="fileContent" placeholder="Track notes, snippets, or JSON context." />
-			</div>
-			<div class="flex items-center justify-end gap-2">
-				<Button variant="outline" type="button" :disabled="!canWriteFiles || !fileName.trim()" @click="emit('deleteFile', fileName)">
-					<Trash2 class="h-4 w-4" />
-					Delete file
-				</Button>
-				<Button type="button" :disabled="!canWriteFiles || !fileName.trim()" @click="emit('writeFile', fileName, fileContent)">
-					<Save class="h-4 w-4" />
-					Save file
-				</Button>
-			</div>
+			<template v-else>
+				<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+					File name
+					<Input v-model="fileName" autocomplete="off" placeholder="context.md" />
+				</label>
+				<div class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+					<span>File content</span>
+					<MarkdownEditor v-model="fileContent" placeholder="Track notes, snippets, or handoff context." />
+				</div>
+				<div class="flex items-center justify-end gap-2">
+					<Button variant="outline" type="button" :disabled="!fileName.trim()" @click="deleteCurrentFile">
+						Delete
+					</Button>
+					<Button type="button" :disabled="!fileName.trim()" @click="saveCurrentFile">
+						Save
+					</Button>
+				</div>
+			</template>
 		</section>
-
 	</div>
 </template>

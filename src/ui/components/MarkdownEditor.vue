@@ -36,7 +36,7 @@ function updateValue(event: Event) {
 
 <template>
 	<div :class="cn('grid gap-2', props.class)">
-		<div class="flex items-center justify-between gap-3 rounded-md border border-border/55 bg-background/28 p-1.5">
+		<div class="flex items-center justify-between gap-3 rounded-[2px] border border-border/55 bg-background/28 p-1.5">
 			<div class="flex items-center gap-1">
 				<button
 					v-for="item in modes"
@@ -54,7 +54,7 @@ function updateValue(event: Event) {
 		</div>
 
 		<div
-			class="note-editor-grid rounded-md border border-input/70 bg-background/35"
+			class="note-editor-grid rounded-[2px] border border-input/70 bg-background/35"
 			:class="mode === 'split' ? 'grid-cols-2' : 'grid-cols-1'"
 		>
 			<div

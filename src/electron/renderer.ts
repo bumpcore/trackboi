@@ -1,7 +1,6 @@
 import type {
 	AppSettings,
 	Board,
-	CardComment,
 	CardPatch,
 	CreateCardCommentInput,
 	CreateTrackInput,
@@ -11,7 +10,6 @@ import type {
 	TrackDecision,
 	TrackPatch,
 	TrackReference,
-	TrackSource,
 	TrackFileWriteInput,
 	WorkScope,
 } from "@/core/types";
@@ -80,12 +78,6 @@ function serializeCreateCardCommentInput(input: CreateCardCommentInput): CreateC
 	};
 }
 
-function serializeTrackSource(source: TrackSource): TrackSource {
-	return source.kind === "branch"
-		? { kind: "branch", ref: source.ref }
-		: { kind: "manual" };
-}
-
 function serializeTrackDecision(decision: TrackDecision): TrackDecision {
 	return {
 		id: decision.id,
@@ -106,25 +98,11 @@ function serializeTrackReference(reference: TrackReference): TrackReference {
 	};
 }
 
-function serializeTrackActivityComment(comment: CardComment): CardComment {
-	return {
-		id: comment.id,
-		cardId: comment.cardId,
-		body: comment.body,
-		createdAt: comment.createdAt,
-		updatedAt: comment.updatedAt,
-		createdBy: comment.createdBy,
-		updatedBy: comment.updatedBy,
-	};
-}
-
 function serializeCreateTrackInput(input: CreateTrackInput): CreateTrackInput {
 	return {
 		title: input.title,
-		boardId: input.boardId,
-		source: input.source ? serializeTrackSource(input.source) : undefined,
 		summary: input.summary,
-		plan: input.plan,
+		brief: input.brief,
 		actorId: input.actorId,
 	};
 }
@@ -132,12 +110,10 @@ function serializeCreateTrackInput(input: CreateTrackInput): CreateTrackInput {
 function serializeTrackPatch(patch: TrackPatch): TrackPatch {
 	return {
 		title: patch.title,
-		source: patch.source ? serializeTrackSource(patch.source) : undefined,
 		summary: patch.summary,
-		plan: patch.plan,
+		brief: patch.brief,
 		decisions: patch.decisions ? patch.decisions.map(serializeTrackDecision) : undefined,
 		references: patch.references ? patch.references.map(serializeTrackReference) : undefined,
-		activity: patch.activity ? patch.activity.map(serializeTrackActivityComment) : undefined,
 		actorId: patch.actorId,
 	};
 }

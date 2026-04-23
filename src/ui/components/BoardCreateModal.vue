@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, watch } from "vue";
-import { ListPlus, X } from "lucide-vue-next";
+import { X } from "lucide-vue-next";
 import Button from "@/ui/components/Button.vue";
 import Input from "@/ui/components/Input.vue";
 
@@ -52,7 +52,7 @@ onBeforeUnmount(() => {
 							Create another board inside the current project.
 						</p>
 					</div>
-					<Button variant="ghost" size="icon" type="button" @click="emit('close')">
+					<Button variant="ghost" size="icon" type="button" title="Close" aria-label="Close" @click="emit('close')">
 						<X class="h-4 w-4" />
 					</Button>
 				</header>
@@ -68,7 +68,6 @@ onBeforeUnmount(() => {
 							Cancel
 						</Button>
 						<Button type="submit" :disabled="busy || !boardCreateNameDraft.trim()">
-							<ListPlus class="h-4 w-4" />
 							Create
 						</Button>
 					</div>

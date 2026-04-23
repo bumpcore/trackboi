@@ -1,19 +1,24 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { DEFAULT_BOARD_ID } from "./constants";
+import { parseFrontmatter, writeFrontmatter } from "./frontmatter";
 import { newId } from "./id";
-import { readJson, writeJsonAtomic } from "./json";
-import { trackFilePath, trackFilesPath, trackPath, tracksPath } from "./paths";
+import { trackBriefPath, trackDecisionsPath, trackDirPath, trackFilePath, trackFilesPath, trackPath, trackReferencesPath, tracksPath } from "./paths";
 import { now, type ProjectStore } from "./storage";
 import type {
 	CreateTrackInput,
 	Track,
+	TrackDecision,
+	TrackDecisionStatus,
 	TrackFile,
 	TrackFileReadResult,
 	TrackFileWriteInput,
 	TrackPatch,
-	TrackSource,
+	TrackReference,
+	TrackReferenceKind,
 } from "./types";
+
+const DECISION_STATUSES = new Set<TrackDecisionStatus>(["proposed", "accepted", "rejected"]);
+const REFERENCE_KINDS = new Set<TrackReferenceKind>(["card", "path", "branch", "worktree", "url"]);
 
 export function readTracks(rootPath: string): Track[] {
 	const trackRoot = tracksPath(rootPath);
@@ -21,11 +26,10 @@ export function readTracks(rootPath: string): Track[] {
 
 	const tracks: Track[] = [];
 	for (const entry of readdirSync(trackRoot, { withFileTypes: true })) {
-		if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
-		const filePath = path.join(trackRoot, entry.name);
-		const track = normalizeTrack(readJson<Track>(filePath));
-		track.files = listTrackFiles(rootPath, track.id);
-		tracks.push(track);
+		if (!entry.isDirectory()) continue;
+		const indexPath = trackPath(rootPath, entry.name);
+		if (!existsSync(indexPath)) continue;
+		tracks.push(readTrack(rootPath, entry.name));
 	}
 
 	tracks.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || left.title.localeCompare(right.title));
@@ -39,52 +43,51 @@ export function createTrackInStore(store: ProjectStore, input: CreateTrackInput)
 	const timestamp = now();
 	const track: Track = {
 		id: newId("track"),
-		boardId: input.boardId ?? DEFAULT_BOARD_ID,
 		title,
 		slug: slugifyTrackTitle(title),
-		source: normalizeTrackSource(input.source),
 		summary: input.summary?.trim() ?? "",
-		plan: input.plan?.trim() ?? "",
+		brief: input.brief?.trim() ?? "",
 		decisions: [],
 		references: [],
-		activity: [],
 		files: [],
 		createdAt: timestamp,
 		updatedAt: timestamp,
 		createdBy: input.actorId ?? "person_unknown",
 		updatedBy: input.actorId ?? "person_unknown",
 	};
-	writeJsonAtomic(trackPath(store.rootPath, track.id), track);
+	writeTrack(store.rootPath, track, {
+		brief: true,
+		decisions: true,
+		references: true,
+	});
 	return track;
 }
 
 export function updateTrackInStore(store: ProjectStore, trackId: string, patch: TrackPatch): Track {
-	const filePath = trackPath(store.rootPath, trackId);
-	const current = normalizeTrack(readJson<Track>(filePath));
+	const current = readTrack(store.rootPath, trackId);
 	const next: Track = {
 		...current,
 		title: typeof patch.title === "string" ? patch.title.trim() : current.title,
-		source: patch.source ? normalizeTrackSource(patch.source) : current.source,
 		summary: typeof patch.summary === "string" ? patch.summary.trim() : current.summary,
-		plan: typeof patch.plan === "string" ? patch.plan.trim() : current.plan,
+		brief: typeof patch.brief === "string" ? patch.brief.trim() : current.brief,
 		decisions: Array.isArray(patch.decisions) ? patch.decisions : current.decisions,
 		references: Array.isArray(patch.references) ? patch.references : current.references,
-		activity: Array.isArray(patch.activity) ? patch.activity : current.activity,
 		updatedAt: now(),
 		createdBy: current.createdBy ?? "person_unknown",
 		updatedBy: patch.actorId ?? current.updatedBy ?? current.createdBy ?? "person_unknown",
 	};
 	if (!next.title) throw new Error("Track title is required");
-	writeJsonAtomic(filePath, next);
-	return {
-		...next,
-		files: listTrackFiles(store.rootPath, trackId),
-	};
+	next.slug = slugifyTrackTitle(next.title);
+	writeTrack(store.rootPath, next, {
+		brief: typeof patch.brief === "string",
+		decisions: Array.isArray(patch.decisions),
+		references: Array.isArray(patch.references),
+	});
+	return readTrack(store.rootPath, trackId);
 }
 
 export function deleteTrackInStore(store: ProjectStore, trackId: string): { ok: true } {
-	rmSync(trackPath(store.rootPath, trackId), { force: true });
-	rmSync(path.join(tracksPath(store.rootPath), trackId), { recursive: true, force: true });
+	rmSync(trackDirPath(store.rootPath, trackId), { recursive: true, force: true });
 	return { ok: true };
 }
 
@@ -135,7 +138,136 @@ export function sanitizeTrackFileName(fileName: string): string {
 	if (normalized !== path.basename(normalized) || normalized.includes("..")) {
 		throw new Error("Track file names must stay within the track files folder");
 	}
+	if (path.extname(normalized).toLowerCase() !== ".md") {
+		throw new Error("Track files must be markdown files");
+	}
 	return normalized;
+}
+
+function readTrack(rootPath: string, trackId: string): Track {
+	const parsed = parseFrontmatter<Partial<Track>>(readFileSync(trackPath(rootPath, trackId), "utf8"));
+	const timestamp = typeof parsed.data.updatedAt === "string" ? parsed.data.updatedAt : now();
+	const id = typeof parsed.data.id === "string" && parsed.data.id ? parsed.data.id : trackId;
+	const title = typeof parsed.data.title === "string" && parsed.data.title.trim() ? parsed.data.title.trim() : id;
+	const track: Track = {
+		id,
+		title,
+		slug: typeof parsed.data.slug === "string" && parsed.data.slug ? parsed.data.slug : slugifyTrackTitle(title),
+		summary: parsed.body.trim(),
+		brief: readTextFile(trackBriefPath(rootPath, id)),
+		decisions: readDecisions(rootPath, id, timestamp),
+		references: readReferences(rootPath, id),
+		files: listTrackFiles(rootPath, id),
+		createdAt: typeof parsed.data.createdAt === "string" ? parsed.data.createdAt : timestamp,
+		updatedAt: timestamp,
+		createdBy: typeof parsed.data.createdBy === "string" ? parsed.data.createdBy : "person_unknown",
+		updatedBy: typeof parsed.data.updatedBy === "string" ? parsed.data.updatedBy : "person_unknown",
+	};
+	return track;
+}
+
+function writeTrack(
+	rootPath: string,
+	track: Track,
+	options: { brief?: boolean; decisions?: boolean; references?: boolean } = {},
+): void {
+	mkdirSync(trackDirPath(rootPath, track.id), { recursive: true });
+	mkdirSync(trackFilesPath(rootPath, track.id), { recursive: true });
+	writeFileSync(trackPath(rootPath, track.id), writeFrontmatter({
+		id: track.id,
+		title: track.title,
+		slug: track.slug,
+		createdAt: track.createdAt,
+		updatedAt: track.updatedAt,
+		createdBy: track.createdBy,
+		updatedBy: track.updatedBy,
+	}, track.summary), "utf8");
+	if (options.brief) writeFileSync(trackBriefPath(rootPath, track.id), normalizeMarkdownDoc(track.brief), "utf8");
+	if (options.decisions) writeFileSync(trackDecisionsPath(rootPath, track.id), writeDecisions(track.decisions), "utf8");
+	if (options.references) writeFileSync(trackReferencesPath(rootPath, track.id), writeReferences(track.references), "utf8");
+}
+
+function readTextFile(filePath: string): string {
+	return existsSync(filePath) ? readFileSync(filePath, "utf8").trim() : "";
+}
+
+function normalizeMarkdownDoc(content: string): string {
+	const normalized = content.replace(/\r\n/g, "\n").trim();
+	return normalized ? `${normalized}\n` : "";
+}
+
+function readDecisions(rootPath: string, trackId: string, timestamp: string): TrackDecision[] {
+	const filePath = trackDecisionsPath(rootPath, trackId);
+	if (!existsSync(filePath)) return [];
+	const lines = readFileSync(filePath, "utf8").replace(/\r\n/g, "\n").split("\n");
+	const decisions: TrackDecision[] = [];
+	let current: { status: TrackDecisionStatus; title: string; body: string[] } | null = null;
+
+	function flush() {
+		if (!current) return;
+		const index = decisions.length + 1;
+		decisions.push({
+			id: `decision_${index}_${slugifyTrackTitle(current.title)}`,
+			title: current.title,
+			body: current.body.join("\n").trim(),
+			status: current.status,
+			createdAt: timestamp,
+			updatedAt: timestamp,
+		});
+		current = null;
+	}
+
+	for (const line of lines) {
+		const heading = line.match(/^##\s+(?:\[([^\]]+)\]\s*)?(.+)$/);
+		if (heading) {
+			flush();
+			const rawStatus = heading[1]?.trim().toLowerCase();
+			const status = DECISION_STATUSES.has(rawStatus as TrackDecisionStatus) ? rawStatus as TrackDecisionStatus : "accepted";
+			current = { status, title: heading[2]?.trim() || "Decision", body: [] };
+			continue;
+		}
+		if (current) current.body.push(line);
+	}
+	flush();
+	return decisions;
+}
+
+function writeDecisions(decisions: TrackDecision[]): string {
+	const body = decisions.map((decision) => [
+		`## [${normalizeDecisionStatus(decision.status)}] ${decision.title.trim() || "Decision"}`,
+		"",
+		decision.body.trim(),
+	].filter((line, index) => index < 2 || line.length > 0).join("\n")).join("\n\n");
+	return `# Decisions\n${body ? `\n${body}\n` : ""}`;
+}
+
+function readReferences(rootPath: string, trackId: string): TrackReference[] {
+	const filePath = trackReferencesPath(rootPath, trackId);
+	if (!existsSync(filePath)) return [];
+	const references: TrackReference[] = [];
+	for (const line of readFileSync(filePath, "utf8").replace(/\r\n/g, "\n").split("\n")) {
+		const match = line.match(/^\s*-\s+\[([^\]]+)\]\s+([^:]+):\s*(.+)$/);
+		if (!match) continue;
+		const kind = match[1]?.trim().toLowerCase();
+		if (!REFERENCE_KINDS.has(kind as TrackReferenceKind)) continue;
+		const label = match[2]?.trim();
+		const value = match[3]?.trim();
+		if (!label || !value) continue;
+		references.push({
+			id: `reference_${references.length + 1}_${slugifyTrackTitle(label)}`,
+			kind: kind as TrackReferenceKind,
+			label,
+			value,
+		});
+	}
+	return references;
+}
+
+function writeReferences(references: TrackReference[]): string {
+	const body = references
+		.map((reference) => `- [${normalizeReferenceKind(reference.kind)}] ${reference.label.trim()}: ${reference.value.trim()}`)
+		.join("\n");
+	return `# References\n${body ? `\n${body}\n` : ""}`;
 }
 
 function listTrackFiles(rootPath: string, trackId: string): TrackFile[] {
@@ -144,7 +276,7 @@ function listTrackFiles(rootPath: string, trackId: string): TrackFile[] {
 
 	const files: TrackFile[] = [];
 	for (const entry of readdirSync(filesDir, { withFileTypes: true })) {
-		if (!entry.isFile()) continue;
+		if (!entry.isFile() || path.extname(entry.name).toLowerCase() !== ".md") continue;
 		const fullPath = path.join(filesDir, entry.name);
 		const stats = statSync(fullPath);
 		files.push({
@@ -159,57 +291,21 @@ function listTrackFiles(rootPath: string, trackId: string): TrackFile[] {
 }
 
 function touchTrack(store: ProjectStore, trackId: string): void {
-	const filePath = trackPath(store.rootPath, trackId);
-	const current = normalizeTrack(readJson<Track>(filePath));
-	writeJsonAtomic(filePath, {
+	const current = readTrack(store.rootPath, trackId);
+	writeTrack(store.rootPath, {
 		...current,
 		updatedAt: now(),
 	});
 }
 
-function inferTrackFileContentType(fileName: string): string {
-	const extension = path.extname(fileName).toLowerCase();
-	switch (extension) {
-		case ".md":
-			return "text/markdown";
-		case ".json":
-			return "application/json";
-		case ".ts":
-		case ".tsx":
-		case ".js":
-		case ".jsx":
-		case ".css":
-		case ".html":
-		case ".vue":
-		case ".txt":
-		default:
-			return "text/plain";
-	}
+function inferTrackFileContentType(_fileName: string): string {
+	return "text/markdown";
 }
 
-function normalizeTrack(track: Track): Track {
-	return {
-		id: track.id,
-		boardId: track.boardId || DEFAULT_BOARD_ID,
-		title: track.title,
-		slug: typeof track.slug === "string" && track.slug.length > 0 ? track.slug : slugifyTrackTitle(track.title),
-		source: normalizeTrackSource(track.source),
-		summary: typeof track.summary === "string" ? track.summary : "",
-		plan: typeof track.plan === "string" ? track.plan : "",
-		decisions: Array.isArray(track.decisions) ? track.decisions : [],
-		references: Array.isArray(track.references) ? track.references : [],
-		activity: Array.isArray(track.activity) ? track.activity : [],
-		files: [],
-		createdAt: typeof track.createdAt === "string" ? track.createdAt : now(),
-		updatedAt: typeof track.updatedAt === "string" ? track.updatedAt : now(),
-		createdBy: typeof track.createdBy === "string" ? track.createdBy : "person_unknown",
-		updatedBy: typeof track.updatedBy === "string" ? track.updatedBy : (typeof track.createdBy === "string" ? track.createdBy : "person_unknown"),
-	};
+function normalizeDecisionStatus(status: TrackDecisionStatus | string | undefined): TrackDecisionStatus {
+	return DECISION_STATUSES.has(status as TrackDecisionStatus) ? status as TrackDecisionStatus : "accepted";
 }
 
-function normalizeTrackSource(source: TrackSource | undefined): TrackSource {
-	if (source?.kind === "branch" && source.ref.trim()) {
-		return { kind: "branch", ref: source.ref.trim() };
-	}
-	return { kind: "manual" };
+function normalizeReferenceKind(kind: TrackReferenceKind | string | undefined): TrackReferenceKind {
+	return REFERENCE_KINDS.has(kind as TrackReferenceKind) ? kind as TrackReferenceKind : "path";
 }

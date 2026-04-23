@@ -134,6 +134,7 @@ function createPerformanceFixture() {
 				version: 1,
 				name: path.basename(projectPath),
 				people: [],
+				agents: [],
 			};
 
 			writeJsonAtomic(path.join(storageRoot, "boards/default.json"), board);

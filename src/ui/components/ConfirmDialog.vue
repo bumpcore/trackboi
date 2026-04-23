@@ -34,7 +34,7 @@ defineEmits<{
 			<AlertDialogOverlay class="dialog-overlay fixed inset-0 z-50 bg-background/70 backdrop-blur-sm" />
 			<AlertDialogContent
 				data-testid="confirm-dialog"
-				class="dialog-content fixed left-1/2 top-1/2 z-50 grid w-[min(420px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-md border border-border bg-card p-5 text-card-foreground shadow-2xl outline-none"
+				class="dialog-content fixed left-1/2 top-1/2 z-50 grid w-[min(420px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-[2px] border border-border bg-card p-5 text-card-foreground shadow-2xl outline-none"
 			>
 				<div class="grid gap-2">
 					<AlertDialogTitle class="text-lg font-semibold">

@@ -375,6 +375,47 @@ describe("runtime worktree integration", () => {
 		expect(created.updatedBy).toBe(created.createdBy);
 	});
 
+	test("registered agent identities are copied into project metadata on first mutation", () => {
+		const fixture = createRuntimeFixture();
+		fixture.seedStore(fixture.mainRepo, ".trackboi", {
+			board: {
+				name: "Main board",
+				columns: [{ id: "todo", name: "To Do" }],
+			},
+			cards: [],
+		});
+
+		const runtime = fixture.runtime();
+		runtime.updateAppSettings({
+			version: 1,
+			agents: [{
+				id: "agent_boi",
+				name: "boi",
+				description: "Default coding identity",
+			}],
+			agentContexts: [],
+			editor: {
+				preferredEditorId: "auto",
+				customCommand: "",
+			},
+		});
+		runtime.chooseProjectPath(fixture.mainRepo);
+
+		const created = runtime.createCard({
+			title: "Agent stamped card",
+			column: "todo",
+			scope: { kind: "project", ref: "global" },
+			actorId: "agent_boi",
+		});
+		const agent = runtime.readDesktopState().snapshot?.metadata.agents.find((entry) => entry.id === created.createdBy);
+
+		expect(agent).toEqual({
+			id: "agent_boi",
+			name: "boi",
+			description: "Default coding identity",
+		});
+	});
+
 	test("lists multiple boards and filters cards by the selected board", () => {
 		const fixture = createRuntimeFixture();
 		fixture.seedStore(fixture.mainRepo, ".trackboi", {
@@ -418,6 +459,32 @@ describe("runtime worktree integration", () => {
 		const snapshot = runtime.readDesktopState().snapshot;
 		expect(snapshot?.board.id).toBe("ops");
 		expect(snapshot?.cards.map((card) => card.id)).toEqual(["card_ops_1"]);
+	});
+
+	test("keeps tracks project-wide across board switches and empty board deletion", () => {
+		const fixture = createRuntimeFixture();
+		fixture.seedStore(fixture.mainRepo, ".trackboi", {
+			board: {
+				name: "Main board",
+				columns: [{ id: "todo", name: "To Do" }],
+			},
+			cards: [],
+		});
+
+		const runtime = fixture.runtime();
+		runtime.chooseProjectPath(fixture.mainRepo);
+		const track = runtime.createTrack({
+			title: "Project-wide context",
+			summary: "This workstream should follow the project, not one board.",
+		});
+
+		const withSecondBoard = runtime.createBoard({ name: "Ops" });
+		expect(withSecondBoard.board.id).toBe("ops");
+		expect(withSecondBoard.tracks.map((candidate) => candidate.id)).toContain(track.id);
+
+		const afterDelete = runtime.deleteBoard("ops");
+		expect(afterDelete.board.id).toBe("default");
+		expect(afterDelete.tracks.map((candidate) => candidate.id)).toContain(track.id);
 	});
 
 	test("falls back to the selected worktree board set when another worktree has different boards", () => {
@@ -539,7 +606,7 @@ describe("runtime worktree integration", () => {
 		runtime.chooseProjectPath(fixture.mainRepo);
 
 		const before = runtime.readDesktopState().snapshot;
-		const syntheticTrack = before?.tracks.find((track) => track.source.kind === "branch" && track.source.ref === "feature/onboarding");
+		const syntheticTrack = before?.tracks.find((track) => track.syntheticRef === "feature/onboarding");
 		const legacyCard = before?.cards.find((card) => card.id === "card_legacy_track");
 
 		expect(syntheticTrack?.synthetic).toBe(true);
@@ -551,8 +618,7 @@ describe("runtime worktree integration", () => {
 
 		const after = runtime.readDesktopState().snapshot;
 		const materializedTrack = after?.tracks.find((track) => (
-			track.source.kind === "branch" &&
-			track.source.ref === "feature/onboarding" &&
+			track.title === "feature/onboarding" &&
 			!track.synthetic
 		));
 		const cardFile = parseFrontmatter<Card>(readFileSync(
@@ -581,14 +647,13 @@ describe("runtime worktree integration", () => {
 
 		const created = runtime.createTrack({
 			title: "Inspector rewrite",
-			source: { kind: "branch", ref: "feat/inspector-rewrite" },
 			summary: "Lift track planning above cards.",
 		});
 
 		expect(runtime.listTracks().map((track) => track.id)).toContain(created.id);
 
 		const updated = runtime.updateTrack(created.id, {
-			plan: "1. Add track filter\n2. Dock inspector\n3. Materialize legacy refs",
+			brief: "1. Add track filter\n2. Dock inspector\n3. Materialize legacy refs",
 			decisions: [{
 				id: "decision_1",
 				title: "Use real track records",
@@ -599,8 +664,16 @@ describe("runtime worktree integration", () => {
 			}],
 		});
 
-		expect(updated.plan).toContain("Dock inspector");
+		expect(updated.brief).toContain("Dock inspector");
 		expect(updated.decisions).toHaveLength(1);
+		expect(existsSync(path.join(fixture.mainRepo, ".trackboi/tracks", created.id, "index.md"))).toBe(true);
+		expect(readFileSync(path.join(fixture.mainRepo, ".trackboi/tracks", created.id, "brief.md"), "utf8")).toContain("Dock inspector");
+		expect(readFileSync(path.join(fixture.mainRepo, ".trackboi/tracks", created.id, "decisions.md"), "utf8")).toContain("## [accepted] Use real track records");
+
+		const referencesPath = path.join(fixture.mainRepo, ".trackboi/tracks", created.id, "references.md");
+		writeFileSync(referencesPath, "# References\n\nFree form note that should survive metadata writes.\n", "utf8");
+		runtime.updateTrack(created.id, { summary: "Refined summary" });
+		expect(readFileSync(referencesPath, "utf8")).toContain("Free form note that should survive metadata writes.");
 
 		const file = runtime.writeTrackFile({
 			trackId: created.id,
@@ -697,6 +770,7 @@ function createRuntimeFixture() {
 				version: 1,
 				name: path.basename(projectPath),
 				people: [],
+				agents: [],
 			};
 			writeJsonAtomic(path.join(storageRoot, "boards/default.json"), board);
 			for (const extraBoard of input.extraBoards ?? []) {

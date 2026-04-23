@@ -19,6 +19,7 @@ type ColumnWorkflow = {
 	openCreateColumn(afterColumnId?: string | null): void;
 	openColumn(columnId: string): void;
 	closeColumnPanel(): void;
+	reorderColumn(columnId: string, beforeColumnId: string | null): Promise<void>;
 	submitColumn(): Promise<void>;
 	deleteSelectedColumn(): Promise<void>;
 };
@@ -54,6 +55,20 @@ function insertColumn(columns: Column[], column: Column, afterColumnId: string):
 		...columns.slice(0, insertionIndex + 1),
 		column,
 		...columns.slice(insertionIndex + 1),
+	];
+}
+
+function moveColumnBefore(columns: Column[], columnId: string, beforeColumnId: string | null): Column[] {
+	const column = columns.find((candidate) => candidate.id === columnId);
+	if (!column) return columns;
+	const remaining = columns.filter((candidate) => candidate.id !== columnId);
+	if (!beforeColumnId) return [...remaining, column];
+	const insertionIndex = remaining.findIndex((candidate) => candidate.id === beforeColumnId);
+	if (insertionIndex === -1) return [...remaining, column];
+	return [
+		...remaining.slice(0, insertionIndex),
+		column,
+		...remaining.slice(insertionIndex),
 	];
 }
 
@@ -161,6 +176,14 @@ export function useColumnWorkflow(options: {
 		insertAfterId.value = INSERT_AT_START_VALUE;
 	}
 
+	async function reorderColumn(columnId: string, beforeColumnId: string | null) {
+		const snapshot = options.snapshot.value;
+		if (!snapshot) return;
+		const nextColumns = moveColumnBefore(snapshot.board.columns, columnId, beforeColumnId);
+		if (nextColumns.map((column) => column.id).join("|") === snapshot.board.columns.map((column) => column.id).join("|")) return;
+		await updateBoardColumns(nextColumns);
+	}
+
 	async function submitColumn() {
 		const snapshot = options.snapshot.value;
 		const name = columnNameDraft.value.trim();
@@ -220,6 +243,7 @@ export function useColumnWorkflow(options: {
 		openCreateColumn,
 		openColumn,
 		closeColumnPanel,
+		reorderColumn,
 		submitColumn,
 		deleteSelectedColumn,
 	};

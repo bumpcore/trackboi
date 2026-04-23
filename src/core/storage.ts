@@ -88,6 +88,7 @@ export function ensureProjectFiles(project: Project, rootPath: string, _storageP
 			version: 1,
 			name: project.name,
 			people: [],
+			agents: [],
 		});
 	}
 
@@ -108,6 +109,7 @@ export function normalizeProjectMetadata(metadata: ProjectMetadata, project: Pro
 		version: 1,
 		name: typeof metadata.name === "string" ? metadata.name : project.name,
 		people: Array.isArray(metadata.people) ? metadata.people : [],
+		agents: Array.isArray(metadata.agents) ? metadata.agents : [],
 	};
 }
 

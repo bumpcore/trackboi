@@ -25,7 +25,6 @@ const props = defineProps<{
 	columnInsertAfterOptions: SelectOption[];
 	columnOptions: SelectOption[];
 	commentList: TrackboiCard["comments"];
-	currentBranch: string | null;
 	customFields: CustomField[];
 	actorLabels: Record<string, string>;
 	subtaskProgress: ChildProgress;
@@ -53,7 +52,7 @@ const emit = defineEmits<{
 	addCardComment: [];
 	createSubtask: [];
 	editSubtask: [card: TrackboiCard];
-	saveTrack: [patch: Required<Pick<TrackPatch, "title" | "source" | "summary" | "plan" | "decisions" | "references" | "activity">>];
+	saveTrack: [patch: Required<Pick<TrackPatch, "title" | "summary" | "brief" | "decisions" | "references">>];
 	deleteTrack: [track: Track];
 	loadTrackFile: [fileName: string];
 	writeTrackFile: [fileName: string, content: string];
@@ -157,13 +156,12 @@ function submitTrackFromFooter() {
 						<div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
 							<Badge v-if="card" variant="outline">{{ card.column }}</Badge>
 							<Badge v-if="cardTrack" variant="outline" class="text-primary">{{ cardTrack.title }}</Badge>
-							<Badge v-if="track?.source.kind === 'branch'" variant="outline">{{ track.source.ref }}</Badge>
 							<Badge v-if="activeView === 'column' && column" variant="outline">{{ columnCardCount }} cards</Badge>
 						</div>
 					</div>
 				</div>
 
-				<div v-if="showCardTrackInline" class="mt-3 rounded-md border border-border/80 bg-secondary/55 px-3 py-3">
+				<div v-if="showCardTrackInline" class="mt-3 rounded-[2px] border border-border/80 bg-secondary/55 px-3 py-3">
 					<div class="flex items-start justify-between gap-3">
 						<div class="min-w-0">
 							<div class="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Track container</div>
@@ -218,7 +216,6 @@ function submitTrackFromFooter() {
 					:busy="busy"
 					:mode="trackMode"
 					:track="track"
-					:current-branch="currentBranch"
 					:linked-cards="linkedTrackCards"
 					:selected-file-name="trackFileName"
 					:selected-file-content="trackFileContent"
@@ -264,27 +261,17 @@ function submitTrackFromFooter() {
 						<div>
 							<p class="shell-section-title">Comments / Activity</p>
 							<p class="mt-1 text-sm text-muted-foreground">
-								{{ card ? "Task memory attached to the selected card." : "Track activity attached to the selected work container." }}
+								Task memory attached to the selected card.
 							</p>
 						</div>
 						<div v-if="card && commentList.length > 0" class="grid gap-3">
 							<div
 								v-for="comment in commentList"
 								:key="comment.id"
-								class="rounded-md border border-border/80 bg-secondary/55 px-3 py-3"
+								class="rounded-[2px] border border-border/80 bg-secondary/55 px-3 py-3"
 							>
 								<div class="text-sm font-medium text-foreground">{{ actorLabels[comment.createdBy] ?? comment.createdBy }}</div>
 								<MarkdownContent :value="comment.body" class="mt-2 text-sm text-foreground" />
-							</div>
-						</div>
-						<div v-else-if="track && track.activity.length > 0" class="grid gap-3">
-							<div
-								v-for="entry in track.activity"
-								:key="entry.id"
-								class="rounded-md border border-border/80 bg-secondary/55 px-3 py-3"
-							>
-								<div class="text-sm font-medium text-foreground">{{ actorLabels[entry.createdBy] ?? entry.createdBy }}</div>
-								<MarkdownContent :value="entry.body" class="mt-2 text-sm text-foreground" />
 							</div>
 						</div>
 						<p v-else class="text-sm text-muted-foreground">Nothing recorded here yet.</p>
@@ -298,35 +285,35 @@ function submitTrackFromFooter() {
 							<p class="mt-1 text-sm text-muted-foreground">Keep related track context, files, references, and metadata nearby.</p>
 						</div>
 						<div v-if="cardTrack || track" class="grid gap-3">
-							<div class="rounded-md border border-border/80 bg-secondary/55 px-3 py-3">
+							<div class="rounded-[2px] border border-border/80 bg-secondary/55 px-3 py-3">
 								<div class="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Summary</div>
 								<p class="mt-2 text-sm leading-6 text-foreground">{{ (cardTrack ?? track)?.summary }}</p>
 							</div>
-							<div class="rounded-md border border-border/80 bg-secondary/55 px-3 py-3">
-								<div class="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Plan</div>
-								<p class="mt-2 text-sm leading-6 text-muted-foreground">{{ (cardTrack ?? track)?.plan }}</p>
+							<div class="rounded-[2px] border border-border/80 bg-secondary/55 px-3 py-3">
+								<div class="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Brief</div>
+								<p class="mt-2 text-sm leading-6 text-muted-foreground">{{ (cardTrack ?? track)?.brief }}</p>
 							</div>
 							<div class="grid gap-3 md:grid-cols-2">
-								<div class="rounded-md border border-border/80 bg-secondary/55 px-3 py-3">
+								<div class="rounded-[2px] border border-border/80 bg-secondary/55 px-3 py-3">
 									<div class="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Decisions</div>
 									<div class="mt-2 space-y-2">
 										<div
 											v-for="decision in (cardTrack ?? track)?.decisions ?? []"
 											:key="decision.id"
-											class="rounded-md border border-border/70 bg-background/20 px-2 py-2"
+											class="rounded-[2px] border border-border/70 bg-background/20 px-2 py-2"
 										>
 											<div class="text-sm font-medium text-foreground">{{ decision.title }}</div>
 											<div class="mt-1 text-xs text-muted-foreground">{{ decision.status }}</div>
 										</div>
 									</div>
 								</div>
-								<div class="rounded-md border border-border/80 bg-secondary/55 px-3 py-3">
+								<div class="rounded-[2px] border border-border/80 bg-secondary/55 px-3 py-3">
 									<div class="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">References & files</div>
 									<div class="mt-2 space-y-2">
 										<div
 											v-for="reference in (cardTrack ?? track)?.references ?? []"
 											:key="reference.id"
-											class="rounded-md border border-border/70 bg-background/20 px-2 py-2"
+											class="rounded-[2px] border border-border/70 bg-background/20 px-2 py-2"
 										>
 											<div class="text-sm font-medium text-foreground">{{ reference.label }}</div>
 											<div class="mt-1 text-xs text-muted-foreground">{{ reference.value }}</div>
@@ -334,7 +321,7 @@ function submitTrackFromFooter() {
 										<div
 											v-for="file in (cardTrack ?? track)?.files ?? []"
 											:key="file.name"
-											class="rounded-md border border-border/70 bg-background/20 px-2 py-2"
+											class="rounded-[2px] border border-border/70 bg-background/20 px-2 py-2"
 										>
 											<div class="text-sm font-medium text-foreground">{{ file.name }}</div>
 											<div class="mt-1 text-xs text-muted-foreground">{{ file.path }}</div>

@@ -32,7 +32,7 @@ const sizes = {
 <template>
 	<button
 		:class="cn(
-			'trackboi-mono-font inline-flex items-center justify-center gap-1.25 whitespace-nowrap rounded-[4px] font-normal leading-none tracking-[-0.01em] shadow-[inset_0_1px_0_hsl(0_0%_100%/0.03)] transition-[border-color,background-color,color,box-shadow] duration-120 [&_svg]:h-3.5 [&_svg]:w-3.5 disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+			'trackboi-mono-font inline-flex items-center justify-center gap-1.25 whitespace-nowrap rounded-[2px] font-normal leading-none tracking-[-0.01em] shadow-[inset_0_1px_0_hsl(0_0%_100%/0.03)] transition-[border-color,background-color,color,box-shadow] duration-120 [&_svg]:h-3.5 [&_svg]:w-3.5 disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
 			variants[props.variant],
 			sizes[props.size],
 			props.class,

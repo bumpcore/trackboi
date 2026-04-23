@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, watch, type Ref } from "vue";
+import { computed, onBeforeUnmount, ref, watch, type Ref } from "vue";
 import type { ThemeMode } from "@/ui/composables/useAppPreferences";
 
 type ResolvedTheme = "dark" | "light";
@@ -11,10 +11,11 @@ export function useThemeMode(themeMode: Ref<ThemeMode>) {
 	const mediaQuery = typeof window !== "undefined"
 		? window.matchMedia("(prefers-color-scheme: light)")
 		: null;
+	const systemPrefersLight = ref(mediaQuery?.matches ?? false);
 
 	const resolvedTheme = computed<ResolvedTheme>(() => {
 		if (themeMode.value === "system") {
-			return mediaQuery?.matches ? "light" : "dark";
+			return systemPrefersLight.value ? "light" : "dark";
 		}
 		return themeMode.value;
 	});
@@ -28,7 +29,7 @@ export function useThemeMode(themeMode: Ref<ThemeMode>) {
 	const stopWatch = watch(resolvedTheme, applyTheme, { immediate: true });
 
 	function onMediaChange() {
-		if (themeMode.value === "system") applyTheme();
+		systemPrefersLight.value = mediaQuery?.matches ?? false;
 	}
 
 	mediaQuery?.addEventListener("change", onMediaChange);

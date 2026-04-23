@@ -21,11 +21,10 @@ type SeedCard = {
 
 type SeedTrack = {
 	id: string;
-	boardId?: string;
 	title: string;
 	slug: string;
 	summary: string;
-	source?: Track["source"];
+	brief?: string;
 };
 
 type SeedStoreInput = {
@@ -102,7 +101,6 @@ export function createUiFixture(): UiFixture {
 			title: "Master",
 			slug: "master",
 			summary: "Primary track context for the main board.",
-			source: { kind: "branch", ref: "master" },
 		}],
 		cards: [{
 			id: seededIds.cardAlpha,
@@ -229,6 +227,7 @@ function seedStore(projectPath: string, storagePath: string, input: SeedStoreInp
 		version: 1,
 		name: path.basename(projectPath),
 		people: [],
+		agents: [],
 	};
 	writeJsonAtomic(path.join(storageRoot, "project.json"), metadata);
 	writeBoard(storageRoot, {
@@ -305,22 +304,32 @@ function writeTrack(storageRoot: string, seed: SeedTrack) {
 	const timestamp = "2026-04-19T00:00:00.000Z";
 	const track: Track = {
 		id: seed.id,
-		boardId: seed.boardId ?? "default",
 		title: seed.title,
 		slug: seed.slug,
-		source: seed.source ?? { kind: "manual" },
 		summary: seed.summary,
-		plan: "",
+		brief: seed.brief ?? "",
 		decisions: [],
 		references: [],
-		activity: [],
 		files: [],
 		createdAt: timestamp,
 		updatedAt: timestamp,
 		createdBy: "person_fixture",
 		updatedBy: "person_fixture",
 	};
-	writeJsonAtomic(path.join(storageRoot, "tracks", `${track.id}.json`), track);
+	const trackRoot = path.join(storageRoot, "tracks", track.id);
+	mkdirSync(path.join(trackRoot, "files"), { recursive: true });
+	writeFileSync(path.join(trackRoot, "index.md"), writeFrontmatter({
+		id: track.id,
+		title: track.title,
+		slug: track.slug,
+		createdAt: track.createdAt,
+		updatedAt: track.updatedAt,
+		createdBy: track.createdBy,
+		updatedBy: track.updatedBy,
+	}, track.summary));
+	writeFileSync(path.join(trackRoot, "brief.md"), track.brief);
+	writeFileSync(path.join(trackRoot, "decisions.md"), "# Decisions\n");
+	writeFileSync(path.join(trackRoot, "references.md"), "# References\n");
 }
 
 function runGit(cwd: string, args: string[]) {

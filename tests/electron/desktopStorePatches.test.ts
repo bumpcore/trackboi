@@ -115,6 +115,7 @@ function createDesktopState(overrides: {
 			version: 1,
 			name: overrides.metadataName ?? projectName,
 			people: [],
+			agents: [],
 		},
 		git: {
 			isGitRepo: true,

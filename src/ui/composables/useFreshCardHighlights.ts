@@ -13,25 +13,36 @@ type FreshCardHighlights = {
 export function useFreshCardHighlights(snapshot: Ref<ProjectSnapshot | null>): FreshCardHighlights {
 	const freshCardIdSet = ref(new Set<string>());
 	let seededProjectPath: string | null = null;
-	let seenCardIds = new Set<string>();
+	const seenCardIdsByBoard = new Map<string, Set<string>>();
 
 	watch(
 		() => snapshot.value,
 		(nextSnapshot) => {
 			const nextProjectPath = nextSnapshot?.project.path ?? null;
+			const nextBoardId = nextSnapshot?.board.id ?? null;
 			const nextCardIds = new Set(nextSnapshot?.cards.map((card) => card.id) ?? []);
 
-			if (!nextProjectPath) {
+			if (!nextProjectPath || !nextBoardId) {
 				seededProjectPath = null;
-				seenCardIds = new Set();
+				seenCardIdsByBoard.clear();
 				freshCardIdSet.value = new Set();
 				return;
 			}
 
 			if (seededProjectPath !== nextProjectPath) {
 				seededProjectPath = nextProjectPath;
-				seenCardIds = nextCardIds;
+				seenCardIdsByBoard.clear();
+				seenCardIdsByBoard.set(nextBoardId, nextCardIds);
 				freshCardIdSet.value = new Set();
+				return;
+			}
+
+			const seenCardIds = seenCardIdsByBoard.get(nextBoardId);
+			if (!seenCardIds) {
+				seenCardIdsByBoard.set(nextBoardId, nextCardIds);
+				freshCardIdSet.value = new Set(
+					[...freshCardIdSet.value].filter((cardId) => nextCardIds.has(cardId)),
+				);
 				return;
 			}
 
@@ -42,7 +53,7 @@ export function useFreshCardHighlights(snapshot: Ref<ProjectSnapshot | null>): F
 				if (!seenCardIds.has(cardId)) nextFreshCardIds.add(cardId);
 			}
 
-			seenCardIds = nextCardIds;
+			seenCardIdsByBoard.set(nextBoardId, nextCardIds);
 			freshCardIdSet.value = nextFreshCardIds;
 		},
 		{ immediate: true },

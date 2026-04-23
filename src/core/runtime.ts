@@ -39,6 +39,7 @@ import {
 	stripProjectFromWorktree,
 } from "./services/runtimeWorktrees";
 import type {
+	AgentRegistration,
 	AppSettings,
 	Board,
 	BoardDescriptor,
@@ -405,10 +406,41 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 	}
 
 	function resolveDesktopActorId(store: ProjectStore, worktreePath: string, explicitActorId?: string): string {
-		if (explicitActorId) return explicitActorId;
+		if (explicitActorId) {
+			ensureProjectAgentRegistration(store, explicitActorId);
+			return explicitActorId;
+		}
 		const identity = readGitIdentity(worktreePath);
 		if (!identity) return "person_unknown";
 		return ensurePersonAlias(store, identity).id;
+	}
+
+	function ensureProjectAgentRegistration(store: ProjectStore, agentId: string): void {
+		const registryAgent = registry.readRegistry().appSettings.agents.find((agent) => agent.id === agentId);
+		if (!registryAgent) return;
+
+		const metadataPath = projectMetadataPath(store.rootPath);
+		const metadata = normalizeProjectMetadata(readJson<ProjectMetadata>(metadataPath), store.project, store.storagePath);
+		const existing = metadata.agents.find((agent) => agent.id === registryAgent.id);
+		const nextAgent: AgentRegistration = {
+			id: registryAgent.id,
+			name: registryAgent.name,
+			description: registryAgent.description,
+		};
+		if (
+			existing &&
+			existing.name === nextAgent.name &&
+			existing.description === nextAgent.description
+		) {
+			return;
+		}
+
+		writeJsonAtomic(metadataPath, {
+			...metadata,
+			agents: existing
+				? metadata.agents.map((agent) => agent.id === nextAgent.id ? nextAgent : agent)
+				: [...metadata.agents, nextAgent],
+		});
 	}
 
 	function ensurePersonAlias(store: ProjectStore, identity: GitIdentity): PersonAlias {
@@ -472,19 +504,11 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		return { worktreeId: worktree.id, worktreePath: worktree.path };
 	}
 
-	function findExistingBranchTrack(ref: string): Track | null {
-		return listTracks().find((track) => track.source.kind === "branch" && track.source.ref === ref && !track.synthetic) ?? null;
-	}
-
 	function materializeBranchTrack(ref: string, title = ref): Track {
-		const existing = findExistingBranchTrack(ref);
-		if (existing) return existing;
-
 		const store = openTargetStore(true);
 		const created = createTrackInStore(store, {
 			title,
-			boardId: requireActiveBoard().id,
-			source: { kind: "branch", ref },
+			summary: `Legacy branch context: ${ref}`,
 		});
 		invalidateProjectState(requireActiveProject().path, { rootPath: store.rootPath });
 		return created;
@@ -494,8 +518,8 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		if (input.trackId) {
 			if (input.trackId.startsWith("synthetic-track:")) {
 				const synthetic = getTrack(input.trackId);
-				if (synthetic.source.kind === "branch") {
-					return materializeBranchTrack(synthetic.source.ref, synthetic.title).id;
+				if (synthetic.syntheticRef) {
+					return materializeBranchTrack(synthetic.syntheticRef, synthetic.title).id;
 				}
 			}
 			return input.trackId;
@@ -507,15 +531,11 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 	}
 
 	function createTrack(input: CreateTrackInput): Track {
-		if (input.source?.kind === "branch") {
-			return materializeBranchTrack(input.source.ref, input.title);
-		}
 		const project = requireActiveProject();
 		const store = openTargetStore(true);
 		const worktree = requireSelectedWorktree();
 		const track = createTrackInStore(store, {
 			...input,
-			boardId: input.boardId ?? requireActiveBoard().id,
 			actorId: resolveDesktopActorId(store, worktree.path, input.actorId),
 		});
 		invalidateProjectState(project.path, { rootPath: store.rootPath });
@@ -524,15 +544,13 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 
 	function updateTrack(trackId: string, patch: TrackPatch): Track {
 		const track = getTrack(trackId);
-		if (track.synthetic && track.source.kind === "branch") {
-			const realTrack = materializeBranchTrack(track.source.ref, patch.title ?? track.title);
+		if (track.synthetic && track.syntheticRef) {
+			const realTrack = materializeBranchTrack(track.syntheticRef, patch.title ?? track.title);
 			return patch.title === undefined &&
 				patch.summary === undefined &&
-				patch.plan === undefined &&
+				patch.brief === undefined &&
 				patch.decisions === undefined &&
-				patch.references === undefined &&
-				patch.activity === undefined &&
-				patch.source === undefined
+				patch.references === undefined
 				? realTrack
 				: updateTrack(realTrack.id, patch);
 		}
@@ -566,9 +584,9 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			for (const card of selectedSnapshot.cards) {
 				const matchesRealTrack = card.trackId === trackId;
 				const matchesLegacyBranch = !card.trackId &&
-					track.source.kind === "branch" &&
+					track.syntheticRef &&
 					card.scope.kind === "track" &&
-					card.scope.ref === track.source.ref;
+					card.scope.ref === track.syntheticRef;
 				if (!matchesRealTrack && !matchesLegacyBranch) continue;
 				updateCardInStore(store, card.id, {
 					trackId: null,
@@ -597,8 +615,8 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 	function readTrackFile(trackId: string, fileName: string): TrackFileReadResult {
 		const project = requireActiveProject();
 		const track = getTrack(trackId);
-		const realTrack = track.synthetic && track.source.kind === "branch"
-			? materializeBranchTrack(track.source.ref, track.title)
+		const realTrack = track.synthetic && track.syntheticRef
+			? materializeBranchTrack(track.syntheticRef, track.title)
 			: track;
 		const origin = findTrackOrigin(realTrack.id);
 		const store = openStore({
@@ -612,8 +630,8 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 	function writeTrackFile(input: TrackFileWriteInput): TrackFile {
 		const project = requireActiveProject();
 		const track = getTrack(input.trackId);
-		const realTrackId = track.synthetic && track.source.kind === "branch"
-			? materializeBranchTrack(track.source.ref, track.title).id
+		const realTrackId = track.synthetic && track.syntheticRef
+			? materializeBranchTrack(track.syntheticRef, track.title).id
 			: track.id;
 		const origin = findTrackOrigin(realTrackId);
 		const store = openStore({
@@ -629,8 +647,8 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 	function deleteTrackFile(trackId: string, fileName: string): { ok: true } {
 		const project = requireActiveProject();
 		const track = getTrack(trackId);
-		const realTrackId = track.synthetic && track.source.kind === "branch"
-			? materializeBranchTrack(track.source.ref, track.title).id
+		const realTrackId = track.synthetic && track.syntheticRef
+			? materializeBranchTrack(track.syntheticRef, track.title).id
 			: track.id;
 		const origin = findTrackOrigin(realTrackId);
 		const store = openStore({
@@ -745,8 +763,8 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		const descriptors = currentSnapshot?.boards ?? [];
 		if (!descriptors.some((board) => board.id === boardId)) throw new Error(`Unknown board: ${boardId}`);
 		if (descriptors.length <= 1) throw new Error("Trackboi needs at least one board");
-		if (currentSnapshot?.cards.some((card) => card.boardId === boardId) || currentSnapshot?.tracks.some((track) => track.boardId === boardId)) {
-			throw new Error("Move or delete board cards and tracks before removing this board");
+		if (currentSnapshot?.cards.some((card) => card.boardId === boardId)) {
+			throw new Error("Move or delete board cards before removing this board");
 		}
 		const store = openTargetStore(false);
 		rmSync(boardPath(store.rootPath, boardId), { force: true });

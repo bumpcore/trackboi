@@ -25,12 +25,12 @@ const emit = defineEmits<{
 			@pointerdown="emit('drag', $event)"
 		>
 			<img :src="trackboiLogoUrl" alt="Trackboi" class="h-4 w-4 shrink-0" />
-			<span class="rounded-[4px] bg-secondary/88 px-1.5 py-0.5 text-foreground">Trackboi</span>
+			<span class="rounded-[2px] bg-secondary/88 px-1.5 py-0.5 text-foreground">Trackboi</span>
 			<span>/</span>
 			<span class="truncate text-foreground">{{ projectName }}</span>
 			<span
 				v-if="branchLabel"
-				class="shrink-0 rounded-[4px] border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-primary"
+				class="shrink-0 rounded-[2px] border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-primary"
 			>
 				{{ branchLabel }}
 			</span>

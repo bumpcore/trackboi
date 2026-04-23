@@ -32,7 +32,7 @@ const manualSource = computed(() => props.view.sources.find((source) => source.k
 
 <template>
 	<aside class="flex min-h-0 flex-col items-center border-r border-border/60 bg-card/70 py-4">
-		<div class="grid h-8 w-8 place-items-center rounded-md bg-primary/90 text-xs font-black text-primary-foreground">
+		<div class="grid h-8 w-8 place-items-center rounded-[2px] bg-primary/90 text-xs font-black text-primary-foreground">
 			tb
 		</div>
 
@@ -44,7 +44,7 @@ const manualSource = computed(() => props.view.sources.find((source) => source.k
 				side="right"
 			>
 					<button
-						class="relative grid h-8 w-8 place-items-center rounded-md border text-sm font-semibold transition"
+						class="relative grid h-8 w-8 place-items-center rounded-[2px] border text-sm font-semibold transition"
 						:class="entry.projectPath === view.activeProjectPath
 							? 'border-[var(--project-color)] bg-[var(--project-color)] text-[var(--project-fg)] shadow-[0_0_0_1px_hsl(var(--background)),0_0_0_2px_var(--project-color)]'
 							: 'border-border/60 bg-background/40 text-muted-foreground hover:border-muted-foreground/70 hover:text-foreground'"

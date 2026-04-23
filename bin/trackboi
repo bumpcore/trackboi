@@ -7,7 +7,7 @@ COMMAND="${1:-}"
 
 is_cli_command() {
 	case "$1" in
-		mcp|projects|cards|help|--help|-h) return 0 ;;
+		install|mcp|help|--help|-h) return 0 ;;
 		*) return 1 ;;
 	esac
 }

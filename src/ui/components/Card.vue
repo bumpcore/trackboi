@@ -9,7 +9,7 @@ defineProps<{
 <template>
 	<div
 		:class="cn(
-			'rounded-[8px] border border-border/75 bg-card/96 text-card-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.03),0_10px_22px_hsl(0_0%_0%/0.14)]',
+			'rounded-[2px] border border-border/75 bg-card/96 text-card-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.03),0_10px_22px_hsl(0_0%_0%/0.14)]',
 			$props.class,
 		)"
 	>

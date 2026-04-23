@@ -38,7 +38,19 @@ export function tracksPath(rootPath: string): string {
 }
 
 export function trackPath(rootPath: string, trackId: string): string {
-	return path.join(tracksPath(rootPath), `${trackId}.json`);
+	return path.join(trackDirPath(rootPath, trackId), "index.md");
+}
+
+export function trackBriefPath(rootPath: string, trackId: string): string {
+	return path.join(trackDirPath(rootPath, trackId), "brief.md");
+}
+
+export function trackDecisionsPath(rootPath: string, trackId: string): string {
+	return path.join(trackDirPath(rootPath, trackId), "decisions.md");
+}
+
+export function trackReferencesPath(rootPath: string, trackId: string): string {
+	return path.join(trackDirPath(rootPath, trackId), "references.md");
 }
 
 export function trackDirPath(rootPath: string, trackId: string): string {
@@ -67,6 +79,9 @@ export const runtimePaths = {
 	cardCommentPath,
 	tracksPath,
 	trackPath,
+	trackBriefPath,
+	trackDecisionsPath,
+	trackReferencesPath,
 	trackDirPath,
 	trackFilesPath,
 	trackFilePath,

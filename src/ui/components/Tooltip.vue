@@ -79,7 +79,7 @@ function hideTooltip() {
 		<div
 			v-if="open"
 			ref="floating"
-			class="pointer-events-none z-50 max-w-64 whitespace-nowrap rounded-md border border-border/70 bg-popover/96 px-2 py-1 text-xs font-medium text-popover-foreground shadow-xl backdrop-blur-sm"
+			class="pointer-events-none z-50 max-w-64 whitespace-nowrap rounded-[2px] border border-border/70 bg-popover/96 px-2 py-1 text-xs font-medium text-popover-foreground shadow-xl backdrop-blur-sm"
 			:style="floatingStyles"
 			role="tooltip"
 			@mouseenter="clearTimers"

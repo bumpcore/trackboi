@@ -57,14 +57,14 @@ function selectWorktree(worktreeId: string) {
 				@update:model-value="selectWorktree"
 			>
 				<SelectTrigger
-					class="flex h-8 min-w-0 max-w-[min(56vw,520px)] items-center gap-2 rounded-md border border-border/60 bg-card/55 px-2.5 text-sm text-foreground outline-none transition-colors hover:bg-accent/55 focus-visible:ring-1 focus-visible:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
+					class="flex h-8 min-w-0 max-w-[min(56vw,520px)] items-center gap-2 rounded-[2px] border border-border/60 bg-card/55 px-2.5 text-sm text-foreground outline-none transition-colors hover:bg-accent/55 focus-visible:ring-1 focus-visible:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
 				>
 					<div
 						class="flex min-w-0 items-center gap-1.5"
 						:style="projectColorStyle({ name: selectedWorktree.name, path: selectedWorktree.colorKey })"
 					>
 						<span
-							class="grid h-4 w-4 shrink-0 place-items-center rounded bg-[var(--project-color)] text-[10px] font-bold text-[var(--project-fg)]"
+							class="grid h-4 w-4 shrink-0 place-items-center rounded-[2px] bg-[var(--project-color)] text-[10px] font-bold text-[var(--project-fg)]"
 						>
 							{{ projectInitial(selectedWorktree.name) }}
 						</span>
@@ -85,14 +85,14 @@ function selectWorktree(worktreeId: string) {
 					<SelectContent
 						position="popper"
 						:side-offset="6"
-						class="z-50 max-h-72 min-w-[var(--reka-select-trigger-width)] overflow-hidden rounded-md border border-border/70 bg-popover text-popover-foreground shadow-xl outline-none"
+						class="z-50 max-h-72 min-w-[var(--reka-select-trigger-width)] overflow-hidden rounded-[2px] border border-border/70 bg-popover text-popover-foreground shadow-xl outline-none"
 					>
 						<SelectViewport class="p-1">
 							<SelectItem
 								v-for="worktree in worktrees"
 								:key="worktree.id"
 								:value="worktree.id"
-								class="relative flex min-h-9 cursor-default select-none items-center rounded py-2 pl-7 pr-2 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
+								class="relative flex min-h-9 cursor-default select-none items-center rounded-[2px] py-2 pl-7 pr-2 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
 							>
 								<span class="absolute left-2 grid h-4 w-4 place-items-center">
 									<SelectItemIndicator>
@@ -101,11 +101,11 @@ function selectWorktree(worktreeId: string) {
 								</span>
 								<div class="flex min-w-0 items-center gap-2">
 									<span
-										class="grid h-4 w-4 shrink-0 place-items-center rounded text-[10px] font-bold"
+										class="grid h-4 w-4 shrink-0 place-items-center rounded-[2px] text-[10px] font-bold"
 										:style="projectColorStyle({ name: worktree.name, path: worktree.colorKey })"
 									>
 										<span
-											class="grid h-4 w-4 place-items-center rounded bg-[var(--project-color)] text-[var(--project-fg)]"
+											class="grid h-4 w-4 place-items-center rounded-[2px] bg-[var(--project-color)] text-[var(--project-fg)]"
 										>
 											{{ projectInitial(worktree.name) }}
 										</span>

@@ -27,7 +27,7 @@ type TrackWorkflow = {
 	clearTrackSelection(): void;
 	selectTrack(trackId: string): void;
 	openCreateTrack(): void;
-	saveTrack(patch: Required<Pick<TrackPatch, "title" | "source" | "summary" | "plan" | "decisions" | "references" | "activity">>): Promise<void>;
+	saveTrack(patch: Required<Pick<TrackPatch, "title" | "summary" | "brief" | "decisions" | "references">>): Promise<void>;
 	deleteSelectedTrack(track: Track): Promise<void>;
 	loadSelectedTrackFile(fileName: string): Promise<void>;
 	writeSelectedTrackFile(fileName: string, content: string): Promise<void>;
@@ -69,7 +69,7 @@ export function useTrackWorkflow(options: {
 		{ value: NO_TRACK_SELECT_VALUE, label: "No track" },
 		...tracks.value.map((track) => ({
 			value: track.id,
-			label: track.source.kind === "branch" ? `${track.title} (${track.source.ref})` : track.title,
+			label: track.title,
 		})),
 	]);
 
@@ -111,7 +111,7 @@ export function useTrackWorkflow(options: {
 		selectedTrackFileContent.value = "";
 	}
 
-	async function saveTrack(patch: Required<Pick<TrackPatch, "title" | "source" | "summary" | "plan" | "decisions" | "references" | "activity">>) {
+	async function saveTrack(patch: Required<Pick<TrackPatch, "title" | "summary" | "brief" | "decisions" | "references">>) {
 		await options.run(async () => {
 			if (panelMode.value === "create" || !selectedTrack.value) {
 				const created = await desktop.createTrack(patch);

@@ -133,6 +133,7 @@ function cloneMetadata(metadata: ProjectMetadata): ProjectMetadata {
 			gitEmails: [...person.gitEmails],
 			gitNames: [...person.gitNames],
 		})),
+		agents: metadata.agents.map((agent) => ({ ...agent })),
 	};
 }
 
@@ -141,7 +142,6 @@ function cloneTrack(track: Track): Track {
 		...track,
 		decisions: track.decisions.map((decision) => ({ ...decision })),
 		references: track.references.map((reference) => ({ ...reference })),
-		activity: track.activity.map((comment) => ({ ...comment })),
 		files: track.files.map((file) => ({ ...file })),
 	};
 }
@@ -347,7 +347,6 @@ function createDesktopProjectState(): InternalDesktopProjectState {
 	}
 
 	function upsertTrack(track: Track) {
-		if (!currentBoardId() || track.boardId !== currentBoardId()) return;
 		tracksById.value = {
 			...tracksById.value,
 			[track.id]: cloneTrack(track),

@@ -33,12 +33,14 @@ function worktreeTooltip(worktree: WorktreeContext) {
 	return `${worktree.name}${worktree.branch ? ` • ${worktree.branch}` : ""}${worktree.storagePath ? ` • ${worktree.storagePath}` : ""}`;
 }
 
-function trackSourceLabel(track: Track) {
-	return track.source.kind === "branch" ? track.source.ref : "manual";
-}
-
 function boardStatusLabel(board: BoardDescriptor) {
 	return board.status === "stale" ? "stale" : "active in current workspace";
+}
+
+function selectBoardWithKeyboard(event: KeyboardEvent, boardId: string) {
+	if (event.key !== "Enter" && event.key !== " ") return;
+	event.preventDefault();
+	emit("selectBoard", boardId);
 }
 </script>
 
@@ -102,32 +104,30 @@ function boardStatusLabel(board: BoardDescriptor) {
 						<div
 							v-for="board in boards"
 							:key="board.id"
-							class="flex items-start gap-1.5"
+							role="button"
+							tabindex="0"
+							class="shell-sidebar-item group w-full"
+							:class="{ 'is-active': (selectedBoardId ?? snapshot.board.id) === board.id }"
+							:data-testid="`board-${board.id}`"
+							@click="emit('selectBoard', board.id)"
+							@keydown="selectBoardWithKeyboard($event, board.id)"
 						>
-							<button
-								type="button"
-								class="shell-sidebar-item w-full !items-start"
-								:class="{ 'is-active': (selectedBoardId ?? snapshot.board.id) === board.id }"
-								:data-testid="`board-${board.id}`"
-								@click="emit('selectBoard', board.id)"
-							>
-								<Layers3 class="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-								<div class="w-0 flex-1 overflow-hidden">
-									<div class="w-full truncate text-foreground">{{ board.name }}</div>
-									<div class="w-full truncate trackboi-mono-font text-[10px] text-muted-foreground">{{ boardStatusLabel(board) }}</div>
-								</div>
-							</button>
+							<Layers3 class="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+							<div class="w-0 flex-1 overflow-hidden">
+								<div class="w-full truncate text-foreground">{{ board.name }}</div>
+								<div class="w-full truncate trackboi-mono-font text-[10px] text-muted-foreground">{{ boardStatusLabel(board) }}</div>
+							</div>
 							<Tooltip content="Board settings" side="right">
 								<Button
 									variant="ghost"
 									size="icon"
 									type="button"
-									class="shrink-0"
+									class="-mr-1 h-6 w-6 shrink-0 self-center opacity-65 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
 									:disabled="busy"
 									:data-testid="`board-settings-${board.id}`"
 									@click.stop="emit('openBoardSettings', board.id)"
 								>
-									<Settings class="h-4 w-4" />
+									<Settings class="h-3.5 w-3.5" />
 								</Button>
 							</Tooltip>
 						</div>
@@ -138,7 +138,6 @@ function boardStatusLabel(board: BoardDescriptor) {
 					<div class="mb-2 flex items-center justify-between gap-3">
 						<div class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Tracks</div>
 						<Button variant="outline" size="sm" type="button" data-testid="create-track-button" :disabled="busy" @click="emit('createTrack')">
-							<Plus class="h-4 w-4" />
 							New
 						</Button>
 					</div>
@@ -170,7 +169,7 @@ function boardStatusLabel(board: BoardDescriptor) {
 							<span class="mt-1 inline-flex h-2 w-2 rounded-full bg-primary/90" />
 							<div class="w-0 flex-1 overflow-hidden">
 								<div class="w-full truncate text-foreground">{{ track.title }}</div>
-								<div class="w-full truncate trackboi-mono-font text-[10px] text-muted-foreground">{{ trackSourceLabel(track) }}</div>
+								<div class="w-full truncate trackboi-mono-font text-[10px] text-muted-foreground">{{ track.summary || track.brief || "track context" }}</div>
 							</div>
 							<span class="shell-count">{{ trackCounts[track.id] ?? 0 }}</span>
 						</button>

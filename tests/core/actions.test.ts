@@ -117,9 +117,8 @@ describe("nodefs trackboi actions", () => {
 		await trackboi.chooseProject();
 		const created = await trackboi.createTrack({
 			title: "Track actions",
-			source: { kind: "branch", ref: "feat/track-actions" },
 		});
-		expect(created.source.kind).toBe("branch");
+		expect(created.title).toBe("Track actions");
 
 		const file = await trackboi.writeTrackFile({
 			trackId: created.id,
@@ -277,6 +276,7 @@ function createActionsFixture() {
 				version: 1,
 				name: path.basename(projectPath),
 				people: [],
+				agents: [],
 			};
 			writeJsonAtomic(path.join(storageRoot, "boards/default.json"), board);
 			writeJsonAtomic(path.join(storageRoot, "project.json"), metadata);

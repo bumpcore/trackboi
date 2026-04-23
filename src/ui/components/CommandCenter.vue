@@ -157,9 +157,9 @@ onBeforeUnmount(() => {
 			data-testid="command-center"
 			@pointerdown.self="emit('close')"
 		>
-			<section class="grid w-[min(620px,92vw)] overflow-hidden rounded-[10px] border border-border/80 bg-[hsl(var(--background)/0.985)] shadow-[0_12px_34px_hsl(0_0%_0%/0.22)]">
+			<section class="grid w-[min(620px,92vw)] overflow-hidden rounded-[2px] border border-border/80 bg-[hsl(var(--background)/0.985)] shadow-[0_12px_34px_hsl(0_0%_0%/0.22)]">
 				<header class="border-b border-border/45 px-3 py-2.5">
-					<div class="flex items-center gap-2 rounded-[7px] border border-input/70 bg-[hsl(var(--card)/0.6)] px-2.5 py-1.5">
+					<div class="flex items-center gap-2 rounded-[2px] border border-input/70 bg-[hsl(var(--card)/0.6)] px-2.5 py-1.5">
 						<input
 							ref="inputRef"
 							:value="query"
@@ -187,7 +187,7 @@ onBeforeUnmount(() => {
 							<button
 								:ref="(element) => setItemRef(element as HTMLButtonElement | null, index)"
 								type="button"
-								class="flex min-w-0 w-full items-start gap-2.5 rounded-[7px] px-2.5 py-1.5 text-left transition-colors"
+								class="flex min-w-0 w-full items-start gap-2.5 rounded-[2px] px-2.5 py-1.5 text-left transition-colors"
 								:class="index === selectedIndex
 									? 'bg-accent/52 text-foreground'
 									: 'text-foreground hover:bg-accent/24'"

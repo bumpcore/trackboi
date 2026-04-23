@@ -3,6 +3,25 @@ import type { TrackboiBridgeApi, WindowBridgeApi } from "../../src/electron/brid
 import { createDesktopFacade } from "../../src/electron/renderer";
 import { createIpcTrackboiActions } from "../../src/electron/trackboi";
 import { createWindowShell } from "../../src/electron/window";
+import type { Track } from "../../src/core/types";
+
+function trackResult(): Track {
+	return {
+		id: "track_1",
+		boardId: "default",
+		title: "Track",
+		slug: "track",
+		summary: "",
+		brief: "",
+		decisions: [],
+		references: [],
+		files: [],
+		createdAt: "2026-04-18T10:00:00.000Z",
+		updatedAt: "2026-04-18T10:00:00.000Z",
+		createdBy: "person_unknown",
+		updatedBy: "person_unknown",
+	};
+}
 
 function createTrackboiBridge(overrides: Partial<TrackboiBridgeApi> = {}): TrackboiBridgeApi {
 	return {
@@ -70,6 +89,7 @@ function createTrackboiBridge(overrides: Partial<TrackboiBridgeApi> = {}): Track
 			version: 1,
 			name: "Project",
 			people: [],
+			agents: [],
 		}),
 		addCardComment: async () => ({
 			id: "comment_1",
@@ -101,57 +121,9 @@ function createTrackboiBridge(overrides: Partial<TrackboiBridgeApi> = {}): Track
 		}),
 		deleteCard: async () => ({ ok: true }),
 		listTracks: async () => [],
-		getTrack: async () => ({
-			id: "track_1",
-			boardId: "default",
-			title: "Track",
-			slug: "track",
-			source: { kind: "manual" as const },
-			summary: "",
-			plan: "",
-			decisions: [],
-			references: [],
-			activity: [],
-			files: [],
-			createdAt: "2026-04-18T10:00:00.000Z",
-			updatedAt: "2026-04-18T10:00:00.000Z",
-			createdBy: "person_unknown",
-			updatedBy: "person_unknown",
-		}),
-		createTrack: async () => ({
-			id: "track_1",
-			boardId: "default",
-			title: "Track",
-			slug: "track",
-			source: { kind: "manual" as const },
-			summary: "",
-			plan: "",
-			decisions: [],
-			references: [],
-			activity: [],
-			files: [],
-			createdAt: "2026-04-18T10:00:00.000Z",
-			updatedAt: "2026-04-18T10:00:00.000Z",
-			createdBy: "person_unknown",
-			updatedBy: "person_unknown",
-		}),
-		updateTrack: async () => ({
-			id: "track_1",
-			boardId: "default",
-			title: "Track",
-			slug: "track",
-			source: { kind: "manual" as const },
-			summary: "",
-			plan: "",
-			decisions: [],
-			references: [],
-			activity: [],
-			files: [],
-			createdAt: "2026-04-18T10:00:00.000Z",
-			updatedAt: "2026-04-18T10:00:00.000Z",
-			createdBy: "person_unknown",
-			updatedBy: "person_unknown",
-		}),
+		getTrack: async () => trackResult(),
+		createTrack: async () => trackResult(),
+		updateTrack: async () => trackResult(),
 		deleteTrack: async () => ({ ok: true }),
 		readTrackFile: async () => ({ name: "notes.md", contentType: "text/markdown", content: "# Notes", updatedAt: "2026-04-18T10:00:00.000Z" }),
 		writeTrackFile: async () => ({ name: "notes.md", path: "tracks/track_1/files/notes.md", contentType: "text/markdown", updatedAt: "2026-04-18T10:00:00.000Z" }),
@@ -219,23 +191,7 @@ describe("electron adapters", () => {
 	});
 
 	test("desktop facade delegates track mutations without forcing a reread", async () => {
-		const createTrack = mock(async () => ({
-			id: "track_1",
-			boardId: "default",
-			title: "Track",
-			slug: "track",
-			source: { kind: "manual" as const },
-			summary: "",
-			plan: "",
-			decisions: [],
-			references: [],
-			activity: [],
-			files: [],
-			createdAt: "2026-04-18T10:00:00.000Z",
-			updatedAt: "2026-04-18T10:00:00.000Z",
-			createdBy: "person_unknown",
-			updatedBy: "person_unknown",
-		}));
+		const createTrack = mock(async () => trackResult());
 		const getActiveProject = mock(async () => null);
 		const trackboi = createTrackboiBridge({ createTrack, getActiveProject });
 		const desktop = createDesktopFacade(trackboi, createWindowBridge());

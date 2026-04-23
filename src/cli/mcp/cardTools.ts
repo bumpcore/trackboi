@@ -3,13 +3,18 @@ import * as z from "zod/v4";
 import type { CardPatch, NodeFsTrackboiActions } from "../../core";
 import { boardIdSchema, type McpProjectContext, cardIdSchema, columnSchema, getCard, projectPathSchema, requireAgentId, scopeSchema, toolResult, withProject } from "./helpers";
 
+const fieldValuesSchema = z.record(
+	z.string(),
+	z.union([z.string(), z.number(), z.boolean(), z.null()]),
+).describe("Complete replacement map of board custom field id to value.");
+
 /**
  * Registers MCP tools for card reads and card mutations.
  */
 export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiActions, context: McpProjectContext): void {
 	server.registerTool("list_cards", {
 		title: "List cards",
-		description: "List cards for a project. Supports board, column, track, assignee, label, text, and parent filtering.",
+		description: "List executable task cards. Filter by board, column, track, assignee, label, text, or parent before choosing what to change.",
 		inputSchema: {
 			projectPath: projectPathSchema,
 			boardId: boardIdSchema,
@@ -38,7 +43,7 @@ export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiAct
 
 	server.registerTool("get_card", {
 		title: "Get card",
-		description: "Get one card by id.",
+		description: "Get one task card with markdown body, comments, labels, assignee, column, and track link.",
 		inputSchema: {
 			projectPath: projectPathSchema,
 			cardId: cardIdSchema,
@@ -47,16 +52,16 @@ export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiAct
 
 	server.registerTool("create_card", {
 		title: "Create card",
-		description: "Create a card in a project.",
+		description: "Create an executable task card. Prefer linking to trackId when the work belongs to an ongoing feature/workstream.",
 		inputSchema: {
 			projectPath: projectPathSchema,
 			boardId: boardIdSchema,
 			title: z.string().min(1),
-			description: z.string().optional(),
-			parentId: z.string().nullable().optional(),
+			description: z.string().optional().describe("Markdown task body. Include concrete acceptance criteria or handoff context when useful."),
+			parentId: z.string().nullable().optional().describe("Parent card id for subtasks, null for a top-level card."),
 			column: columnSchema,
 			scope: scopeSchema.optional(),
-			trackId: z.string().nullable().optional(),
+			trackId: z.string().nullable().optional().describe("Owning track id. Use null for untracked board-wide tasks."),
 		},
 	}, ({ projectPath, boardId, title, description, parentId, column, scope, trackId }) => toolResult(() => (
 		withProject(trackboi, context, projectPath, async (actions) => actions.createCard({
@@ -73,20 +78,21 @@ export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiAct
 
 	server.registerTool("update_card", {
 		title: "Update card",
-		description: "Patch card fields. Omitted fields are left unchanged.",
+		description: "Patch task card fields. Omitted fields are left unchanged; use add_card_comment for progress/handoff notes.",
 		inputSchema: {
 			projectPath: projectPathSchema,
 			cardId: cardIdSchema,
 			title: z.string().optional(),
-			description: z.string().optional(),
-			parentId: z.string().nullable().optional(),
-			column: z.string().optional(),
+			description: z.string().optional().describe("Replace the markdown task body."),
+			parentId: z.string().nullable().optional().describe("Parent card id for subtasks, null to make top-level."),
+			column: z.string().optional().describe("Column id. Use list_columns first if unsure."),
 			scope: scopeSchema.optional(),
-			trackId: z.string().nullable().optional(),
-			labels: z.array(z.string()).optional(),
-			assignee: z.string().nullable().optional(),
+			trackId: z.string().nullable().optional().describe("Owning track id, or null to unlink from a track."),
+			labels: z.array(z.string()).optional().describe("Complete replacement label list."),
+			assignee: z.string().nullable().optional().describe("Person/agent alias, or null to clear."),
+			fieldValues: fieldValuesSchema.optional(),
 		},
-	}, ({ projectPath, cardId, title, description, parentId, column, scope, trackId, labels, assignee }) => (
+	}, ({ projectPath, cardId, title, description, parentId, column, scope, trackId, labels, assignee, fieldValues }) => (
 		toolResult(() => withProject(trackboi, context, projectPath, async (actions) => {
 			const patch: CardPatch = {};
 			if (title !== undefined) patch.title = title;
@@ -97,6 +103,7 @@ export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiAct
 			if (trackId !== undefined) patch.trackId = trackId;
 			if (labels !== undefined) patch.labels = labels;
 			if (assignee !== undefined) patch.assignee = assignee;
+			if (fieldValues !== undefined) patch.fieldValues = fieldValues;
 			patch.actorId = await requireAgentId(trackboi, context);
 			return actions.updateCard(cardId, patch);
 		}))
@@ -104,7 +111,7 @@ export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiAct
 
 	server.registerTool("move_card", {
 		title: "Move card",
-		description: "Move a card to a column and optionally position it before another card.",
+		description: "Move a task card to a column and optionally position it before another card. Use this for kanban status changes.",
 		inputSchema: {
 			projectPath: projectPathSchema,
 			cardId: cardIdSchema,
@@ -120,7 +127,7 @@ export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiAct
 
 	server.registerTool("delete_card", {
 		title: "Delete card",
-		description: "Delete one card file from Trackboi storage.",
+		description: "Delete one task card from Trackboi storage. Prefer comments/status changes unless the task is truly obsolete.",
 		inputSchema: {
 			projectPath: projectPathSchema,
 			cardId: cardIdSchema,
@@ -134,7 +141,7 @@ export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiAct
 
 	server.registerTool("list_card_comments", {
 		title: "List card comments",
-		description: "List markdown comments for one card.",
+		description: "List markdown progress/handoff comments for one task card.",
 		inputSchema: {
 			projectPath: projectPathSchema,
 			cardId: cardIdSchema,
@@ -143,11 +150,11 @@ export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiAct
 
 	server.registerTool("add_card_comment", {
 		title: "Add card comment",
-		description: "Add a markdown comment file under one card's comments folder.",
+		description: "Append a markdown progress, blocker, verification, or handoff note to a task card.",
 		inputSchema: {
 			projectPath: projectPathSchema,
 			cardId: cardIdSchema,
-			body: z.string().min(1),
+			body: z.string().min(1).describe("Markdown comment body. Include what changed, evidence, blockers, or next steps."),
 		},
 	}, ({ projectPath, cardId, body }) => toolResult(() => (
 		withProject(trackboi, context, projectPath, async (actions) => actions.addCardComment({

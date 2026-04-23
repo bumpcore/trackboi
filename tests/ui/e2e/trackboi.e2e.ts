@@ -162,7 +162,7 @@ test("manages board settings including board creation and board-scoped custom fi
 	await page.getByTestId("board-settings-modal").getByLabel("Field type").click();
 	await page.getByRole("option", { name: "Select" }).click();
 	await page.getByTestId("board-settings-modal").getByLabel("Options").fill("Low, High");
-	await page.getByTestId("board-settings-modal").getByRole("button", { name: "Add field" }).click();
+	await page.getByTestId("board-settings-modal").getByRole("button", { name: "Add" }).click();
 	await expect(page.getByTestId("board-settings-modal").getByText("Severity")).toBeVisible();
 
 	await page.keyboard.press("Escape");
@@ -176,7 +176,7 @@ test("adds a new column from the ghost lane affordance", async () => {
 	await expect(page.getByRole("heading", { name: "New Column 4" })).toBeVisible();
 });
 
-test("manages project aliases and app-level agents through settings flows", async () => {
+test("manages project aliases and agent identity through settings flows", async () => {
 	await page.getByTestId("project-settings-button").click();
 	await expect(page.getByTestId("project-settings-modal")).toBeVisible();
 	await page.getByTestId("project-settings-modal").getByLabel("Display name").fill("Abdul Kadir");
@@ -188,11 +188,11 @@ test("manages project aliases and app-level agents through settings flows", asyn
 
 	await page.getByTestId("app-settings-button").click();
 	await expect(page.getByTestId("app-settings-modal")).toBeVisible();
-	await page.getByTestId("app-settings-modal").getByRole("button", { name: "Agents" }).click();
-	await expect(page.getByTestId("app-settings-modal").getByRole("heading", { name: "Agents", exact: true })).toBeVisible();
-	await page.getByTestId("app-settings-modal").getByLabel("Name").fill("Playwright Agent");
-	await page.getByTestId("app-settings-modal").getByLabel("Description").fill("UI integration actor");
-	await page.getByTestId("app-settings-modal").getByRole("button", { name: "Register agent" }).click();
+	await page.getByTestId("app-settings-modal").getByRole("button", { name: "My agent" }).click();
+	await expect(page.getByTestId("app-settings-modal").getByRole("heading", { name: "Agent identity", exact: true })).toBeVisible();
+	await page.getByTestId("app-settings-modal").getByLabel("Handle").fill("Playwright Agent");
+	await page.getByTestId("app-settings-modal").getByLabel("Note").fill("UI integration actor");
+	await page.getByTestId("app-settings-modal").getByRole("button", { name: "Save" }).click();
 	await expect(page.getByTestId("app-settings-modal").getByText("Playwright Agent")).toBeVisible();
 
 	await page.getByTestId("app-settings-modal").getByRole("button", { name: "Editor" }).click();

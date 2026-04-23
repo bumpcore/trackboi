@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import { Bot, Code2, HardDrive, Keyboard, ListPlus, Monitor, Moon, Palette, RotateCcw, SlidersHorizontal, Sun, Trash2, X } from "lucide-vue-next";
+import { Bot, Code2, HardDrive, Keyboard, Monitor, Moon, Palette, SlidersHorizontal, Sun, Trash2, X } from "lucide-vue-next";
 import type { AgentRegistration, PersonAlias, ProjectSnapshot } from "@/core/types";
 import Button from "@/ui/components/Button.vue";
 import Input from "@/ui/components/Input.vue";
@@ -62,7 +62,7 @@ const sectionMeta: Record<SettingsSection, { group: string; title: string; descr
 	storage:    { group: "App",       title: "Storage paths",      description: "Trackboi checks these paths in order and opens the first store it finds. Earlier entries take priority over later ones." },
 	appearance: { group: "App",       title: "Appearance",         description: "Control how Trackboi looks across the desktop shell and editing surfaces." },
 	shortcuts:  { group: "Workspace", title: "Keyboard shortcuts", description: "Bind key combinations for the command center and side panels. Shortcuts won't fire while you're typing inside an input or editor." },
-	agents:     { group: "Workspace", title: "Agents",             description: "Agents registered here are attributed as the actor on card changes made through the MCP interface." },
+	agents:     { group: "Workspace", title: "Agent identity",     description: "Choose the stable handle Trackboi should stamp on agent-made work, regardless of which harness or model is driving it." },
 	editor:     { group: "Workspace", title: "Code editor",        description: "Choose which editor Trackboi launches when you open a card's source file." },
 	project:    { group: "Current project", title: "Project settings", description: "Manage people aliases and project-scoped configuration for the active worktree project." },
 };
@@ -194,7 +194,7 @@ onBeforeUnmount(() => {
 									@click="activeSection = 'agents'"
 								>
 									<Bot class="h-4 w-4 shrink-0" />
-									Agents
+									My agent
 								</button>
 								<button
 									type="button"
@@ -232,7 +232,7 @@ onBeforeUnmount(() => {
 							<h2 class="mt-1 text-xl font-semibold tracking-tight">{{ sectionMeta[activeSection].title }}</h2>
 							<p class="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{{ sectionMeta[activeSection].description }}</p>
 						</div>
-						<Button variant="ghost" size="icon" type="button" class="rounded-none" @click="emit('close')">
+						<Button variant="ghost" size="icon" type="button" class="rounded-none" title="Close" aria-label="Close" @click="emit('close')">
 							<X class="h-4 w-4" />
 						</Button>
 					</header>
@@ -263,6 +263,8 @@ onBeforeUnmount(() => {
 										variant="ghost"
 										size="icon"
 										type="button"
+										title="Remove path"
+										aria-label="Remove path"
 										:disabled="busy"
 										class="rounded-none text-muted-foreground hover:text-destructive"
 										@click="emit('remove', path)"
@@ -288,11 +290,9 @@ onBeforeUnmount(() => {
 								</label>
 								<div class="flex flex-wrap gap-2">
 									<Button type="submit" class="rounded-none" :disabled="busy || !draft.trim()">
-										<ListPlus class="h-4 w-4" />
 										Add
 									</Button>
 									<Button variant="outline" type="button" class="rounded-none" :disabled="busy" @click="emit('reset')">
-										<RotateCcw class="h-4 w-4" />
 										Reset
 									</Button>
 								</div>
@@ -331,7 +331,6 @@ onBeforeUnmount(() => {
 
 							<div>
 								<Button variant="outline" type="button" class="rounded-none" @click="emit('resetTheme')">
-									<RotateCcw class="h-4 w-4" />
 									Reset
 								</Button>
 							</div>
@@ -423,20 +422,19 @@ onBeforeUnmount(() => {
 
 							<div>
 								<Button variant="outline" type="button" class="rounded-none" @click="emit('resetShortcuts')">
-									<RotateCcw class="h-4 w-4" />
 									Reset
 								</Button>
 							</div>
 						</section>
 					</section>
 
-					<!-- Agents -->
+					<!-- Agent identity -->
 					<section v-else-if="activeSection === 'agents'" class="grid gap-4">
 						<section class="grid gap-4 bg-background/12 p-4">
 							<div>
-								<h3 class="text-sm font-semibold text-foreground">Registered agents</h3>
+								<h3 class="text-sm font-semibold text-foreground">Saved identities</h3>
 								<p class="mt-1 text-sm leading-6 text-muted-foreground">
-									Each registered agent gets a stable identity. Card mutations from MCP are attributed to the matching agent rather than a raw model name.
+									This is the name of your agent in Trackboi. When it touches a project, Trackboi records the identity in that project's metadata so future changes still read as the same actor.
 								</p>
 							</div>
 
@@ -454,6 +452,8 @@ onBeforeUnmount(() => {
 										variant="ghost"
 										size="icon"
 										type="button"
+										title="Remove identity"
+										aria-label="Remove identity"
 										class="rounded-none text-muted-foreground hover:text-destructive"
 										@click="emit('removeAgent', agent.id)"
 									>
@@ -463,24 +463,23 @@ onBeforeUnmount(() => {
 							</div>
 
 							<div v-else class="border border-dashed border-border/75 bg-background/20 px-4 py-4 text-sm text-muted-foreground">
-								No agents registered yet.
+								No agent identity saved yet.
 							</div>
 
 							<form class="grid gap-3" @submit.prevent="emit('registerAgent')">
 								<div class="grid gap-3 sm:grid-cols-2">
 									<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-										Name
-										<Input v-model="agentNameDraft" autocomplete="off" placeholder="Claude Code" />
+										Handle
+										<Input v-model="agentNameDraft" autocomplete="off" placeholder="boi" />
 									</label>
 									<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-										Description
-										<Input v-model="agentDescriptionDraft" autocomplete="off" placeholder="Primary coding agent" />
+										Note
+										<Input v-model="agentDescriptionDraft" autocomplete="off" placeholder="Default coding identity" />
 									</label>
 								</div>
 								<div>
-									<Button type="submit" class="rounded-none" :disabled="!agentNameDraft.trim()" @click="emit('registerAgent')">
-										<ListPlus class="h-4 w-4" />
-										Register
+									<Button type="submit" class="rounded-none" :disabled="!agentNameDraft.trim()">
+										Save
 									</Button>
 								</div>
 							</form>

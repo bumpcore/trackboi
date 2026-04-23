@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, watch } from "vue";
-import { Layers3, Save, SlidersHorizontal, Trash2, X } from "lucide-vue-next";
+import { Trash2, X } from "lucide-vue-next";
 import type { CustomField, FieldType, ProjectSnapshot } from "@/core/types";
 import Button from "@/ui/components/Button.vue";
 import Input from "@/ui/components/Input.vue";
@@ -55,91 +55,69 @@ onBeforeUnmount(() => {
 			data-testid="board-settings-modal"
 			@pointerdown.self="emit('close')"
 		>
-			<aside class="modal-panel grid h-[min(820px,calc(100vh-72px))] w-[min(980px,96vw)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-xl border border-border/60 bg-card shadow-2xl">
-				<header class="flex items-start justify-between gap-3 border-b border-border/30 px-6 py-5">
+			<aside class="modal-panel app-scroll grid h-[min(760px,calc(100vh-72px))] w-[min(760px,96vw)] min-h-0 content-start gap-6 overflow-y-auto border border-border/60 bg-card p-6 shadow-2xl">
+				<header class="flex items-start justify-between gap-3 border-b border-border/30 pb-5">
 					<div>
-						<p class="text-xs font-semibold uppercase tracking-wide text-primary">Board</p>
-						<h2 class="mt-1 text-xl font-semibold tracking-tight text-foreground">{{ snapshot?.board.name ?? "Board settings" }}</h2>
+						<p class="text-xs font-semibold uppercase tracking-wide text-primary">Current board</p>
+						<h2 class="mt-1 truncate text-xl font-semibold tracking-tight text-foreground">{{ snapshot?.board.name ?? "Board settings" }}</h2>
 						<p class="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-							Adjust this board's name and custom fields. Column structure lives in the board canvas and right panel.
+							Adjust the board name and board-owned fields. Columns stay on the canvas and right panel.
 						</p>
 					</div>
-					<Button variant="ghost" size="icon" type="button" @click="emit('close')">
+					<Button variant="ghost" size="icon" type="button" class="rounded-none" title="Close" aria-label="Close" @click="emit('close')">
 						<X class="h-4 w-4" />
 					</Button>
 				</header>
 
-				<div class="app-scroll min-h-0 overflow-y-auto p-6">
-					<div v-if="snapshot" class="grid content-start gap-5">
-						<section class="shell-section">
-							<div class="flex items-start gap-3">
-								<div class="grid h-9 w-9 place-items-center rounded-md border border-border/80 bg-secondary/55 text-muted-foreground">
-									<Layers3 class="h-4 w-4" />
-								</div>
-								<div>
-									<p class="shell-section-title">Current board</p>
-									<p class="mt-1 text-sm text-muted-foreground">Rename the active board. Column structure now lives in the right-side workspace.</p>
-								</div>
+				<div v-if="snapshot" class="grid content-start gap-6">
+					<section class="grid gap-4 bg-background/12 p-4">
+							<div>
+								<h3 class="text-sm font-semibold text-foreground">Name</h3>
+								<p class="mt-1 text-sm leading-6 text-muted-foreground">Rename the active board without touching its cards, columns, or custom field values.</p>
 							</div>
 
-							<form class="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]" @submit.prevent="emit('saveBoardName')">
+							<form class="grid gap-3" @submit.prevent="emit('saveBoardName')">
 								<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
 									Board name
 									<Input v-model="boardNameDraft" autocomplete="off" />
 								</label>
-								<div class="flex items-end gap-2">
-									<Button type="submit" :disabled="busy || !boardNameDraft.trim()">
-										<Save class="h-4 w-4" />
+								<div class="flex justify-end">
+									<Button type="submit" class="rounded-none" :disabled="busy || !boardNameDraft.trim()">
 										Save
-									</Button>
-									<Button
-										v-if="boardCount > 1"
-										variant="outline"
-										type="button"
-										:disabled="busy"
-										@click="emit('deleteBoard')"
-									>
-										<Trash2 class="h-4 w-4" />
-										Delete
 									</Button>
 								</div>
 							</form>
 						</section>
 
-						<section class="shell-section">
-							<div class="flex items-start gap-3">
-								<div class="grid h-9 w-9 place-items-center rounded-md border border-border/80 bg-secondary/55 text-muted-foreground">
-									<SlidersHorizontal class="h-4 w-4" />
-								</div>
-								<div>
-									<p class="shell-section-title">Board fields</p>
-									<p class="mt-1 text-sm text-muted-foreground">Define structured metadata that belongs to this board only.</p>
-								</div>
+						<section class="grid gap-4 bg-background/12 p-4">
+							<div>
+								<h3 class="text-sm font-semibold text-foreground">Fields</h3>
+								<p class="mt-1 text-sm leading-6 text-muted-foreground">Define structured metadata that belongs to this board only.</p>
 							</div>
 
-							<div v-if="customFields.length > 0" class="grid gap-2">
+							<div v-if="customFields.length > 0" class="grid border border-border/50">
 								<div
 									v-for="field in customFields"
 									:key="field.id"
-									class="flex items-center justify-between gap-3 rounded-md border border-border/80 bg-secondary/55 px-3 py-3"
+									class="flex items-center justify-between gap-3 border-b border-border/35 bg-secondary/35 px-3 py-3 last:border-b-0"
 								>
 									<div class="min-w-0">
 										<p class="truncate text-sm font-medium text-foreground">{{ field.name }}</p>
-										<p class="mt-1 text-xs text-muted-foreground">
+										<p class="mt-1 truncate text-xs text-muted-foreground">
 											{{ field.type }}{{ field.options?.length ? `: ${field.options.join(", ")}` : "" }}
 										</p>
 									</div>
-									<Button variant="outline" type="button" :disabled="busy" @click="emit('removeCustomField', field.id)">
+									<Button variant="ghost" size="icon" type="button" class="rounded-none text-muted-foreground hover:text-destructive" title="Remove field" aria-label="Remove field" :disabled="busy" @click="emit('removeCustomField', field.id)">
 										<Trash2 class="h-4 w-4" />
 									</Button>
 								</div>
 							</div>
 
-							<div v-else class="rounded-md border border-dashed border-border/75 bg-background/20 px-4 py-4 text-sm text-muted-foreground">
+							<div v-else class="border border-dashed border-border/75 bg-background/20 px-4 py-4 text-sm text-muted-foreground">
 								No custom fields yet.
 							</div>
 
-							<form class="grid gap-3" @submit.prevent="emit('addCustomField')">
+							<form class="grid gap-3 border-t border-border/30 pt-4" @submit.prevent="emit('addCustomField')">
 								<div class="grid gap-3 md:grid-cols-2">
 									<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
 										Field name
@@ -154,15 +132,27 @@ onBeforeUnmount(() => {
 									Options
 									<Input v-model="fieldOptionsDraft" autocomplete="off" placeholder="Low, Medium, High" />
 								</label>
-								<div>
-									<Button type="submit" :disabled="busy || !fieldNameDraft.trim()">
-										<ListPlus class="h-4 w-4" />
-										Add field
+								<div class="flex justify-end">
+									<Button type="submit" class="rounded-none" :disabled="busy || !fieldNameDraft.trim()">
+										Add
 									</Button>
 								</div>
 							</form>
 						</section>
-					</div>
+
+						<section v-if="boardCount > 1" class="grid gap-4 border border-destructive/20 bg-destructive/5 p-4">
+							<div>
+								<h3 class="text-sm font-semibold text-foreground">Delete board</h3>
+								<p class="mt-1 text-sm leading-6 text-muted-foreground">
+									Remove this board after its cards have been moved or deleted.
+								</p>
+							</div>
+							<div class="flex justify-end">
+								<Button variant="outline" type="button" class="rounded-none text-destructive hover:text-destructive" :disabled="busy" @click="emit('deleteBoard')">
+									Delete
+								</Button>
+							</div>
+					</section>
 				</div>
 			</aside>
 		</div>

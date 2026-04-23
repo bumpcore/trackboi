@@ -47,7 +47,7 @@ const insertAfter = defineModel<string>("insertAfter", { required: true });
 				<Badge variant="outline">{{ cardCount }} cards</Badge>
 			</div>
 
-			<div class="rounded-md border border-border/80 bg-secondary/55 px-3 py-3">
+			<div class="rounded-[2px] border border-border/80 bg-secondary/55 px-3 py-3">
 				<div class="text-sm font-medium text-foreground">{{ column.name }}</div>
 				<div class="mt-1 trackboi-mono-font text-[11px] text-muted-foreground">{{ column.id }}</div>
 			</div>

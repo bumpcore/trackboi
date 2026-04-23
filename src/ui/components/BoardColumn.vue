@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import Sortable, { type SortableEvent } from "sortablejs";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { ChevronRight, CircleDashed, Plus, Trash2 } from "lucide-vue-next";
+import { ChevronRight, CircleDashed, GripVertical, Plus, Trash2 } from "lucide-vue-next";
 import Badge from "@/ui/components/Badge.vue";
 import Button from "@/ui/components/Button.vue";
 import MarkdownContent from "@/ui/components/MarkdownContent.vue";
@@ -376,26 +376,39 @@ onBeforeUnmount(() => {
 	<section
 		class="column-shell grid h-full min-h-0 w-[356px] min-w-[356px] max-w-[356px] grid-rows-[auto_minmax(0,1fr)] overflow-hidden border border-border/70 bg-secondary/45 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.02)]"
 		:data-column-id="column.id"
+		:data-board-column-id="column.id"
 		:data-testid="`column-${column.id}`"
 	>
 		<header class="flex items-start justify-between gap-3 border-b border-border/55 px-4 py-3">
-			<button
-				type="button"
-				class="min-w-0 flex-1 text-left"
-				@click="emit('editColumn', column)"
-			>
+			<div class="flex min-w-0 flex-1 items-start gap-1">
+				<Tooltip content="Drag column" side="top">
+					<button
+						type="button"
+						class="-ml-1 mt-0.5 grid h-6 w-5 shrink-0 cursor-grab place-items-center text-muted-foreground/55 transition-colors hover:text-foreground active:cursor-grabbing"
+						data-column-drag-handle
+						aria-label="Drag column"
+					>
+						<GripVertical class="h-4 w-4" />
+					</button>
+				</Tooltip>
+				<button
+					type="button"
+					class="min-w-0 flex-1 text-left"
+					@click="emit('editColumn', column)"
+				>
 				<div class="flex items-center gap-2">
 					<span class="h-2 w-2 rounded-full bg-primary/90" aria-hidden="true" />
 					<h2 class="truncate text-[13px] font-semibold uppercase tracking-[0.08em] text-foreground/94">{{ column.name }}</h2>
 				</div>
 				<p class="mt-2 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{{ props.cards.length }} cards</p>
-			</button>
+				</button>
+			</div>
 			<div class="flex items-center gap-2">
 				<Tooltip content="Add card" side="left">
 					<Button
 						variant="ghost"
 						size="icon"
-						class="rounded-[8px] border border-transparent hover:border-border/60 hover:bg-background/70"
+						class="rounded-[2px] border border-transparent hover:border-border/60 hover:bg-background/70"
 						type="button"
 						data-sortable-ignore
 						@click="emit('create', column.id)"
@@ -488,10 +501,12 @@ onBeforeUnmount(() => {
 					</div>
 					</div>
 					<Button
-						class="mt-0.5 rounded-[6px] border border-transparent opacity-0 transition group-hover:border-border/55 group-hover:bg-background/72 group-hover:opacity-100"
+						class="mt-0.5 rounded-[2px] border border-transparent opacity-0 transition group-hover:border-border/55 group-hover:bg-background/72 group-hover:opacity-100"
 						variant="ghost"
 						size="icon"
 						type="button"
+						title="Delete card"
+						aria-label="Delete card"
 						data-sortable-ignore
 						@click.stop="emit('delete', card)"
 					>
@@ -505,11 +520,10 @@ onBeforeUnmount(() => {
 					class="pointer-events-none absolute inset-x-0 top-0 px-2.5 py-3"
 					:data-testid="`column-${column.id}-empty`"
 				>
-					<div class="column-empty-state rounded-[8px] border border-dashed border-border/55 bg-background/16 px-6 py-5 text-center">
+					<div class="column-empty-state rounded-[2px] border border-dashed border-border/55 bg-background/16 px-6 py-5 text-center">
 						<CircleDashed class="mx-auto h-4 w-4 text-muted-foreground" />
 						<p class="mt-2 text-xs font-medium text-muted-foreground">Drop cards here</p>
 						<Button class="pointer-events-auto mt-3" variant="ghost" size="sm" type="button" @click="emit('create', column.id)">
-							<Plus class="h-3.5 w-3.5" />
 							Add card
 						</Button>
 					</div>
@@ -518,7 +532,7 @@ onBeforeUnmount(() => {
 				<Teleport to="body">
 					<div
 						v-if="contextMenu"
-						class="fixed z-[80] min-w-36 rounded-[7px] border border-border/75 bg-card/98 p-1 shadow-[0_18px_34px_hsl(0_0%_0%/0.16)] backdrop-blur-sm"
+						class="fixed z-[80] min-w-36 rounded-[2px] border border-border/75 bg-card/98 p-1 shadow-[0_18px_34px_hsl(0_0%_0%/0.16)] backdrop-blur-sm"
 						:style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
 						data-testid="card-context-menu"
 						data-sortable-ignore
@@ -527,7 +541,7 @@ onBeforeUnmount(() => {
 					>
 							<button
 								type="button"
-								class="trackboi-mono-font flex w-full items-center rounded-[5px] px-2.5 py-1.5 text-left text-[11px] text-foreground hover:bg-secondary/55"
+								class="trackboi-mono-font flex w-full items-center rounded-[2px] px-2.5 py-1.5 text-left text-[11px] text-foreground hover:bg-secondary/55"
 								data-testid="card-context-edit"
 								@click="openCardEditor(contextMenu.card); closeContextMenu()"
 							>
@@ -535,7 +549,7 @@ onBeforeUnmount(() => {
 						</button>
 							<button
 								type="button"
-								class="trackboi-mono-font flex w-full items-center rounded-[5px] px-2.5 py-1.5 text-left text-[11px] text-foreground hover:bg-secondary/55"
+								class="trackboi-mono-font flex w-full items-center rounded-[2px] px-2.5 py-1.5 text-left text-[11px] text-foreground hover:bg-secondary/55"
 								data-testid="card-context-open-in-editor"
 								@click="emit('openInEditor', contextMenu.card); closeContextMenu()"
 							>
@@ -548,7 +562,7 @@ onBeforeUnmount(() => {
 						>
 							<button
 								type="button"
-								class="trackboi-mono-font flex w-full items-center justify-between rounded-[5px] px-2.5 py-1.5 text-left text-[11px] text-foreground hover:bg-secondary/55"
+								class="trackboi-mono-font flex w-full items-center justify-between rounded-[2px] px-2.5 py-1.5 text-left text-[11px] text-foreground hover:bg-secondary/55"
 								data-testid="card-context-move"
 								@click="contextMenu.moveOpen = !contextMenu.moveOpen"
 							>
@@ -557,7 +571,7 @@ onBeforeUnmount(() => {
 							</button>
 							<div
 								v-if="contextMenu.moveOpen"
-								class="absolute top-0 z-[81] min-w-32 rounded-[7px] border border-border/75 bg-card/98 p-1 shadow-[0_18px_34px_hsl(0_0%_0%/0.16)] backdrop-blur-sm"
+								class="absolute top-0 z-[81] min-w-32 rounded-[2px] border border-border/75 bg-card/98 p-1 shadow-[0_18px_34px_hsl(0_0%_0%/0.16)] backdrop-blur-sm"
 								:class="contextMenu.moveMenuSide === 'left' ? 'right-full mr-1.5' : 'left-full ml-1.5'"
 								data-testid="card-context-move-menu"
 								@mouseenter="openMoveMenu()"
@@ -567,7 +581,7 @@ onBeforeUnmount(() => {
 									v-for="targetColumn in availableMoveColumns()"
 									:key="targetColumn.id"
 									type="button"
-									class="trackboi-mono-font flex w-full items-center rounded-[5px] px-2.5 py-1.5 text-left text-[11px] text-foreground hover:bg-secondary/55"
+									class="trackboi-mono-font flex w-full items-center rounded-[2px] px-2.5 py-1.5 text-left text-[11px] text-foreground hover:bg-secondary/55"
 									:data-testid="`card-context-move-${targetColumn.id}`"
 									@click="moveViaContext(targetColumn.id)"
 								>
@@ -577,7 +591,7 @@ onBeforeUnmount(() => {
 						</div>
 						<button
 							type="button"
-							class="trackboi-mono-font mt-1 flex w-full items-center rounded-[5px] px-2.5 py-1.5 text-left text-[11px] text-destructive hover:bg-destructive/8"
+							class="trackboi-mono-font mt-1 flex w-full items-center rounded-[2px] px-2.5 py-1.5 text-left text-[11px] text-destructive hover:bg-destructive/8"
 							data-testid="card-context-delete"
 							@click="emit('delete', contextMenu.card); closeContextMenu()"
 						>

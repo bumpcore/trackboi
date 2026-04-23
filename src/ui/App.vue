@@ -92,7 +92,6 @@ const {
 	hasProjects,
 	selectedWorktree,
 	gitBranchLabel,
-	currentBranch,
 } = useDesktopProjectState(requestConfirmation);
 
 const {
@@ -157,7 +156,6 @@ const {
 	editingSubtasks,
 	editingSubtaskProgress,
 	visibleCardCount,
-	scopeEmptyMessage,
 } = useBoardPresentationState({
 	snapshot,
 	boardScopeMode,
@@ -211,6 +209,7 @@ const {
 	openCreateColumn,
 	openColumn,
 	closeColumnPanel,
+	reorderColumn,
 	submitColumn,
 	deleteSelectedColumn,
 } = useColumnWorkflow({
@@ -230,9 +229,20 @@ const {
 	appSettings,
 	detectedEditors,
 	registerAgent,
+	updateAgent,
 	removeAgent,
 	updateEditorPreference,
 } = useGlobalAppSettings();
+
+watch(
+	[settingsOpen, settingsSection, appSettings],
+	([open, section]) => {
+		if (!open || section !== "agents") return;
+		const currentAgent = appSettings.value.agents[0];
+		agentNameDraft.value = currentAgent?.name ?? "";
+		agentDescriptionDraft.value = currentAgent?.description ?? "";
+	},
+);
 
 const shell = useWorkspaceShellState();
 const {
@@ -269,6 +279,7 @@ const selectedCardTrack = computed(() => {
 const actorLabels = computed<Record<string, string>>(() => {
 	const labels: Record<string, string> = {};
 	for (const person of snapshot.value?.metadata.people ?? []) labels[person.id] = person.displayName;
+	for (const agent of snapshot.value?.metadata.agents ?? []) labels[agent.id] = agent.name;
 	for (const agent of appSettings.value.agents) labels[agent.id] = agent.name;
 	return labels;
 });
@@ -302,7 +313,6 @@ function ensureRightPanelOpen() {
 
 function focusTrack(trackId: string) {
 	selectTrack(trackId);
-	ensureRightPanelOpen();
 	shell.setRightView("track");
 }
 
@@ -322,16 +332,12 @@ function selectCardFromBoard(card: Parameters<typeof openCard>[0]) {
 	selectCard(card);
 }
 
-function openTrackPanel(trackId: string) {
-	focusTrack(trackId);
-}
-
 function handleTrackSelection(trackId: string) {
 	if (trackId === "__all__") {
 		clearTrackSelection();
 		return;
 	}
-	openTrackPanel(trackId);
+	focusTrack(trackId);
 }
 
 function createTrackFromShell() {
@@ -384,8 +390,7 @@ async function focusCard(cardId: string, boardId?: string) {
 	if (nextCard) editCard(nextCard);
 }
 
-async function focusTrackById(trackId: string, boardId?: string) {
-	if (boardId && snapshot.value?.board.id !== boardId) await focusBoard(boardId);
+async function focusTrackById(trackId: string) {
 	focusTrack(trackId);
 }
 
@@ -444,13 +449,10 @@ const commandCenterItems = computed<CommandCenterItem[]>(() => {
 			kind: "track",
 			section: "Tracks",
 			title: track.title,
-			subtitle: [
-				boardNameById.value[track.boardId] ?? "Board",
-				track.source.kind === "branch" ? track.source.ref : "manual track",
-			].join(" · "),
-			keywords: [track.slug, track.summary, track.plan, track.boardId],
+			subtitle: "Project-wide track",
+			keywords: [track.slug, track.summary, track.brief],
 			run: async () => {
-				await focusTrackById(track.id, track.boardId);
+				await focusTrackById(track.id);
 			},
 		});
 	}
@@ -502,8 +504,8 @@ const commandCenterItems = computed<CommandCenterItem[]>(() => {
 			kind: "command",
 			section: "Workspace",
 			title: "Open settings",
-			subtitle: "Show app preferences, shortcuts, agents, and editor settings",
-			keywords: ["preferences", "app settings", "shortcuts"],
+			subtitle: "Show app preferences, shortcuts, agent identity, and editor settings",
+			keywords: ["preferences", "app settings", "shortcuts", "agent identity", "my agent"],
 			icon: "settings",
 			run: openSettings,
 		},
@@ -717,6 +719,10 @@ function editColumnFromBoard(column: { id: string }) {
 	openColumnPanel(column.id);
 }
 
+async function reorderColumnFromBoard(columnId: string, beforeColumnId: string | null) {
+	await reorderColumn(columnId, beforeColumnId);
+}
+
 async function submitColumnFromPanel() {
 	await submitColumn();
 	ensureRightPanelOpen();
@@ -756,12 +762,20 @@ async function saveEditorSettings() {
 async function handleRegisterAgent() {
 	const name = agentNameDraft.value.trim();
 	if (!name) return;
-	await registerAgent({
-		name,
-		description: agentDescriptionDraft.value,
-	});
-	agentNameDraft.value = "";
-	agentDescriptionDraft.value = "";
+	const existingAgent = appSettings.value.agents[0];
+	if (existingAgent) {
+		await updateAgent(existingAgent.id, {
+			name,
+			description: agentDescriptionDraft.value,
+		});
+	} else {
+		await registerAgent({
+			name,
+			description: agentDescriptionDraft.value,
+		});
+	}
+	agentNameDraft.value = name;
+	agentDescriptionDraft.value = agentDescriptionDraft.value.trim();
 }
 
 function handleGlobalDeleteKey(event: KeyboardEvent) {
@@ -843,7 +857,6 @@ onBeforeUnmount(() => {
 				:fresh-card-ids="freshCardIds"
 				:has-projects="hasProjects"
 				:loading="loading"
-				:scope-empty-message="scopeEmptyMessage"
 				:selected-card-id="selectedCard?.id ?? null"
 				:selected-track="selectedTrack"
 				:selected-worktree="selectedWorktree"
@@ -853,6 +866,7 @@ onBeforeUnmount(() => {
 				@choose-project="chooseProject"
 				@create-column="createColumnFromBoard"
 				@edit-column="editColumnFromBoard"
+				@reorder-column="reorderColumnFromBoard"
 				@create-card="openCardPanel"
 				@clear-card-selection="closeCardPanel"
 				@select-card="selectCardFromBoard"
@@ -883,7 +897,6 @@ onBeforeUnmount(() => {
 				:column-insert-after-options="columnInsertAfterOptions"
 				:column-options="columnOptions"
 				:comment-list="selectedCard?.comments ?? []"
-				:current-branch="currentBranch"
 				:custom-fields="customFields"
 				:actor-labels="actorLabels"
 				:subtask-progress="editingSubtaskProgress"

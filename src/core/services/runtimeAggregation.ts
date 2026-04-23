@@ -60,25 +60,19 @@ export function aggregateSnapshot(options: {
 		?? selectedSnapshot.board;
 
 	const realTracks = selectedSnapshot.tracks
-		.filter((track) => track.boardId === activeBoardId)
 		.map((track) => ({
 			...track,
 			originWorktreeId: selected.id,
 			originStoragePath: selected.storagePath ?? undefined,
 		}));
-	const branchTracksByRef = new Map(
-		realTracks.flatMap((track) => track.source.kind === "branch" ? [[track.source.ref, track] as const] : []),
-	);
 	const syntheticTracksByRef = new Map<string, Track>();
 	const cards = selectedSnapshot.cards
 		.filter((card) => card.boardId === activeBoardId)
-		.map((card) => mapCardToSelectedWorktree(card, selected, activeBoardId, branchTracksByRef, syntheticTracksByRef))
+		.map((card) => mapCardToSelectedWorktree(card, selected, activeBoardId, syntheticTracksByRef))
 		.sort((left, right) => left.column.localeCompare(right.column) || left.rank.localeCompare(right.rank));
 	const tracks = [
 		...realTracks,
-		...[...syntheticTracksByRef.values()].filter((track) => (
-			track.source.kind !== "branch" || !branchTracksByRef.has(track.source.ref)
-		)),
+		...[...syntheticTracksByRef.values()],
 	].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || left.title.localeCompare(right.title));
 
 	return {
@@ -110,23 +104,21 @@ function syntheticTrackId(ref: string): string {
 	return `synthetic-track:${ref}`;
 }
 
-function createSyntheticTrack(ref: string, boardId: string): Track {
+function createSyntheticTrack(ref: string): Track {
 	const timestamp = new Date().toISOString();
 	return {
 		id: syntheticTrackId(ref),
-		boardId,
 		title: ref,
 		slug: ref,
-		source: { kind: "branch", ref },
 		summary: "",
-		plan: "",
+		brief: "",
 		decisions: [],
 		references: [],
-		activity: [],
 		files: [],
 		createdAt: timestamp,
 		updatedAt: timestamp,
 		synthetic: true,
+		syntheticRef: ref,
 		originWorktreeId: undefined,
 		originStoragePath: undefined,
 	};
@@ -134,17 +126,12 @@ function createSyntheticTrack(ref: string, boardId: string): Track {
 
 function effectiveTrackIdForCard(
 	card: Card,
-	branchTracksByRef: Map<string, Track>,
 	syntheticTracksByRef: Map<string, Track>,
-	boardId: string,
 ): string | null {
 	if (card.trackId) return card.trackId;
 	if (card.scope.kind !== "track") return null;
 
-	const existingTrack = branchTracksByRef.get(card.scope.ref);
-	if (existingTrack) return existingTrack.id;
-
-	const synthetic = syntheticTracksByRef.get(card.scope.ref) ?? createSyntheticTrack(card.scope.ref, boardId);
+	const synthetic = syntheticTracksByRef.get(card.scope.ref) ?? createSyntheticTrack(card.scope.ref);
 	syntheticTracksByRef.set(card.scope.ref, synthetic);
 	return synthetic.id;
 }
@@ -153,14 +140,13 @@ function mapCardToSelectedWorktree(
 	card: Card,
 	selected: WorktreeStore,
 	boardId: string,
-	branchTracksByRef: Map<string, Track>,
 	syntheticTracksByRef: Map<string, Track>,
 ): Card {
 	return {
 		...card,
 		boardId,
 		scope: { kind: "project", ref: "global" },
-		trackId: effectiveTrackIdForCard(card, branchTracksByRef, syntheticTracksByRef, boardId),
+		trackId: effectiveTrackIdForCard(card, syntheticTracksByRef),
 		originWorktreeId: selected.id,
 		originStoragePath: selected.storagePath ?? undefined,
 		worktreeIds: [selected.id],
@@ -174,7 +160,7 @@ function mapCardToSelectedWorktree(
 			description: card.description,
 			column: card.column,
 			scope: { kind: "project", ref: "global" },
-			trackId: effectiveTrackIdForCard(card, branchTracksByRef, syntheticTracksByRef, boardId),
+			trackId: effectiveTrackIdForCard(card, syntheticTracksByRef),
 		}],
 	};
 }

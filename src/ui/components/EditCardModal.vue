@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { MessageSquarePlus, Plus, Save, Trash2, X } from "lucide-vue-next";
+import { X } from "lucide-vue-next";
 import type { Card as TrackboiCard, CardComment, CustomField } from "@/core/types";
 import Badge from "@/ui/components/Badge.vue";
 import Button from "@/ui/components/Button.vue";
@@ -93,7 +93,7 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 			@pointerdown.self="$emit('close')"
 		>
 			<aside
-				class="modal-panel app-scroll grid max-h-[min(900px,calc(100vh-64px))] w-[min(980px,96vw)] content-start overflow-auto rounded-[18px] border border-border/75 bg-[linear-gradient(180deg,hsl(var(--card))_0%,hsl(var(--card)/0.96)_100%)] shadow-[0_1px_0_hsl(0_0%_100%/0.04),0_28px_64px_hsl(0_0%_0%/0.44)]"
+				class="modal-panel app-scroll grid max-h-[min(900px,calc(100vh-64px))] w-[min(980px,96vw)] content-start overflow-auto rounded-[2px] border border-border/75 bg-[linear-gradient(180deg,hsl(var(--card))_0%,hsl(var(--card)/0.96)_100%)] shadow-[0_1px_0_hsl(0_0%_100%/0.04),0_28px_64px_hsl(0_0%_0%/0.44)]"
 			>
 				<header class="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-border/55 bg-card/96 px-6 py-5 backdrop-blur-md">
 					<div class="min-w-0">
@@ -104,8 +104,10 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 					<Button
 						variant="ghost"
 						size="icon"
-						class="rounded-[10px] border border-transparent hover:border-border/60 hover:bg-background/70"
+						class="rounded-[2px] border border-transparent hover:border-border/60 hover:bg-background/70"
 						type="button"
+						title="Close"
+						aria-label="Close"
 						@click="$emit('close')"
 					>
 						<X class="h-4 w-4" />
@@ -114,7 +116,7 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 
 				<div class="grid gap-5 px-6 py-6 lg:grid-cols-[minmax(0,1.65fr)_300px]">
 					<div class="grid min-w-0 content-start gap-5">
-						<section class="grid gap-4 rounded-[14px] border border-border/55 bg-background/22 p-4">
+						<section class="grid gap-4 rounded-[2px] border border-border/55 bg-background/22 p-4">
 							<div>
 								<p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary/90">Summary</p>
 								<p class="mt-1 text-sm text-muted-foreground">Keep the title sharp and the notes decision-oriented.</p>
@@ -125,7 +127,7 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 								<Input
 									v-model="draft.title"
 									autocomplete="off"
-									class="h-10 rounded-[10px] border-border/75 bg-background/62 px-3 text-[15px] font-medium"
+									class="h-10 rounded-[2px] border-border/75 bg-background/62 px-3 text-[15px] font-medium"
 								/>
 							</label>
 
@@ -138,7 +140,7 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 							</div>
 						</section>
 
-						<section class="grid gap-4 rounded-[14px] border border-border/55 bg-background/22 p-4">
+						<section class="grid gap-4 rounded-[2px] border border-border/55 bg-background/22 p-4">
 							<div>
 								<p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary/90">Placement</p>
 								<p class="mt-1 text-sm text-muted-foreground">Where the card lives and which track owns it.</p>
@@ -158,7 +160,7 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 
 						</section>
 
-						<div v-if="card.conflicted && card.variants?.length" class="grid gap-3 rounded-[14px] border border-border/55 bg-background/22 p-4 text-xs">
+						<div v-if="card.conflicted && card.variants?.length" class="grid gap-3 rounded-[2px] border border-border/55 bg-background/22 p-4 text-xs">
 					<div>
 						<p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary/90">Variants</p>
 						<p class="mt-1 text-muted-foreground">Newest update wins in the board, but every origin is still visible here.</p>
@@ -167,7 +169,7 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 						<div
 							v-for="variant in card.variants"
 							:key="`${variant.worktreeId}:${variant.updatedAt}`"
-							class="rounded-md border border-border/60 bg-card/60 p-2"
+							class="rounded-[2px] border border-border/60 bg-card/60 p-2"
 						>
 							<div class="flex items-center gap-2">
 								<Badge variant="secondary">{{ variant.worktreeName }}</Badge>
@@ -187,7 +189,7 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 					</div>
 						</div>
 
-						<div v-if="customFields.length > 0" class="grid gap-3 rounded-[14px] border border-border/55 bg-background/22 p-4">
+						<div v-if="customFields.length > 0" class="grid gap-3 rounded-[2px] border border-border/55 bg-background/22 p-4">
 					<div>
 						<p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary/90">Fields</p>
 						<p class="mt-1 text-xs text-muted-foreground">
@@ -201,7 +203,7 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 							class="grid gap-1.5 text-xs font-medium text-muted-foreground"
 						>
 						{{ field.name }}
-						<div v-if="field.type === 'checkbox'" class="flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2">
+						<div v-if="field.type === 'checkbox'" class="flex items-center gap-2 rounded-[2px] border border-input bg-background px-3 py-2">
 							<Checkbox
 								:model-value="fieldBooleanValue(field.id)"
 								@update:model-value="setFieldBooleanValue(field, $event)"
@@ -223,7 +225,7 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 					</label>
 						</div>
 
-						<section class="grid gap-4 rounded-[14px] border border-border/55 bg-background/22 p-4">
+						<section class="grid gap-4 rounded-[2px] border border-border/55 bg-background/22 p-4">
 							<div>
 								<p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary/90">Comments</p>
 								<p class="mt-1 text-sm text-muted-foreground">Keep task history, handoffs, and agent notes attached to the work.</p>
@@ -233,7 +235,7 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 								<article
 									v-for="comment in sortedComments"
 									:key="comment.id"
-									class="grid gap-2 rounded-[12px] border border-border/55 bg-card/55 px-3 py-3"
+									class="grid gap-2 rounded-[2px] border border-border/55 bg-card/55 px-3 py-3"
 								>
 									<div class="flex items-center justify-between gap-3 text-xs">
 										<span class="font-medium text-foreground">{{ comment.createdBy }}</span>
@@ -244,7 +246,7 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 							</div>
 							<p v-else class="text-sm text-muted-foreground">No comments yet. Add a handoff note, investigation summary, or next-step context.</p>
 
-							<div class="grid gap-3 rounded-[12px] border border-dashed border-border/70 bg-background/35 p-3">
+							<div class="grid gap-3 rounded-[2px] border border-dashed border-border/70 bg-background/35 p-3">
 								<div class="grid gap-1.5 text-xs font-medium text-muted-foreground">
 									<span>New comment</span>
 									<MarkdownEditor
@@ -255,7 +257,6 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 
 								<div class="flex justify-end">
 									<Button type="button" :disabled="busy || !commentBody.trim()" @click="$emit('addComment')">
-										<MessageSquarePlus class="h-4 w-4" />
 										Add comment
 									</Button>
 								</div>
@@ -264,7 +265,7 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 					</div>
 
 					<div class="grid min-w-0 content-start gap-5">
-						<section class="grid gap-3 rounded-[14px] border border-border/55 bg-background/22 p-4 text-xs text-muted-foreground">
+						<section class="grid gap-3 rounded-[2px] border border-border/55 bg-background/22 p-4 text-xs text-muted-foreground">
 							<div class="flex items-center justify-between gap-3">
 								<span class="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary/90">Card Info</span>
 								<Badge variant="outline" class="border-border/65 bg-background/42 text-foreground">{{ card.column }}</Badge>
@@ -287,7 +288,7 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 							</div>
 						</section>
 
-						<div class="grid gap-3 rounded-[14px] border border-border/55 bg-background/22 p-4">
+						<div class="grid gap-3 rounded-[2px] border border-border/55 bg-background/22 p-4">
 					<div class="flex items-center justify-between gap-3">
 						<div>
 							<p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary/90">Subtasks</p>
@@ -304,7 +305,7 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 						<button
 							v-for="subtask in subtasks"
 							:key="subtask.id"
-							class="grid gap-1 rounded-md border border-border bg-card px-3 py-2 text-left transition hover:border-primary/40 hover:bg-secondary/60"
+							class="grid gap-1 rounded-[2px] border border-border bg-card px-3 py-2 text-left transition hover:border-primary/40 hover:bg-secondary/60"
 							type="button"
 							@click="$emit('editSubtask', subtask)"
 						>
@@ -319,7 +320,6 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 					<form class="flex gap-2" @submit.prevent="$emit('createSubtask')">
 						<Input v-model="subtaskTitle" autocomplete="off" placeholder="Add a subtask" />
 						<Button type="submit" :disabled="busy || !subtaskTitle.trim()">
-							<Plus class="h-4 w-4" />
 							Add
 						</Button>
 					</form>
@@ -329,7 +329,6 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 
 				<div class="sticky bottom-0 flex gap-2 border-t border-border/55 bg-card/96 px-6 py-4 backdrop-blur-md">
 					<Button type="button" :disabled="busy || !draft.title.trim()" @click="$emit('save')">
-						<Save class="h-4 w-4" />
 						Save
 					</Button>
 					<Button variant="outline" type="button" :disabled="busy" @click="$emit('close')">
@@ -342,7 +341,6 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 						:disabled="busy"
 						@click="$emit('delete', card)"
 					>
-						<Trash2 class="h-4 w-4" />
 						Delete
 					</Button>
 				</div>

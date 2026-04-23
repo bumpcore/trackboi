@@ -8,7 +8,7 @@ Trackboi keeps the product source boundaries intentionally small:
   - `actions.ts` is the public nodefs-facing facade
   - `runtime.ts` is the high-level runtime assembly layer
   - `services/` holds runtime-only orchestration helpers such as aggregation, worktree discovery, and snapshot loading
-- `cli`: command-line orchestration. This is where `trackboi cards`, `trackboi mcp`, and future human/agent commands live.
+- `cli`: command-line orchestration. This is where `trackboi install` and `trackboi mcp` live.
   Internal hierarchy:
   - `mcp.ts` bootstraps the MCP server
   - `mcp/` holds tool registration groups and shared MCP helpers
@@ -33,7 +33,7 @@ Trackboi's working hierarchy is:
 - `Worktree`: a discovered workspace variant with its own filesystem-backed state
 - `Project`: the per-worktree project definition and identity
 - `Board`: a first-class board inside that worktree project
-- `Track`: a board-scoped work container
+- `Track`: a project-wide work container that can link cards across boards
 - `Task/Card`: a board-scoped work item
 
 The active worktree is the current workspace context. Switching worktrees replaces

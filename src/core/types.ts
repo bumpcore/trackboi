@@ -43,6 +43,12 @@ export type PersonAlias = {
 	gitNames: string[];
 };
 
+/**
+ * Stable identity used to attribute agent-made mutations across harnesses.
+ *
+ * App settings hold the user's preferred identity, while project metadata keeps
+ * the agent identities that have actually interacted with that project.
+ */
 export type AgentRegistration = {
 	id: string;
 	name: string;
@@ -72,6 +78,7 @@ export type ProjectMetadata = {
 	version: 1;
 	name: string;
 	people: PersonAlias[];
+	agents: AgentRegistration[];
 };
 
 export type Card = {
@@ -109,15 +116,6 @@ export type CardComment = {
 	updatedBy: string;
 };
 
-export type TrackSource =
-	| {
-		kind: "manual";
-	}
-	| {
-		kind: "branch";
-		ref: string;
-	};
-
 export type TrackDecisionStatus = "proposed" | "accepted" | "rejected";
 
 export type TrackDecision = {
@@ -147,21 +145,19 @@ export type TrackFile = {
 
 export type Track = {
 	id: string;
-	boardId: string;
 	title: string;
 	slug: string;
-	source: TrackSource;
 	summary: string;
-	plan: string;
+	brief: string;
 	decisions: TrackDecision[];
 	references: TrackReference[];
-	activity: CardComment[];
 	files: TrackFile[];
 	createdAt: string;
 	updatedAt: string;
 	createdBy?: string;
 	updatedBy?: string;
 	synthetic?: boolean;
+	syntheticRef?: string;
 	originWorktreeId?: string;
 	originStoragePath?: string;
 };
@@ -307,10 +303,8 @@ export type CreateCardCommentInput = {
 
 export type CreateTrackInput = {
 	title: string;
-	boardId?: string;
-	source?: TrackSource;
 	summary?: string;
-	plan?: string;
+	brief?: string;
 	actorId?: string;
 };
 
@@ -319,7 +313,7 @@ export type CreateBoardInput = {
 };
 
 export type TrackPatch = Partial<
-	Pick<Track, "title" | "source" | "summary" | "plan" | "decisions" | "references" | "activity">
+	Pick<Track, "title" | "summary" | "brief" | "decisions" | "references">
 > & {
 	actorId?: string;
 };

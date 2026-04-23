@@ -110,6 +110,7 @@ function createSnapshot(): ProjectSnapshot {
 			version: 1,
 			name: "Trackboi",
 			people: [],
+			agents: [],
 		},
 		git: {
 			isGitRepo: true,

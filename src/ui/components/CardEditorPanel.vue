@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { MessageSquarePlus, Plus } from "lucide-vue-next";
 import type { Card as TrackboiCard, CardComment, CustomField } from "@/core/types";
 import Badge from "@/ui/components/Badge.vue";
 import Button from "@/ui/components/Button.vue";
@@ -137,7 +136,7 @@ function actorLabel(actorId: string) {
 				class="grid gap-1.5 text-xs font-medium text-muted-foreground"
 			>
 				{{ field.name }}
-				<div v-if="field.type === 'checkbox'" class="flex items-center gap-2 rounded-md border border-input/70 bg-background/35 px-3 py-2">
+				<div v-if="field.type === 'checkbox'" class="flex items-center gap-2 rounded-[2px] border border-input/70 bg-background/35 px-3 py-2">
 					<Checkbox
 						:model-value="fieldBooleanValue(field.id)"
 						@update:model-value="setFieldBooleanValue(field, $event)"
@@ -173,7 +172,7 @@ function actorLabel(actorId: string) {
 					v-for="subtask in subtasks"
 					:key="subtask.id"
 					type="button"
-					class="rounded-md border border-border/80 bg-secondary/55 px-3 py-2 text-left transition hover:border-primary/35 hover:bg-secondary/80"
+					class="rounded-[2px] border border-border/80 bg-secondary/55 px-3 py-2 text-left transition hover:border-primary/35 hover:bg-secondary/80"
 					@click="emit('editSubtask', subtask)"
 				>
 					<MarkdownInline :value="subtask.title" class="block text-sm font-medium text-foreground" />
@@ -184,7 +183,6 @@ function actorLabel(actorId: string) {
 			<form class="flex gap-2" @submit.prevent="emit('createSubtask')">
 				<Input v-model="subtaskTitle" autocomplete="off" placeholder="Add a subtask" />
 				<Button type="submit" :disabled="busy || !subtaskTitle.trim()">
-					<Plus class="h-4 w-4" />
 					Add
 				</Button>
 			</form>
@@ -199,7 +197,7 @@ function actorLabel(actorId: string) {
 				<article
 					v-for="comment in sortedComments"
 					:key="comment.id"
-					class="rounded-md border border-border/80 bg-secondary/55 px-3 py-3"
+					class="rounded-[2px] border border-border/80 bg-secondary/55 px-3 py-3"
 				>
 					<div class="flex items-center justify-between gap-3 text-xs">
 						<span class="font-medium text-foreground">{{ actorLabel(comment.createdBy) }}</span>
@@ -210,14 +208,13 @@ function actorLabel(actorId: string) {
 			</div>
 			<p v-else class="text-sm text-muted-foreground">No comments yet.</p>
 
-			<div class="rounded-md border border-dashed border-border/75 bg-background/20 p-3">
+			<div class="rounded-[2px] border border-dashed border-border/75 bg-background/20 p-3">
 				<div class="grid gap-1.5 text-xs font-medium text-muted-foreground">
 					<span>New comment</span>
 					<MarkdownEditor v-model="commentBody" placeholder="Capture findings, blockers, or the next handoff." />
 				</div>
 				<div class="mt-3 flex justify-end">
 					<Button type="button" :disabled="busy || !commentBody.trim()" @click="emit('addComment')">
-						<MessageSquarePlus class="h-4 w-4" />
 						Add comment
 					</Button>
 				</div>

@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as z from "zod/v4";
 import { newId } from "../../core/id";
-import type { AgentRegistration, AppSettings, NodeFsTrackboiActions } from "../../core";
+import type { AgentRegistration, AppSettings, CustomField, FieldType, NodeFsTrackboiActions, PersonAlias } from "../../core";
 import { boardIdSchema, type McpProjectContext, projectPathSchema, requireAgentId, requireSnapshot, toolResult, withProject } from "./helpers";
 
 function updateAgents(settings: AppSettings, updater: (agents: AgentRegistration[]) => AgentRegistration[]): AppSettings {
@@ -11,28 +11,201 @@ function updateAgents(settings: AppSettings, updater: (agents: AgentRegistration
 	};
 }
 
+const fieldTypeSchema = z.enum(["text", "number", "checkbox", "select", "date"]);
+
+function fieldIdFromName(name: string): string {
+	const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+	return slug || `field-${newId("field").slice(-8)}`;
+}
+
+function normalizeFieldOptions(type: FieldType, options?: string[]): string[] | undefined {
+	if (type !== "select") return undefined;
+	const normalized = (options ?? []).map((option) => option.trim()).filter(Boolean);
+	if (normalized.length === 0) throw new Error("Select fields need at least one option");
+	return normalized;
+}
+
 /**
  * Registers MCP tools that inspect or switch Trackboi projects and worktrees.
  */
 export function registerProjectTools(server: McpServer, trackboi: NodeFsTrackboiActions, context: McpProjectContext): void {
+	server.registerTool("get_agent_guide", {
+		title: "Get agent guide",
+		description: "Return the recommended Trackboi MCP workflow for agents: orient, choose context, mutate safely, and leave useful progress notes.",
+	}, () => toolResult(async () => ({
+		workflow: [
+			"Call get_active_context first to see your isolated project, worktree, board, and active agent identity.",
+			"If no active agent is set, call list_agents, then set_active_agent or register_agent before mutating cards/tracks/boards.",
+			"Use list_boards and list_columns before creating or moving cards so you write to valid board and column ids.",
+			"Use list_board_fields before setting card fieldValues, then update_card with the complete fieldValues object.",
+			"Use project people tools for project settings, and storage/editor tools for global settings parity with the desktop UI.",
+			"Use tracks for project-wide durable feature/workstream context: summary, brief, decisions, references, linked cards, and markdown docs.",
+			"Use cards for executable tasks. Append card comments for progress, handoff notes, blockers, and verification results.",
+			"Prefer explicit projectPath when operating outside the cwd-selected project; otherwise the MCP session uses its isolated active project.",
+		],
+		commonFlows: {
+			orient: ["get_active_context", "list_boards", "list_columns", "list_board_fields", "list_tracks", "list_cards"],
+			startWork: ["set_active_agent", "create_track or get_track", "create_card", "add_card_comment"],
+			updateWork: ["update_card or move_card", "add_card_comment", "add_track_decision or write_track_file when context should live beyond one card"],
+			switchContext: ["list_projects", "switch_project", "list_worktrees", "set_active_worktree", "list_boards", "set_active_board"],
+			settings: ["list_project_people", "add_project_person", "update_storage_paths", "update_editor_preference"],
+		},
+		terms: {
+			workspace: "A user-registered repo/folder entry.",
+			worktree: "A discovered workspace variant with its own storage context.",
+			project: "The per-worktree project identity and settings.",
+			board: "A first-class board inside a worktree project.",
+			track: "A project-wide work container for durable intent, context, files, decisions, references, and linked cards across boards.",
+			card: "A board-scoped executable task that can optionally link to one track.",
+		},
+	})));
+
 	server.registerTool("list_projects", {
 		title: "List projects",
-		description: "List projects Trackboi can see, grouped by source.",
+		description: "List local Trackboi workspaces and show which project this MCP session currently targets.",
 	}, () => toolResult(() => context.listView()));
 
 	server.registerTool("get_active_project", {
 		title: "Get active project",
-		description: "Return the agent's active project snapshot, including the unified board, git context, and cards.",
+		description: "Return the MCP session's active project snapshot: project metadata, git context, active board, boards, tracks, and cards.",
 	}, () => toolResult(() => withProject(trackboi, context, undefined, (actions) => actions.getActiveProject())));
 
 	server.registerTool("get_active_context", {
 		title: "Get active context",
-		description: "Return the MCP agent's isolated project, worktree, board, and agent context next to the desktop selection.",
-	}, () => toolResult(async () => context.listView()));
+		description: "Return this MCP session's isolated project/worktree/board/agent context without changing the desktop UI.",
+	}, () => toolResult(async () => {
+		const view = await context.listView();
+		const settings = await trackboi.readAppSettings();
+		const activeAgentId = await context.currentAgentId();
+		return {
+			...view,
+			activeAgentId,
+			activeAgent: settings.agents.find((agent) => agent.id === activeAgentId) ?? null,
+			availableAgents: settings.agents,
+			nextSteps: activeAgentId
+				? ["Use list_boards/list_columns/list_tracks/list_cards to orient before mutating."]
+				: ["Call list_agents, then set_active_agent or register_agent before mutating."],
+		};
+	}));
+
+	server.registerTool("get_app_settings", {
+		title: "Get app settings",
+		description: "Return global Trackboi settings that are also visible in the desktop Settings modal: agent identities, editor preference, and storage path priority.",
+	}, () => toolResult(async () => {
+		const view = await context.listView();
+		return {
+			appSettings: await trackboi.readAppSettings(),
+			storageSearchPaths: view.storageSearchPaths,
+		};
+	}));
+
+	server.registerTool("update_editor_preference", {
+		title: "Update editor preference",
+		description: "Update the desktop Settings > Editor preference.",
+		inputSchema: {
+			preferredEditorId: z.string().min(1).describe("Editor id, usually auto, custom, or a detected editor id."),
+			customCommand: z.string().optional().describe("Shell command used when preferredEditorId is custom. Use {path} as the file placeholder."),
+		},
+	}, ({ preferredEditorId, customCommand }) => toolResult(async () => {
+		await requireAgentId(trackboi, context);
+		const settings = await trackboi.readAppSettings();
+		return trackboi.updateAppSettings({
+			...settings,
+			editor: {
+				preferredEditorId,
+				customCommand: customCommand?.trim() ?? settings.editor.customCommand,
+			},
+		});
+	}));
+
+	server.registerTool("update_storage_paths", {
+		title: "Update storage paths",
+		description: "Replace the global storage search path priority from desktop Settings > Storage. Paths must be repo-relative.",
+		inputSchema: {
+			paths: z.array(z.string().min(1)).min(1),
+		},
+	}, ({ paths }) => toolResult(async () => {
+		await requireAgentId(trackboi, context);
+		return trackboi.setStorageSearchPaths(paths);
+	}));
+
+	server.registerTool("list_project_people", {
+		title: "List project people",
+		description: "List project-scoped people aliases from project settings. These aliases are used for attribution and assignment labels.",
+		inputSchema: {
+			projectPath: projectPathSchema,
+		},
+	}, ({ projectPath }) => toolResult(async () => {
+		const snapshot = await requireSnapshot(trackboi, context, projectPath);
+		return snapshot.metadata.people;
+	}));
+
+	server.registerTool("add_project_person", {
+		title: "Add project person",
+		description: "Add a project-scoped person alias, matching Current project settings in the desktop UI.",
+		inputSchema: {
+			projectPath: projectPathSchema,
+			displayName: z.string().min(1),
+			gitEmails: z.array(z.string()).optional(),
+			gitNames: z.array(z.string()).optional(),
+		},
+	}, ({ projectPath, displayName, gitEmails, gitNames }) => toolResult(() => withProject(trackboi, context, projectPath, async (actions) => {
+		await requireAgentId(trackboi, context);
+		const snapshot = await actions.getActiveProject();
+		if (!snapshot) throw new Error("Choose a project first");
+		const person: PersonAlias = {
+			id: newId("person"),
+			displayName: displayName.trim(),
+			gitEmails: (gitEmails ?? []).map((email) => email.trim().toLowerCase()).filter(Boolean),
+			gitNames: (gitNames ?? []).map((name) => name.trim()).filter(Boolean),
+		};
+		return actions.updateProjectPeople([...snapshot.metadata.people, person]);
+	})));
+
+	server.registerTool("update_project_person", {
+		title: "Update project person",
+		description: "Patch a project-scoped person alias.",
+		inputSchema: {
+			projectPath: projectPathSchema,
+			personId: z.string().min(1),
+			displayName: z.string().min(1).optional(),
+			gitEmails: z.array(z.string()).optional(),
+			gitNames: z.array(z.string()).optional(),
+		},
+	}, ({ projectPath, personId, displayName, gitEmails, gitNames }) => toolResult(() => withProject(trackboi, context, projectPath, async (actions) => {
+		await requireAgentId(trackboi, context);
+		const snapshot = await actions.getActiveProject();
+		if (!snapshot) throw new Error("Choose a project first");
+		if (!snapshot.metadata.people.some((person) => person.id === personId)) throw new Error(`Unknown person alias: ${personId}`);
+		return actions.updateProjectPeople(snapshot.metadata.people.map((person) => (
+			person.id === personId
+				? {
+					...person,
+					displayName: displayName?.trim() ?? person.displayName,
+					gitEmails: gitEmails?.map((email) => email.trim().toLowerCase()).filter(Boolean) ?? person.gitEmails,
+					gitNames: gitNames?.map((name) => name.trim()).filter(Boolean) ?? person.gitNames,
+				}
+				: person
+		)));
+	})));
+
+	server.registerTool("delete_project_person", {
+		title: "Delete project person",
+		description: "Remove a project-scoped person alias from Current project settings.",
+		inputSchema: {
+			projectPath: projectPathSchema,
+			personId: z.string().min(1),
+		},
+	}, ({ projectPath, personId }) => toolResult(() => withProject(trackboi, context, projectPath, async (actions) => {
+		await requireAgentId(trackboi, context);
+		const snapshot = await actions.getActiveProject();
+		if (!snapshot) throw new Error("Choose a project first");
+		return actions.updateProjectPeople(snapshot.metadata.people.filter((person) => person.id !== personId));
+	})));
 
 	server.registerTool("list_worktrees", {
 		title: "List worktrees",
-		description: "List worktree contexts for the agent's active project.",
+		description: "List worktrees for the MCP session's active project so an agent can pick the correct filesystem context.",
 		inputSchema: {
 			projectPath: projectPathSchema,
 		},
@@ -43,7 +216,7 @@ export function registerProjectTools(server: McpServer, trackboi: NodeFsTrackboi
 
 	server.registerTool("switch_project", {
 		title: "Switch project",
-		description: "Switch the MCP agent's active project without changing the desktop app's selected project.",
+		description: "Switch this MCP session's active project without changing the desktop app's selected project.",
 		inputSchema: {
 			projectPath: z.string().min(1),
 		},
@@ -54,7 +227,7 @@ export function registerProjectTools(server: McpServer, trackboi: NodeFsTrackboi
 
 	server.registerTool("set_active_worktree", {
 		title: "Set active worktree",
-		description: "Switch the MCP agent's active worktree inside a project without changing the desktop app's selected worktree.",
+		description: "Switch this MCP session's active worktree inside a project without changing the desktop app's selected worktree.",
 		inputSchema: {
 			projectPath: projectPathSchema,
 			worktreeId: z.string().min(1),
@@ -77,7 +250,7 @@ export function registerProjectTools(server: McpServer, trackboi: NodeFsTrackboi
 
 	server.registerTool("clear_active_worktree", {
 		title: "Clear active worktree",
-		description: "Clear the MCP agent's explicit worktree selection and fall back to the project's default worktree.",
+		description: "Clear this MCP session's explicit worktree selection and fall back to the project's default worktree.",
 		inputSchema: {
 			projectPath: projectPathSchema,
 		},
@@ -99,7 +272,7 @@ export function registerProjectTools(server: McpServer, trackboi: NodeFsTrackboi
 
 	server.registerTool("list_agents", {
 		title: "List agents",
-		description: "List globally registered MCP agents and show the active agent for this MCP session.",
+		description: "List registered agent identities and show which one will be stamped on MCP mutations.",
 	}, () => toolResult(async () => {
 		const settings = await trackboi.readAppSettings();
 		return {
@@ -110,7 +283,7 @@ export function registerProjectTools(server: McpServer, trackboi: NodeFsTrackboi
 
 	server.registerTool("register_agent", {
 		title: "Register agent",
-		description: "Register a new global agent identity and make it active for this MCP session.",
+		description: "Register a durable agent identity and make it active for this MCP session. Do this before creating or changing work.",
 		inputSchema: {
 			name: z.string().min(1),
 			description: z.string().optional(),
@@ -132,7 +305,7 @@ export function registerProjectTools(server: McpServer, trackboi: NodeFsTrackboi
 
 	server.registerTool("update_agent", {
 		title: "Update agent",
-		description: "Rename or describe an existing registered agent.",
+		description: "Rename or describe an existing registered agent identity.",
 		inputSchema: {
 			agentId: z.string().min(1),
 			name: z.string().min(1).optional(),
@@ -181,7 +354,7 @@ export function registerProjectTools(server: McpServer, trackboi: NodeFsTrackboi
 export function registerBoardTools(server: McpServer, trackboi: NodeFsTrackboiActions, context: McpProjectContext): void {
 	server.registerTool("list_boards", {
 		title: "List boards",
-		description: "List explicit boards for a project and show which ones are stale in the currently selected worktree.",
+		description: "List boards for the active project and identify the board this MCP session currently targets.",
 		inputSchema: {
 			projectPath: projectPathSchema,
 		},
@@ -195,7 +368,7 @@ export function registerBoardTools(server: McpServer, trackboi: NodeFsTrackboiAc
 
 	server.registerTool("set_active_board", {
 		title: "Set active board",
-		description: "Switch the MCP agent's active board inside a project without changing the desktop UI shell.",
+		description: "Switch this MCP session's active board without changing the desktop UI shell.",
 		inputSchema: {
 			projectPath: projectPathSchema,
 			boardId: z.string().min(1),
@@ -212,7 +385,7 @@ export function registerBoardTools(server: McpServer, trackboi: NodeFsTrackboiAc
 
 	server.registerTool("create_board", {
 		title: "Create board",
-		description: "Create a new board in the active project and make it the MCP agent's active board.",
+		description: "Create a board in the active project and make it this MCP session's active board.",
 		inputSchema: {
 			projectPath: projectPathSchema,
 			name: z.string().min(1),
@@ -228,7 +401,7 @@ export function registerBoardTools(server: McpServer, trackboi: NodeFsTrackboiAc
 
 	server.registerTool("delete_board", {
 		title: "Delete board",
-		description: "Delete one board from the active project after its cards and tracks have been moved out.",
+		description: "Delete a board after its cards have been moved out. Tracks are project-wide and do not block board deletion.",
 		inputSchema: {
 			projectPath: projectPathSchema,
 			boardId: z.string().min(1),
@@ -242,9 +415,28 @@ export function registerBoardTools(server: McpServer, trackboi: NodeFsTrackboiAc
 		return snapshot;
 	}));
 
+	server.registerTool("update_board", {
+		title: "Update board",
+		description: "Rename the active board or a board by id, matching the desktop Board settings modal.",
+		inputSchema: {
+			projectPath: projectPathSchema,
+			boardId: boardIdSchema,
+			name: z.string().min(1),
+		},
+	}, ({ projectPath, boardId, name }) => toolResult(() => withProject(trackboi, context, projectPath, async (actions) => {
+		await requireAgentId(trackboi, context);
+		if (boardId) await actions.setActiveBoard(boardId);
+		const snapshot = await actions.getActiveProject();
+		if (!snapshot) throw new Error("Choose a project first");
+		return actions.updateBoard({
+			...snapshot.board,
+			name: name.trim(),
+		});
+	})));
+
 	server.registerTool("list_columns", {
 		title: "List columns",
-		description: "List columns for the active board, or for one explicit board when boardId is provided.",
+		description: "List valid column ids for the active board. Call before create_card or move_card.",
 		inputSchema: {
 			projectPath: projectPathSchema,
 			boardId: boardIdSchema,
@@ -256,9 +448,109 @@ export function registerBoardTools(server: McpServer, trackboi: NodeFsTrackboiAc
 		return snapshot.board.columns;
 	})));
 
+	server.registerTool("list_board_fields", {
+		title: "List board fields",
+		description: "List custom fields for the active board. Use before update_card fieldValues.",
+		inputSchema: {
+			projectPath: projectPathSchema,
+			boardId: boardIdSchema,
+		},
+	}, ({ projectPath, boardId }) => toolResult(() => withProject(trackboi, context, projectPath, async (actions) => {
+		if (boardId) await actions.setActiveBoard(boardId);
+		const snapshot = await actions.getActiveProject();
+		if (!snapshot) throw new Error("Choose a project first");
+		return snapshot.board.customFields;
+	})));
+
+	server.registerTool("create_board_field", {
+		title: "Create board field",
+		description: "Create a custom field on the active board, matching desktop Board settings.",
+		inputSchema: {
+			projectPath: projectPathSchema,
+			boardId: boardIdSchema,
+			name: z.string().min(1),
+			type: fieldTypeSchema,
+			options: z.array(z.string()).optional().describe("Required for select fields; ignored for other field types."),
+		},
+	}, ({ projectPath, boardId, name, type, options }) => toolResult(() => withProject(trackboi, context, projectPath, async (actions) => {
+		await requireAgentId(trackboi, context);
+		if (boardId) await actions.setActiveBoard(boardId);
+		const snapshot = await actions.getActiveProject();
+		if (!snapshot) throw new Error("Choose a project first");
+		const trimmedName = name.trim();
+		const existingIds = new Set(snapshot.board.customFields.map((field) => field.id));
+		let id = fieldIdFromName(trimmedName);
+		while (existingIds.has(id)) id = `${fieldIdFromName(trimmedName)}-${newId("field").slice(-6)}`;
+		const fieldOptions = normalizeFieldOptions(type, options);
+		const field: CustomField = {
+			id,
+			name: trimmedName,
+			type,
+			...(fieldOptions ? { options: fieldOptions } : {}),
+		};
+		return actions.updateBoard({
+			...snapshot.board,
+			customFields: [...snapshot.board.customFields, field],
+		});
+	})));
+
+	server.registerTool("update_board_field", {
+		title: "Update board field",
+		description: "Rename or reconfigure a custom field on the active board.",
+		inputSchema: {
+			projectPath: projectPathSchema,
+			boardId: boardIdSchema,
+			fieldId: z.string().min(1),
+			name: z.string().min(1).optional(),
+			type: fieldTypeSchema.optional(),
+			options: z.array(z.string()).optional().describe("Replacement select options when type is select."),
+		},
+	}, ({ projectPath, boardId, fieldId, name, type, options }) => toolResult(() => withProject(trackboi, context, projectPath, async (actions) => {
+		await requireAgentId(trackboi, context);
+		if (boardId) await actions.setActiveBoard(boardId);
+		const snapshot = await actions.getActiveProject();
+		if (!snapshot) throw new Error("Choose a project first");
+		if (!snapshot.board.customFields.some((field) => field.id === fieldId)) throw new Error(`Unknown board field: ${fieldId}`);
+		return actions.updateBoard({
+			...snapshot.board,
+			customFields: snapshot.board.customFields.map((field) => {
+				if (field.id !== fieldId) return field;
+				const nextType = type ?? field.type;
+				const nextOptions = options !== undefined || type !== undefined
+					? normalizeFieldOptions(nextType, options ?? field.options)
+					: field.options;
+				return {
+					id: field.id,
+					name: name?.trim() ?? field.name,
+					type: nextType,
+					...(nextOptions ? { options: nextOptions } : {}),
+				};
+			}),
+		});
+	})));
+
+	server.registerTool("delete_board_field", {
+		title: "Delete board field",
+		description: "Remove a custom field from the active board. Existing card field values for that field are no longer shown by the UI.",
+		inputSchema: {
+			projectPath: projectPathSchema,
+			boardId: boardIdSchema,
+			fieldId: z.string().min(1),
+		},
+	}, ({ projectPath, boardId, fieldId }) => toolResult(() => withProject(trackboi, context, projectPath, async (actions) => {
+		await requireAgentId(trackboi, context);
+		if (boardId) await actions.setActiveBoard(boardId);
+		const snapshot = await actions.getActiveProject();
+		if (!snapshot) throw new Error("Choose a project first");
+		return actions.updateBoard({
+			...snapshot.board,
+			customFields: snapshot.board.customFields.filter((field) => field.id !== fieldId),
+		});
+	})));
+
 	server.registerTool("create_column", {
 		title: "Create column",
-		description: "Append a new column to the active board.",
+		description: "Append a new workflow column to the active board.",
 		inputSchema: {
 			projectPath: projectPathSchema,
 			boardId: boardIdSchema,
@@ -304,7 +596,7 @@ export function registerBoardTools(server: McpServer, trackboi: NodeFsTrackboiAc
 
 	server.registerTool("delete_column", {
 		title: "Delete column",
-		description: "Delete an empty column from the active board.",
+		description: "Delete an empty column from the active board. Move or delete cards first.",
 		inputSchema: {
 			projectPath: projectPathSchema,
 			boardId: boardIdSchema,

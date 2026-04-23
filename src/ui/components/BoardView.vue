@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AlertTriangle, FolderOpen, GitBranch, Layers, Plus, RefreshCw, Route, Settings, Trash2, X } from "lucide-vue-next";
+import { AlertTriangle, GitBranch, Layers, RefreshCw, Route, Settings, Trash2, X } from "lucide-vue-next";
 import type { Card as TrackboiCard, CustomField, ProjectEntry, ProjectSnapshot, WorktreeContext } from "@/core/types";
 import Badge from "@/ui/components/Badge.vue";
 import BoardColumn from "@/ui/components/BoardColumn.vue";
@@ -88,7 +88,7 @@ function workspaceFileLabel(filePath: string) {
 			<div class="flex items-start justify-between gap-4">
 				<div class="flex min-w-0 items-start gap-3">
 					<div
-						class="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-[var(--project-color)] text-sm font-semibold text-[var(--project-fg)]"
+						class="grid h-10 w-10 shrink-0 place-items-center rounded-[2px] bg-[var(--project-color)] text-sm font-semibold text-[var(--project-fg)]"
 						:style="projectColorStyle(activeProject)"
 					>
 						{{ projectInitial(activeProject?.name ?? snapshot?.project.name) }}
@@ -115,11 +115,9 @@ function workspaceFileLabel(filePath: string) {
 
 				<div class="flex shrink-0 flex-wrap justify-end gap-1.5">
 					<Button variant="outline" type="button" :disabled="busy" @click="$emit('chooseProject')">
-						<FolderOpen class="h-4 w-4" />
 						Add project
 					</Button>
 					<Button v-if="!activeWorkspaceFile" variant="outline" type="button" :disabled="busy" @click="$emit('openWorkspace')">
-						<Layers class="h-4 w-4" />
 						Open workspace
 					</Button>
 					<Tooltip v-else content="Close workspace" side="bottom">
@@ -128,7 +126,6 @@ function workspaceFileLabel(filePath: string) {
 						</Button>
 					</Tooltip>
 					<Button v-if="snapshot" type="button" :disabled="busy" @click="$emit('openNewCard')">
-						<Plus class="h-4 w-4" />
 						New card
 					</Button>
 				</div>
@@ -204,7 +201,7 @@ function workspaceFileLabel(filePath: string) {
 
 			<UiCard v-else-if="activeProject?.status === 'missing'" class="mt-20 grid max-w-xl gap-4 border-dashed p-8">
 				<div class="flex items-start gap-3">
-					<div class="grid h-10 w-10 place-items-center rounded-md border border-destructive/40 bg-destructive/10 text-destructive">
+					<div class="grid h-10 w-10 place-items-center rounded-[2px] border border-destructive/40 bg-destructive/10 text-destructive">
 						<AlertTriangle class="h-5 w-5" />
 					</div>
 					<div class="min-w-0">
@@ -212,18 +209,16 @@ function workspaceFileLabel(filePath: string) {
 						<p class="mt-2 text-sm text-muted-foreground">
 							Trackboi kept the entry so you can point it at the folder again or remove it from the rail.
 						</p>
-						<p class="mt-3 truncate rounded-md border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
+						<p class="mt-3 truncate rounded-[2px] border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
 							{{ activeProject.path }}
 						</p>
 					</div>
 				</div>
 				<div v-if="canRemoveActiveProject" class="flex flex-wrap gap-2">
 					<Button type="button" :disabled="busy" @click="$emit('locateProject', activeProject.projectPath)">
-						<RefreshCw class="h-4 w-4" />
 						Locate folder
 					</Button>
 					<Button variant="outline" type="button" :disabled="busy" @click="$emit('removeProject', activeProject.projectPath)">
-						<Trash2 class="h-4 w-4" />
 						Remove from Trackboi
 					</Button>
 				</div>
@@ -240,7 +235,6 @@ function workspaceFileLabel(filePath: string) {
 					</p>
 				</div>
 				<Button class="w-fit" type="button" :disabled="busy" @click="$emit('chooseProject')">
-					<FolderOpen class="h-4 w-4" />
 					Choose project
 				</Button>
 			</UiCard>

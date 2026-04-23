@@ -39,7 +39,7 @@ const supportedLanguages = new Set(highlighter.getLoadedLanguages().map((languag
 
 const blockMarkdown = new MarkdownIt("commonmark", {
 	...baseOptions,
-	highlight(code, language) {
+	highlight(code: string, language: string) {
 		const normalizedLanguage = typeof language === "string" && supportedLanguages.has(language)
 			? language
 			: "plaintext";

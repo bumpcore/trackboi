@@ -43,9 +43,11 @@ export function hasBoards(rootPath: string): boolean {
 
 export function storageCandidates(registry: ProjectRegistry, project: Project | null = null): string[] {
 	const candidates: string[] = [];
-	if (project?.storagePath) candidates.push(project.storagePath);
 	for (const candidate of registry.storageSearchPaths ?? STORAGE_SEARCH_PATHS) {
 		if (!candidates.includes(candidate)) candidates.push(candidate);
+	}
+	if (project?.storagePath && !candidates.includes(project.storagePath)) {
+		candidates.push(project.storagePath);
 	}
 	return candidates;
 }

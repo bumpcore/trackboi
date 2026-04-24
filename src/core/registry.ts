@@ -4,25 +4,25 @@ import { STORAGE_SEARCH_PATHS } from "./constants";
 import { readJson, writeJsonAtomic } from "./json";
 import type { AgentContext, AgentRegistration, AppSettings, EditorPreference, Project, ProjectRegistry } from "./types";
 
+const LEGACY_ETC_FIRST_STORAGE_SEARCH_PATHS = [".etc/.trackboi", ".etc/trackboi", ".trackboi"];
+
 export type RegistryOptions = {
 	configPath?: string;
-	legacyConfigPaths?: string[];
 };
 
 export type RegistryStore = {
 	configPath: string;
-	legacyConfigPaths: string[];
 	readRegistry(): ProjectRegistry;
 	writeRegistry(registry: ProjectRegistry): ProjectRegistry;
 };
 
 export function defaultConfigDir(): string {
-	if (process.platform === "darwin") return path.join(os.homedir(), "Library", "Application Support", "Trackboi");
+	if (process.platform === "darwin") return path.join(os.homedir(), "Library", "Application Support", "trackboi");
 	if (process.platform === "win32") {
-		return path.join(process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming"), "Trackboi");
+		return path.join(process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming"), "trackboi");
 	}
-	if (process.env.XDG_CONFIG_HOME) return path.join(process.env.XDG_CONFIG_HOME, "Trackboi");
-	return path.join(os.homedir(), ".config", "Trackboi");
+	if (process.env.XDG_CONFIG_HOME) return path.join(process.env.XDG_CONFIG_HOME, "trackboi");
+	return path.join(os.homedir(), ".config", "trackboi");
 }
 
 /**
@@ -33,23 +33,13 @@ export function defaultConfigDir(): string {
  */
 export function createRegistryStore(options: RegistryOptions = {}): RegistryStore {
 	const configPath = options.configPath ?? path.join(defaultConfigDir(), "config.json");
-	const legacyConfigPaths = options.legacyConfigPaths ?? [
-		path.join(os.homedir(), ".config", "dev.bumpcore.trackboi", "config.json"),
-		path.join(os.homedir(), ".config", "trackboi", "config.json"),
-	];
 
 	function readRegistry(): ProjectRegistry {
-		for (const candidatePath of [configPath, ...legacyConfigPaths]) {
-			try {
-				const registry = sanitizeRegistry(readJson<ProjectRegistry>(candidatePath));
-				if (candidatePath !== configPath) writeJsonAtomic(configPath, registry);
-				return registry;
-			} catch {
-				// Try the next known registry location.
-			}
+		try {
+			return sanitizeRegistry(readJson<ProjectRegistry>(configPath));
+		} catch {
+			return defaultRegistry();
 		}
-
-		return defaultRegistry();
 	}
 
 	function writeRegistry(registry: ProjectRegistry): ProjectRegistry {
@@ -58,7 +48,7 @@ export function createRegistryStore(options: RegistryOptions = {}): RegistryStor
 		return nextRegistry;
 	}
 
-	return { configPath, legacyConfigPaths, readRegistry, writeRegistry };
+	return { configPath, readRegistry, writeRegistry };
 }
 
 export function defaultRegistry(): ProjectRegistry {
@@ -114,7 +104,7 @@ export function normalizeStorageSearchPaths(paths: readonly string[]): string[] 
 
 export function sanitizeRegistry(registry: Partial<ProjectRegistry>): ProjectRegistry {
 	const storageSearchPaths = Array.isArray(registry.storageSearchPaths)
-		? normalizeStorageSearchPaths(registry.storageSearchPaths)
+		? normalizeRegistryStorageSearchPaths(registry.storageSearchPaths)
 		: [...STORAGE_SEARCH_PATHS];
 	const projects = Array.isArray(registry.projects)
 		? registry.projects.filter(isValidProject)
@@ -129,6 +119,17 @@ export function sanitizeRegistry(registry: Partial<ProjectRegistry>): ProjectReg
 		selectedBoardId: typeof registry.selectedBoardId === "string" ? registry.selectedBoardId : null,
 		appSettings: sanitizeAppSettings(registry.appSettings),
 	};
+}
+
+function normalizeRegistryStorageSearchPaths(paths: readonly string[]): string[] {
+	const normalized = normalizeStorageSearchPaths(paths);
+	return arraysEqual(normalized, LEGACY_ETC_FIRST_STORAGE_SEARCH_PATHS)
+		? [...STORAGE_SEARCH_PATHS]
+		: normalized;
+}
+
+function arraysEqual(left: readonly string[], right: readonly string[]): boolean {
+	return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 function sanitizeAppSettings(value: Partial<AppSettings> | undefined): AppSettings {

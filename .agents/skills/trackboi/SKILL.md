@@ -1,6 +1,6 @@
 ---
 name: trackboi
-description: Use Trackboi as the local-first kanban and durable context layer for agent work. Trigger this skill in repositories or workspaces that have Trackboi installed, a `.trackboi` store, a `.agents/skills/trackboi` skill, Trackboi MCP tools, or requests involving multi-step coding work, planning, task tracking, handoffs, progress notes, board/card/track management, or agent coordination. Prefer Trackboi for non-trivial implementation, debugging, research, review follow-up, and work that should persist beyond the chat.
+description: Use Trackboi as the local-first kanban and durable context layer for agent work. Trigger this skill in repositories or workspaces that have Trackboi installed, a `.trackboi`, `.etc/.trackboi`, or `.etc/trackboi` store, a `.agents/skills/trackboi` skill, Trackboi MCP tools, or requests involving multi-step coding work, planning, task tracking, handoffs, progress notes, board/card/track management, or agent coordination. Prefer Trackboi for non-trivial implementation, debugging, research, review follow-up, and work that should persist beyond the chat.
 ---
 
 # Trackboi
@@ -33,7 +33,7 @@ If Trackboi MCP tools are available, orient before changing anything:
 3. If no active agent is set, call `list_agents`, then `set_active_agent` or `register_agent`.
 4. Call `list_boards`, `list_columns`, `list_tracks`, and `list_cards` as needed.
 
-If MCP tools are not available, do not fabricate tool results. Use local `.trackboi` files only for read-only orientation unless the user explicitly asks for direct file edits. Prefer asking to enable or install Trackboi MCP when durable task updates matter.
+If MCP tools are not available, do not fabricate tool results or claim Trackboi is absent just because the tools are missing. Check the supported local store paths in order: `.trackboi`, `.etc/.trackboi`, then `.etc/trackboi`. Use those local files only for read-only orientation unless the user explicitly asks for direct file edits. Prefer asking to enable or install Trackboi MCP when durable task updates matter.
 
 ## When To Create Or Update Records
 

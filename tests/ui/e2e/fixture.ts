@@ -197,7 +197,7 @@ export function createUiFixture(): UiFixture {
 }
 
 function writeRegistry(configHome: string, repoPath: string) {
-	const registryDir = path.join(configHome, "Trackboi");
+	const registryDir = path.join(configHome, "trackboi");
 	const registry: ProjectRegistry = {
 		projects: [{
 			name: "trackboi",

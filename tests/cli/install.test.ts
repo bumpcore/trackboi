@@ -19,7 +19,9 @@ describe("trackboi install", () => {
 			command: "trackboi",
 			args: ["mcp"],
 		});
-		expect(readFileSync(path.join(root, ".agents", "skills", "trackboi", "SKILL.md"), "utf8")).toContain("Use Trackboi when the work is more than a tiny one-shot answer");
+		const skillText = readFileSync(path.join(root, ".agents", "skills", "trackboi", "SKILL.md"), "utf8");
+		expect(skillText).toContain("Use Trackboi when the work is more than a tiny one-shot answer");
+		expect(skillText).toContain("`.trackboi`, `.etc/.trackboi`, then `.etc/trackboi`");
 		expect(readFileSync(path.join(root, "AGENTS.md"), "utf8")).toContain(".agents/skills/trackboi/SKILL.md");
 	});
 

@@ -116,7 +116,7 @@ function createPerformanceFixture() {
 		onboardingWorktree,
 		checkoutWorktree,
 		secondaryRepo,
-		runtime: () => createRuntime({ configPath: path.join(root, "config.json"), legacyConfigPaths: [] }),
+		runtime: () => createRuntime({ configPath: path.join(root, "config.json") }),
 		seedStore(projectPath: string, storagePath: string, cardCount: number, prefix: string) {
 			const storageRoot = path.join(projectPath, storagePath);
 			const board: Board = {

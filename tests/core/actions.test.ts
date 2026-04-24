@@ -31,7 +31,7 @@ describe("nodefs trackboi actions", () => {
 		writeFileSync(workspaceFile, "{}\n");
 
 		const trackboi = createNodeFsTrackboiActions({
-			runtime: createRuntime({ configPath: fixture.configPath, legacyConfigPaths: [] }),
+			runtime: createRuntime({ configPath: fixture.configPath }),
 			dialogs: {
 				chooseProjectDirectory: async () => fixture.repo,
 				chooseWorkspaceFile: async () => workspaceFile,
@@ -63,7 +63,7 @@ describe("nodefs trackboi actions", () => {
 		});
 
 		const trackboi = createNodeFsTrackboiActions({
-			runtime: createRuntime({ configPath: fixture.configPath, legacyConfigPaths: [] }),
+			runtime: createRuntime({ configPath: fixture.configPath }),
 			dialogs: {
 				chooseProjectDirectory: async () => fixture.repo,
 			},
@@ -108,7 +108,7 @@ describe("nodefs trackboi actions", () => {
 		});
 
 		const trackboi = createNodeFsTrackboiActions({
-			runtime: createRuntime({ configPath: fixture.configPath, legacyConfigPaths: [] }),
+			runtime: createRuntime({ configPath: fixture.configPath }),
 			dialogs: {
 				chooseProjectDirectory: async () => fixture.repo,
 			},
@@ -159,7 +159,7 @@ describe("nodefs trackboi actions", () => {
 		});
 
 		const trackboi = createNodeFsTrackboiActions({
-			runtime: createRuntime({ configPath: fixture.configPath, legacyConfigPaths: [] }),
+			runtime: createRuntime({ configPath: fixture.configPath }),
 			dialogs: {
 				chooseProjectDirectory: async () => fixture.repo,
 			},
@@ -204,7 +204,7 @@ describe("nodefs trackboi actions", () => {
 		});
 
 		const trackboi = createNodeFsTrackboiActions({
-			runtime: createRuntime({ configPath: fixture.configPath, legacyConfigPaths: [] }),
+			runtime: createRuntime({ configPath: fixture.configPath }),
 			dialogs: {
 				chooseProjectDirectory: async () => fixture.repo,
 			},

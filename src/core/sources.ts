@@ -39,14 +39,15 @@ function projectCardCount(project: Project, registry: ProjectRegistry): number |
 
 export function projectEntry(project: Project, registry: ProjectRegistry): ProjectEntry {
 	const git = readGitContext(project.path);
+	const resolved = resolveProjectStorage(project, registry, false);
 	return {
 		projectPath: project.path,
 		name: project.name,
 		path: project.path,
-		storagePath: project.storagePath,
+		storagePath: resolved?.storagePath ?? project.storagePath,
 		status: projectStatus(project, registry),
 		branch: git.branch,
-		cardCount: projectCardCount(project, registry),
+		cardCount: resolved && hasBoards(resolved.rootPath) ? countCards(resolved.rootPath) : null,
 	};
 }
 

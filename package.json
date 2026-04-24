@@ -46,6 +46,10 @@
 			{
 				"from": "trackboi.svg",
 				"to": "assets/trackboi.svg"
+			},
+			{
+				"from": "bin/trackboi",
+				"to": "bin/trackboi"
 			}
 		],
 		"extraMetadata": {
@@ -60,6 +64,9 @@
 				"AppImage",
 				"rpm"
 			]
+		},
+		"rpm": {
+			"afterInstall": "build/linux/after-install.sh"
 		}
 	},
 	"dependencies": {

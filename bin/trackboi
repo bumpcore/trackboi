@@ -1,7 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SELF_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -L "$SOURCE" ]]; do
+	SOURCE_DIR="$(CDPATH= cd -- "$(dirname -- "$SOURCE")" && pwd)"
+	TARGET="$(readlink "$SOURCE")"
+	if [[ "$TARGET" == /* ]]; then
+		SOURCE="$TARGET"
+	else
+		SOURCE="$SOURCE_DIR/$TARGET"
+	fi
+done
+
+SELF_DIR="$(CDPATH= cd -- "$(dirname -- "$SOURCE")" && pwd)"
 ROOT_DIR="$(CDPATH= cd -- "$SELF_DIR/.." && pwd)"
 COMMAND="${1:-}"
 
@@ -22,9 +33,29 @@ first_existing_file() {
 	return 1
 }
 
+first_existing_node_entry() {
+	for candidate in "$@"; do
+		if [[ -f "$candidate" ]]; then
+			printf '%s\n' "$candidate"
+			return 0
+		fi
+
+		case "$candidate" in
+			*.asar/*)
+				asar_path="${candidate%%.asar/*}.asar"
+				if [[ -f "$asar_path" ]]; then
+					printf '%s\n' "$candidate"
+					return 0
+				fi
+				;;
+		esac
+	done
+	return 1
+}
+
 first_executable_file() {
 	for candidate in "$@"; do
-		if [[ -x "$candidate" ]]; then
+		if [[ -f "$candidate" && -x "$candidate" ]]; then
 			printf '%s\n' "$candidate"
 			return 0
 		fi
@@ -37,6 +68,7 @@ if [[ -z "$ELECTRON_BINARY" ]]; then
 	ELECTRON_BINARY="$(first_executable_file \
 		"$ROOT_DIR/node_modules/electron/dist/electron" \
 		"$ROOT_DIR/../MacOS/Trackboi" \
+		"$ROOT_DIR/../trackboi" \
 		"$ROOT_DIR/../../Trackboi" \
 		"$ROOT_DIR/Trackboi" \
 		"$ROOT_DIR/trackboi" \
@@ -44,10 +76,11 @@ if [[ -z "$ELECTRON_BINARY" ]]; then
 fi
 
 if is_cli_command "$COMMAND"; then
-	CLI_ENTRY="$(first_existing_file \
+	CLI_ENTRY="$(first_existing_node_entry \
 		"$ROOT_DIR/dist-node/cli/main.cjs" \
 		"$ROOT_DIR/cli/main.cjs" \
 		"$ROOT_DIR/app/dist-node/cli/main.cjs" \
+		"$ROOT_DIR/app.asar/dist-node/cli/main.cjs" \
 		"$ROOT_DIR/app.asar.unpacked/dist-node/cli/main.cjs" \
 	)"
 	export ELECTRON_RUN_AS_NODE=1

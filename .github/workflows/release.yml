@@ -32,7 +32,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -43,6 +43,16 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: just
+
+      - name: Set up Linux package dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
+
+      - name: Set up macOS package dependencies
+        if: runner.os == 'macOS'
+        run: brew install imagemagick
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -78,7 +88,5 @@ jobs:
           body: |
             Trackboi 0.1.0 is the first public release.
 
-            No bullshit kanban for agents and people. 100% local and git based.
-
-            Prepared and released by an agent :D
+            Trackboi is a local-first kanban app for people and agents. Project state stays on disk, close to the repo, with desktop and MCP workflows built around the same filesystem-backed data.
           files: artifacts/*

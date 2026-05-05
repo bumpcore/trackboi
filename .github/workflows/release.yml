@@ -69,6 +69,7 @@ jobs:
             !release/**/*.blockmap
             !release/builder-*.yaml
             !release/builder-*.yml
+            !release/latest*.yml
 
   publish:
     name: Publish GitHub release

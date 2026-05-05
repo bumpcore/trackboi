@@ -134,9 +134,17 @@ const OPENAI_YAML = `interface:
   default_prompt: "Use trackboi to plan, track, and document this work when the task is non-trivial."
 `;
 
+const AGENTS_BLOCK_START = "<trackboi>";
+const AGENTS_BLOCK_END = "</trackboi>";
+
 const AGENTS_SNIPPET = `## trackboi Skill
 
 Agents working in this repository should load \`.agents/skills/trackboi/SKILL.md\` when work is non-trivial, stateful, or useful to track beyond the current chat. Use trackboi MCP tools when available to orient, choose the active project/worktree/board, update cards, and leave handoff notes.
+`;
+
+const AGENTS_BLOCK = `${AGENTS_BLOCK_START}
+${AGENTS_SNIPPET.trimEnd()}
+${AGENTS_BLOCK_END}
 `;
 
 /**
@@ -187,17 +195,36 @@ function installAgentGuide(targetDir: string, result: InstallResult) {
 	const agentsPath = path.join(targetDir, "AGENTS.md");
 	if (existsSync(agentsPath)) {
 		const current = readFileSync(agentsPath, "utf8");
-		if (current.includes(".agents/skills/trackboi/SKILL.md")) {
+		const next = upsertTrackboiAgentsBlock(current);
+		if (next === current) {
 			result.skipped.push("AGENTS.md");
 			return;
 		}
-		writeFileSync(agentsPath, `${current.trimEnd()}\n\n${AGENTS_SNIPPET}`, "utf8");
+		writeFileSync(agentsPath, next, "utf8");
 		result.installed.push("AGENTS.md");
 		return;
 	}
 
-	writeFileSync(agentsPath, `# Agent Guide\n\n${AGENTS_SNIPPET}`, "utf8");
+	writeFileSync(agentsPath, `# Agent Guide\n\n${AGENTS_BLOCK}`, "utf8");
 	result.installed.push("AGENTS.md");
+}
+
+/**
+ * Keeps trackboi-owned AGENTS.md guidance replaceable without touching the
+ * repository's surrounding agent instructions.
+ */
+function upsertTrackboiAgentsBlock(current: string): string {
+	const managedBlockPattern = new RegExp(`${AGENTS_BLOCK_START}[\\s\\S]*?${AGENTS_BLOCK_END}\\n?`, "m");
+	if (managedBlockPattern.test(current)) {
+		return current.replace(managedBlockPattern, AGENTS_BLOCK);
+	}
+
+	const legacySnippet = AGENTS_SNIPPET.trimEnd();
+	if (current.includes(legacySnippet)) {
+		return current.replace(legacySnippet, AGENTS_BLOCK.trimEnd());
+	}
+
+	return `${current.trimEnd()}\n\n${AGENTS_BLOCK}`;
 }
 
 function readJsonConfig(configPath: string, force: boolean): unknown {

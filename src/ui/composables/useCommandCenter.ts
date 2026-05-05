@@ -51,7 +51,7 @@ export function useCommandCenter(options: CommandCenterOptions): CommandCenterSt
 	const requestedMode = ref<CommandCenterMode>("navigate");
 
 	const activeMode = computed<CommandCenterMode>(() => (
-		query.value.trimStart().startsWith(">") ? "command" : requestedMode.value
+		query.value.trimStart().startsWith(">") ? "command" : "navigate"
 	));
 	const searchQuery = computed(() => (
 		activeMode.value === "command"

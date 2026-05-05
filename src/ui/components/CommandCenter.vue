@@ -70,8 +70,10 @@ const commandIcons: Record<string, Component> = {
 
 function focusInput() {
 	void nextTick(() => {
-		inputRef.value?.focus();
-		inputRef.value?.select();
+		const input = inputRef.value;
+		if (!input) return;
+		input.focus();
+		input.setSelectionRange(input.value.length, input.value.length);
 	});
 }
 
@@ -163,6 +165,7 @@ onBeforeUnmount(() => {
 						<input
 							ref="inputRef"
 							:value="query"
+							data-testid="command-center-input"
 							class="trackboi-mono-font h-4 w-full border-0 bg-transparent p-0 text-[12px] text-foreground placeholder:text-muted-foreground focus-visible:outline-none"
 							placeholder=""
 							autocapitalize="off"

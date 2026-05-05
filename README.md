@@ -4,6 +4,22 @@ No bullshit kanban for agents and people.
 
 trackboi is a local-first desktop kanban app with an MCP server built in. It is 100% local and git based: your boards, cards, tracks, notes, and agent handoffs live on disk beside the work instead of disappearing into somebody else's SaaS.
 
+## Quick setup for agents
+
+Install trackboi, then run this in any repo where you want agents to use it:
+
+```bash
+trackboi install --all
+```
+
+That writes a repo-local `.mcp.json`, installs the trackboi skill under `.agents/skills/trackboi`, and adds managed AGENTS.md guidance. The MCP server command it installs is:
+
+```bash
+trackboi mcp
+```
+
+After that, restart or reload your agent client so it picks up the new MCP server.
+
 ## Why
 
 - Plan work with people and agents in the same place.
@@ -64,7 +80,7 @@ Platform packages are written to `release/`.
 Run the local MCP server:
 
 ```bash
-bun run mcp
+trackboi mcp
 ```
 
 trackboi's MCP tools use the same local project state as the desktop app, so agents can create cards, update tracks, write notes, and leave handoffs without a remote service.

@@ -1,8 +1,11 @@
+import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import type { ElectronApplication, Locator, Page } from "@playwright/test";
 import { createUiFixture, seededIds, type UiFixture } from "./fixture";
 
 test.describe.configure({ mode: "serial" });
+
+const packageVersion = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8")).version as string;
 
 let fixture: UiFixture;
 let app: ElectronApplication | null = null;
@@ -72,7 +75,7 @@ test("keeps empty-state top aligned and supports drag/drop plus card context int
 });
 
 test("switches board and worktree context and opens the settings surfaces", async () => {
-	await expect(page.getByTestId("app-version-indicator")).toHaveText("v0.2.0");
+	await expect(page.getByTestId("app-version-indicator")).toHaveText(`v${packageVersion}`);
 
 	await page.getByTestId("board-delivery").click();
 	await expect(page.getByText("Delivery board card")).toBeVisible();
@@ -102,9 +105,29 @@ test("switches board and worktree context and opens the settings surfaces", asyn
 	await page.getByTestId("app-settings-button").click();
 	await expect(page.getByTestId("app-settings-modal")).toBeVisible();
 	await page.getByRole("button", { name: "About" }).click();
-	await expect(page.getByTestId("app-settings-modal").getByRole("heading", { name: "trackboi v0.2.0" })).toBeVisible();
+	await expect(page.getByTestId("app-settings-modal").getByRole("heading", { name: `trackboi v${packageVersion}` })).toBeVisible();
 	await page.keyboard.press("Escape");
 	await expect(page.getByTestId("app-settings-modal")).toHaveCount(0);
+});
+
+test("command palette keeps the command prefix editable and falls back to navigation", async () => {
+	await page.keyboard.press("Control+Shift+P");
+	await expect(page.getByTestId("command-center")).toBeVisible();
+	const input = page.getByTestId("command-center-input");
+	await expect(input).toHaveValue(">");
+	await expect(page.getByText("Open settings")).toBeVisible();
+
+	await expect.poll(async () => input.evaluate((element) => ({
+		start: (element as HTMLInputElement).selectionStart,
+		end: (element as HTMLInputElement).selectionEnd,
+	}))).toEqual({ start: 1, end: 1 });
+
+	await page.keyboard.press("Backspace");
+	await expect(input).toHaveValue("");
+	await expect(page.getByTestId("command-center").getByText("Open settings")).toHaveCount(0);
+	await expect(page.getByTestId("command-center").getByText("Alpha task")).toBeVisible();
+	await page.keyboard.press("Escape");
+	await expect(page.getByTestId("command-center")).toHaveCount(0);
 });
 
 test("creates, edits, and deletes cards and tracks in the Electron shell", async () => {
@@ -112,13 +135,18 @@ test("creates, edits, and deletes cards and tracks in the Electron shell", async
 	await expect(page.getByTestId("card-editor")).toBeVisible();
 	await page.getByTestId("card-editor").getByLabel("Title").fill("UI created card");
 	await page.getByTestId("card-editor").locator("textarea").first().fill("A card created through Playwright.");
-	await page.getByRole("button", { name: "Create Card" }).click();
+	await page.getByTestId("card-submit-button").click();
 	await expect(page.locator("[data-card-id]", { hasText: "UI created card" })).toBeVisible();
 
-	const createdCard = page.locator("[data-card-id]", { hasText: "UI created card" });
-	await createdCard.dblclick();
-	await page.getByTestId("card-editor").getByLabel("Title").fill("UI created card updated");
-	await page.getByRole("button", { name: "Save Card" }).click();
+	const createdCard = page.locator("[data-card-id]", { hasText: "UI created card" }).first();
+	await createdCard.click();
+	await createdCard.press("Enter");
+	await expect(page.getByTestId("card-submit-button")).toHaveText("Save Card");
+	await expect(page.getByTestId("card-editor").getByLabel("Title")).toHaveValue("UI created card");
+	const cardTitleInput = page.getByTestId("card-editor").getByLabel("Title");
+	await cardTitleInput.fill("UI created card updated");
+	await expect(cardTitleInput).toHaveValue("UI created card updated");
+	await page.getByTestId("card-submit-button").click();
 	await expect(page.locator("[data-card-id]", { hasText: "UI created card updated" })).toBeVisible();
 
 	await page.locator("[data-card-id]", { hasText: "UI created card updated" }).click();

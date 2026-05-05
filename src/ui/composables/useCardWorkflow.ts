@@ -12,6 +12,15 @@ type ConfirmationRequester = (confirmation: Confirmation) => void;
 
 type CardPanelMode = "closed" | "create" | "edit";
 
+type SyncedCardDraft = {
+	cardId: string;
+	title: string;
+	description: string;
+	column: string;
+	trackId: string;
+	fieldValuesJson: string;
+};
+
 type CardWorkflow = {
 	panelMode: Ref<CardPanelMode>;
 	selectedCard: Ref<TrackboiCard | null>;
@@ -55,6 +64,40 @@ export function useCardWorkflow(options: {
 	const fieldValues = ref<Record<string, FieldValue>>({});
 	const commentBody = ref("");
 	const subtaskTitle = ref("");
+	let lastSyncedCardDraft: SyncedCardDraft | null = null;
+
+	function syncedDraftForCard(card: TrackboiCard): SyncedCardDraft {
+		return {
+			cardId: card.id,
+			title: card.title,
+			description: card.description,
+			column: card.column,
+			trackId: card.trackId ?? NO_TRACK_SELECT_VALUE,
+			fieldValuesJson: JSON.stringify(card.fieldValues ?? {}),
+		};
+	}
+
+	function currentDraftMatchesLastSynced() {
+		if (!lastSyncedCardDraft) return false;
+		return (
+			draft.value.title === lastSyncedCardDraft.title
+			&& draft.value.description === lastSyncedCardDraft.description
+			&& draft.value.column === lastSyncedCardDraft.column
+			&& trackId.value === lastSyncedCardDraft.trackId
+			&& JSON.stringify(fieldValues.value) === lastSyncedCardDraft.fieldValuesJson
+		);
+	}
+
+	function syncDraftFromCard(card: TrackboiCard) {
+		draft.value = {
+			title: card.title,
+			description: card.description,
+			column: card.column,
+		};
+		trackId.value = card.trackId ?? NO_TRACK_SELECT_VALUE;
+		fieldValues.value = { ...card.fieldValues };
+		lastSyncedCardDraft = syncedDraftForCard(card);
+	}
 
 	function resetDraft(columnId?: string) {
 		draft.value = {
@@ -66,6 +109,7 @@ export function useCardWorkflow(options: {
 		fieldValues.value = {};
 		commentBody.value = "";
 		subtaskTitle.value = "";
+		lastSyncedCardDraft = null;
 	}
 
 	watch(
@@ -75,18 +119,17 @@ export function useCardWorkflow(options: {
 				draft.value.column = draft.value.column || nextSnapshot.board.columns[0]?.id || "todo";
 			}
 			if (!selectedCard.value) return;
-			selectedCard.value = nextSnapshot?.cards.find((card) => card.id === selectedCard.value?.id) ?? null;
-			if (!selectedCard.value) {
+			const nextSelectedCard = nextSnapshot?.cards.find((card) => card.id === selectedCard.value?.id) ?? null;
+			if (!nextSelectedCard) {
+				selectedCard.value = null;
 				panelMode.value = "closed";
+				lastSyncedCardDraft = null;
 				return;
 			}
-			draft.value = {
-				title: selectedCard.value.title,
-				description: selectedCard.value.description,
-				column: selectedCard.value.column,
-			};
-			trackId.value = selectedCard.value.trackId ?? NO_TRACK_SELECT_VALUE;
-			fieldValues.value = { ...selectedCard.value.fieldValues };
+			selectedCard.value = nextSelectedCard;
+			if (lastSyncedCardDraft?.cardId !== nextSelectedCard.id || currentDraftMatchesLastSynced()) {
+				syncDraftFromCard(nextSelectedCard);
+			}
 		},
 		{ immediate: true },
 	);
@@ -107,13 +150,7 @@ export function useCardWorkflow(options: {
 	function openCard(card: TrackboiCard) {
 		panelMode.value = "edit";
 		selectedCard.value = card;
-		draft.value = {
-			title: card.title,
-			description: card.description,
-			column: card.column,
-		};
-		trackId.value = card.trackId ?? NO_TRACK_SELECT_VALUE;
-		fieldValues.value = { ...card.fieldValues };
+		syncDraftFromCard(card);
 		commentBody.value = "";
 		subtaskTitle.value = "";
 	}
@@ -123,6 +160,7 @@ export function useCardWorkflow(options: {
 		selectedCard.value = null;
 		commentBody.value = "";
 		subtaskTitle.value = "";
+		lastSyncedCardDraft = null;
 	}
 
 	async function submitCard() {
@@ -147,15 +185,19 @@ export function useCardWorkflow(options: {
 		const cardId = selectedCard.value.id;
 		const shouldMove = draft.value.column !== selectedCard.value.column;
 		await options.run(async () => {
-			options.upsertCard(await desktop.updateCard(cardId, {
+			let updatedCard = await desktop.updateCard(cardId, {
 				title,
 				description: draft.value.description,
 				trackId: trackId.value === NO_TRACK_SELECT_VALUE ? null : trackId.value,
 				fieldValues: fieldValues.value,
-			}));
+			});
+			options.upsertCard(updatedCard);
 			if (shouldMove) {
-				options.upsertCard(await desktop.moveCard(cardId, draft.value.column, null));
+				updatedCard = await desktop.moveCard(cardId, draft.value.column, null);
+				options.upsertCard(updatedCard);
 			}
+			selectedCard.value = updatedCard;
+			syncDraftFromCard(updatedCard);
 		});
 	}
 

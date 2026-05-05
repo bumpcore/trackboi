@@ -19,6 +19,18 @@ Download the latest release artifact for your OS from GitHub Releases.
 - macOS: DMG or ZIP
 - Windows: NSIS installer or ZIP
 
+Or run the latest-release installer:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/bumpcore/trackboi/master/scripts/install.sh | sh
+```
+
+Windows PowerShell:
+
+```powershell
+iwr https://raw.githubusercontent.com/bumpcore/trackboi/master/scripts/install.ps1 -UseB | iex
+```
+
 The first public builds are unsigned, so macOS and Windows may show trust warnings.
 
 ## Development

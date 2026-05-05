@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-latest
+            command: bun run dist:linux
+            artifact: linux
+          - name: macOS
+            os: macos-latest
+            command: bun run dist:mac
+            artifact: macos
+          - name: Windows
+            os: windows-latest
+            command: bun run dist:win
+            artifact: windows
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Set up just
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build release package
+        run: ${{ matrix.command }}
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: trackboi-${{ matrix.artifact }}
+          path: |
+            release/*
+            !release/**/*.blockmap
+            !release/builder-*.yaml
+
+  publish:
+    name: Publish GitHub release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v3
+        with:
+          generate_release_notes: true
+          body: |
+            Trackboi 0.1.0 is the first public release.
+
+            No bullshit kanban for agents and people. 100% local and git based.
+
+            Prepared and released by an agent :D
+          files: artifacts/*

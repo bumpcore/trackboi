@@ -31,12 +31,6 @@ export function projectStatus(project: Project, registry: ProjectRegistry): Proj
 	return "ready";
 }
 
-function projectCardCount(project: Project, registry: ProjectRegistry): number | null {
-	const resolved = resolveProjectStorage(project, registry, false);
-	if (!resolved || !hasBoards(resolved.rootPath)) return null;
-	return countCards(resolved.rootPath);
-}
-
 export function projectEntry(project: Project, registry: ProjectRegistry): ProjectEntry {
 	const git = readGitContext(project.path);
 	const resolved = resolveProjectStorage(project, registry, false);

@@ -1,6 +1,6 @@
 {
 	"name": "trackboi",
-	"version": "1.0.0",
+	"version": "0.1.0",
 	"type": "module",
 	"main": "dist-node/electron/main.cjs",
 	"bin": {
@@ -20,6 +20,9 @@
 		"test:ui:headed": "just test-ui-headed",
 		"build": "just build",
 		"dist": "just dist",
+		"dist:linux": "just build && bunx electron-builder --linux --publish never",
+		"dist:mac": "just build && bunx electron-builder --mac --publish never",
+		"dist:win": "just build && bunx electron-builder --win --publish never",
 		"start": "just start",
 		"mcp": "./bin/trackboi mcp",
 		"mcp:inspect": "just mcp-inspect"
@@ -62,8 +65,27 @@
 			"icon": "build/icons",
 			"target": [
 				"AppImage",
-				"rpm"
+				"rpm",
+				"deb"
 			]
+		},
+		"mac": {
+			"category": "public.app-category.developer-tools",
+			"target": [
+				"dmg",
+				"zip"
+			]
+		},
+		"win": {
+			"target": [
+				"nsis",
+				"zip"
+			]
+		},
+		"nsis": {
+			"oneClick": false,
+			"perMachine": false,
+			"allowToChangeInstallationDirectory": true
 		},
 		"rpm": {
 			"afterInstall": "build/linux/after-install.sh"

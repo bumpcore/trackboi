@@ -28,7 +28,7 @@ jobs:
       - name: Set up Electron UI test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb
+          sudo apt-get install -y imagemagick xvfb
 
       - name: Install dependencies
         run: bun install --frozen-lockfile

@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import packageJson from "../../package.json";
 import type { NodeFsTrackboiActions } from "../core";
 import { createMcpProjectContext } from "./mcp/helpers";
 import { registerBoardTools, registerProjectTools } from "./mcp/projectTools";
@@ -15,7 +16,7 @@ import { registerTrackTools } from "./mcp/trackTools";
 export async function runMcpServer(trackboi: NodeFsTrackboiActions): Promise<void> {
 	const server = new McpServer({
 		name: "trackboi",
-		version: "0.1.0",
+		version: packageJson.version,
 	});
 	const projectContext = await createMcpProjectContext(trackboi);
 

@@ -64,7 +64,7 @@ onBeforeUnmount(() => {
 							Adjust the board name and board-owned fields. Columns stay on the canvas and right panel.
 						</p>
 					</div>
-					<Button variant="ghost" size="icon" type="button" class="rounded-none" title="Close" aria-label="Close" @click="emit('close')">
+					<Button variant="ghost" size="icon" type="button" class="rounded-[2px]" title="Close" aria-label="Close" @click="emit('close')">
 						<X class="h-4 w-4" />
 					</Button>
 				</header>

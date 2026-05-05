@@ -56,7 +56,7 @@ export function findGitRoot(startPath: string): string | null {
 export function readGitContext(projectPath: string): GitContext {
 	const root = findGitRoot(projectPath);
 	if (!root) {
-		return { isGitRepo: false, root: null, branch: null, detached: false, dirty: null };
+		return { isGitRepo: false, root: null, branch: null, detached: false, dirty: null, identity: null };
 	}
 
 	const branchOutput = runGit(root, ["branch", "--show-current"]);
@@ -65,7 +65,7 @@ export function readGitContext(projectPath: string): GitContext {
 	const statusOutput = runGit(root, ["status", "--porcelain"]);
 	const dirty = statusOutput == null ? null : statusOutput.length > 0;
 
-	return { isGitRepo: true, root, branch, detached: branch == null, dirty };
+	return { isGitRepo: true, root, branch, detached: branch == null, dirty, identity: readGitIdentity(root) };
 }
 
 export function listGitWorktrees(repoRoot: string): GitWorktree[] {

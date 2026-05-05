@@ -187,7 +187,7 @@ function createDesktopProjectState(): InternalDesktopProjectState {
 	const globalPendingCount = ref(0);
 	const error = ref<string | null>(null);
 	const settingsOpen = ref(false);
-	const settingsSection = ref<SettingsSection>("storage");
+	const settingsSection = ref<SettingsSection>("general");
 	const storagePathDraft = ref("");
 	const busy = computed(() => globalPendingCount.value > 0);
 	let patchListenerStarted = false;
@@ -611,6 +611,7 @@ function createDesktopProjectState(): InternalDesktopProjectState {
 				await run(async () => {
 					await desktop.removeProject(projectPath);
 					await refreshDesktopState();
+					settingsOpen.value = false;
 				});
 			},
 		});
@@ -669,7 +670,7 @@ function createDesktopProjectState(): InternalDesktopProjectState {
 		});
 	}
 
-	function openSettings(section: SettingsSection = "storage") {
+	function openSettings(section: SettingsSection = "general") {
 		settingsSection.value = section;
 		settingsOpen.value = true;
 	}

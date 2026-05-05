@@ -67,11 +67,41 @@ export type EditorPreference = {
 	customCommand: string;
 };
 
+export type UserIdentity = {
+	displayName: string;
+	gitName: string;
+	gitEmail: string;
+};
+
+export type OnboardingState = {
+	userComplete: boolean;
+	firstProjectComplete: boolean;
+};
+
+export type AppShortcuts = {
+	leftPanel: string;
+	rightPanel: string;
+	commandCenterNavigate: string;
+	commandCenterCommand: string;
+	openSettings: string;
+	addProject: string;
+	newCard: string;
+	newTrack: string;
+	nextProject: string;
+	previousProject: string;
+	projectSettings: string;
+	boardSettings: string;
+	focusBoard: string;
+};
+
 export type AppSettings = {
 	version: 1;
 	agents: AgentRegistration[];
 	agentContexts: AgentContext[];
 	editor: EditorPreference;
+	userIdentity: UserIdentity;
+	onboarding: OnboardingState;
+	shortcuts: AppShortcuts;
 };
 
 export type ProjectMetadata = {
@@ -234,6 +264,7 @@ export type GitContext = {
 	branch: string | null;
 	detached: boolean;
 	dirty: boolean | null;
+	identity?: GitIdentity | null;
 };
 
 export type WorktreeContext = {

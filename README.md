@@ -69,6 +69,8 @@ bun run mcp
 
 trackboi's MCP tools use the same local project state as the desktop app, so agents can create cards, update tracks, write notes, and leave handoffs without a remote service.
 
+See [docs/usage-guide.md](docs/usage-guide.md) for storage layout, onboarding, and MCP setup examples for common clients.
+
 ## License
 
 MIT

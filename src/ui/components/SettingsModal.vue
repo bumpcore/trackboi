@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import { Bot, Code2, HardDrive, Keyboard, Monitor, Moon, Palette, SlidersHorizontal, Sun, Trash2, X } from "lucide-vue-next";
+import { Bot, Code2, HardDrive, Info, Keyboard, Monitor, Moon, Palette, SlidersHorizontal, Sun, Trash2, User, X } from "lucide-vue-next";
+import packageJson from "../../../package.json";
 import type { AgentRegistration, PersonAlias, ProjectSnapshot } from "@/core/types";
 import Button from "@/ui/components/Button.vue";
 import Input from "@/ui/components/Input.vue";
@@ -17,6 +18,7 @@ const props = defineProps<{
 	snapshot: ProjectSnapshot | null;
 	people: PersonAlias[];
 	detectedEditors: Array<{ id: string; label: string; command: string }>;
+	canRemoveProject: boolean;
 }>();
 
 const activeSection = defineModel<SettingsSection>("section", { required: true });
@@ -25,9 +27,21 @@ const leftPanelShortcut = defineModel<string>("leftPanelShortcut", { required: t
 const rightPanelShortcut = defineModel<string>("rightPanelShortcut", { required: true });
 const commandCenterNavigateShortcut = defineModel<string>("commandCenterNavigateShortcut", { required: true });
 const commandCenterCommandShortcut = defineModel<string>("commandCenterCommandShortcut", { required: true });
+const openSettingsShortcut = defineModel<string>("openSettingsShortcut", { required: true });
+const addProjectShortcut = defineModel<string>("addProjectShortcut", { required: true });
+const newCardShortcut = defineModel<string>("newCardShortcut", { required: true });
+const newTrackShortcut = defineModel<string>("newTrackShortcut", { required: true });
+const nextProjectShortcut = defineModel<string>("nextProjectShortcut", { required: true });
+const previousProjectShortcut = defineModel<string>("previousProjectShortcut", { required: true });
+const projectSettingsShortcut = defineModel<string>("projectSettingsShortcut", { required: true });
+const boardSettingsShortcut = defineModel<string>("boardSettingsShortcut", { required: true });
+const focusBoardShortcut = defineModel<string>("focusBoardShortcut", { required: true });
 const themeMode = defineModel<ThemeMode>("themeMode", { required: true });
 const preferredEditorId = defineModel<string>("preferredEditorId", { required: true });
 const customEditorCommand = defineModel<string>("customEditorCommand", { required: true });
+const userDisplayName = defineModel<string>("userDisplayName", { required: true });
+const userGitName = defineModel<string>("userGitName", { required: true });
+const userGitEmail = defineModel<string>("userGitEmail", { required: true });
 const agentNameDraft = defineModel<string>("agentNameDraft", { required: true });
 const agentDescriptionDraft = defineModel<string>("agentDescriptionDraft", { required: true });
 const personDisplayNameDraft = defineModel<string>("personDisplayNameDraft", { required: true });
@@ -41,13 +55,31 @@ const emit = defineEmits<{
 	reset: [];
 	resetShortcuts: [];
 	resetTheme: [];
+	saveUserIdentity: [];
 	registerAgent: [];
 	removeAgent: [agentId: string];
 	saveEditor: [];
 	addPersonAlias: [];
 	removePersonAlias: [personId: string];
+	removeProject: [];
 }>();
-const captureArmed = ref<"left" | "right" | "navigate" | "command" | null>(null);
+type ShortcutTarget =
+	| "left"
+	| "right"
+	| "navigate"
+	| "command"
+	| "settings"
+	| "addProject"
+	| "newCard"
+	| "newTrack"
+	| "nextProject"
+	| "previousProject"
+	| "projectSettings"
+	| "boardSettings"
+	| "focusBoard";
+
+const captureArmed = ref<ShortcutTarget | null>(null);
+const versionLabel = computed(() => import.meta.env.DEV ? "dev" : `v${packageJson.version}`);
 
 watch(
 	() => props.open,
@@ -60,12 +92,30 @@ watch(
 
 const sectionMeta: Record<SettingsSection, { group: string; title: string; description: string }> = {
 	storage:    { group: "App",       title: "Storage paths",      description: "trackboi checks these paths in order and opens the first store it finds. Earlier entries take priority over later ones." },
+	general:    { group: "App",       title: "General",            description: "Set the local identity trackboi should use for people aliases, onboarding, and agent handoff defaults." },
 	appearance: { group: "App",       title: "Appearance",         description: "Control how trackboi looks across the desktop shell and editing surfaces." },
 	shortcuts:  { group: "Workspace", title: "Keyboard shortcuts", description: "Bind key combinations for the command center and side panels. Shortcuts won't fire while you're typing inside an input or editor." },
 	agents:     { group: "Workspace", title: "Agent identity",     description: "Choose the stable handle trackboi should stamp on agent-made work, regardless of which harness or model is driving it." },
 	editor:     { group: "Workspace", title: "Code editor",        description: "Choose which editor trackboi launches when you open a card's source file." },
 	project:    { group: "Current project", title: "Project settings", description: "Manage people aliases and project-scoped configuration for the active worktree project." },
+	about:      { group: "App",       title: "About",              description: "Version, storage, release, and project information for this trackboi build." },
 };
+
+const shortcutRows = computed<Array<{ target: ShortcutTarget; label: string; model: string }>>(() => [
+	{ target: "navigate", label: "Command center: navigate", model: commandCenterNavigateShortcut.value },
+	{ target: "command", label: "Command center: command mode", model: commandCenterCommandShortcut.value },
+	{ target: "settings", label: "Open settings", model: openSettingsShortcut.value },
+	{ target: "addProject", label: "Add project", model: addProjectShortcut.value },
+	{ target: "newCard", label: "New card", model: newCardShortcut.value },
+	{ target: "newTrack", label: "New track", model: newTrackShortcut.value },
+	{ target: "left", label: "Toggle left panel", model: leftPanelShortcut.value },
+	{ target: "right", label: "Toggle right panel", model: rightPanelShortcut.value },
+	{ target: "nextProject", label: "Next project", model: nextProjectShortcut.value },
+	{ target: "previousProject", label: "Previous project", model: previousProjectShortcut.value },
+	{ target: "projectSettings", label: "Project settings", model: projectSettingsShortcut.value },
+	{ target: "boardSettings", label: "Board settings", model: boardSettingsShortcut.value },
+	{ target: "focusBoard", label: "Focus board", model: focusBoardShortcut.value },
+]);
 
 const themeOptions: Array<{ value: ThemeMode; label: string; description: string; icon: typeof Sun }> = [
 	{ value: "dark",   label: "Dark",   description: "The default cockpit-style dark workspace.",                     icon: Moon    },
@@ -83,7 +133,7 @@ const editorOptions = computed(() => [
 	{ id: "custom", label: "Custom command",  description: "Provide your own shell command. Use {path} as the file placeholder." },
 ]);
 
-function captureShortcut(target: "left" | "right" | "navigate" | "command", event: KeyboardEvent) {
+function captureShortcut(target: ShortcutTarget, event: KeyboardEvent) {
 	event.preventDefault();
 	event.stopPropagation();
 
@@ -99,7 +149,16 @@ function captureShortcut(target: "left" | "right" | "navigate" | "command", even
 	if (target === "left") leftPanelShortcut.value = shortcut;
 	else if (target === "right") rightPanelShortcut.value = shortcut;
 	else if (target === "navigate") commandCenterNavigateShortcut.value = shortcut;
-	else commandCenterCommandShortcut.value = shortcut;
+	else if (target === "command") commandCenterCommandShortcut.value = shortcut;
+	else if (target === "settings") openSettingsShortcut.value = shortcut;
+	else if (target === "addProject") addProjectShortcut.value = shortcut;
+	else if (target === "newCard") newCardShortcut.value = shortcut;
+	else if (target === "newTrack") newTrackShortcut.value = shortcut;
+	else if (target === "nextProject") nextProjectShortcut.value = shortcut;
+	else if (target === "previousProject") previousProjectShortcut.value = shortcut;
+	else if (target === "projectSettings") projectSettingsShortcut.value = shortcut;
+	else if (target === "boardSettings") boardSettingsShortcut.value = shortcut;
+	else focusBoardShortcut.value = shortcut;
 
 	captureArmed.value = null;
 	(event.currentTarget as HTMLElement | null)?.blur();
@@ -149,6 +208,17 @@ onBeforeUnmount(() => {
 								<button
 									type="button"
 									class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors"
+									:class="activeSection === 'general'
+										? 'bg-secondary/80 font-medium text-foreground'
+										: 'font-normal text-muted-foreground hover:bg-secondary/45 hover:text-foreground'"
+									@click="activeSection = 'general'"
+								>
+									<User class="h-4 w-4 shrink-0" />
+									General
+								</button>
+								<button
+									type="button"
+									class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors"
 									:class="activeSection === 'storage'
 										? 'bg-secondary/80 font-medium text-foreground'
 										: 'font-normal text-muted-foreground hover:bg-secondary/45 hover:text-foreground'"
@@ -167,6 +237,17 @@ onBeforeUnmount(() => {
 								>
 									<Palette class="h-4 w-4 shrink-0" />
 									Appearance
+								</button>
+								<button
+									type="button"
+									class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors"
+									:class="activeSection === 'about'
+										? 'bg-secondary/80 font-medium text-foreground'
+										: 'font-normal text-muted-foreground hover:bg-secondary/45 hover:text-foreground'"
+									@click="activeSection = 'about'"
+								>
+									<Info class="h-4 w-4 shrink-0" />
+									About
 								</button>
 							</div>
 						</div>
@@ -232,13 +313,46 @@ onBeforeUnmount(() => {
 							<h2 class="mt-1 text-xl font-semibold tracking-tight">{{ sectionMeta[activeSection].title }}</h2>
 							<p class="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{{ sectionMeta[activeSection].description }}</p>
 						</div>
-						<Button variant="ghost" size="icon" type="button" class="rounded-none" title="Close" aria-label="Close" @click="emit('close')">
+						<Button variant="ghost" size="icon" type="button" class="rounded-[2px]" title="Close" aria-label="Close" @click="emit('close')">
 							<X class="h-4 w-4" />
 						</Button>
 					</header>
 
+					<!-- General -->
+					<section v-if="activeSection === 'general'" class="grid gap-4">
+						<section class="grid gap-4 bg-background/12 p-4">
+							<div>
+								<h3 class="text-sm font-semibold text-foreground">Your identity</h3>
+								<p class="mt-1 text-sm leading-6 text-muted-foreground">
+									Used to seed project people aliases and make local handoffs readable.
+								</p>
+							</div>
+
+							<div class="grid gap-3 sm:grid-cols-2">
+								<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+									Display name
+									<Input v-model="userDisplayName" autocomplete="off" placeholder="Abdulkadir" />
+								</label>
+								<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
+									Git name
+									<Input v-model="userGitName" autocomplete="off" placeholder="git config user.name" />
+								</label>
+								<label class="grid gap-1.5 text-xs font-medium text-muted-foreground sm:col-span-2">
+									Git email
+									<Input v-model="userGitEmail" autocomplete="off" placeholder="git config user.email" />
+								</label>
+							</div>
+
+							<div>
+								<Button type="button" class="rounded-none" :disabled="!userDisplayName.trim()" @click="emit('saveUserIdentity')">
+									Save
+								</Button>
+							</div>
+						</section>
+					</section>
+
 					<!-- Storage -->
-					<section v-if="activeSection === 'storage'" class="grid gap-4">
+					<section v-else-if="activeSection === 'storage'" class="grid gap-4">
 						<section class="grid gap-0 overflow-hidden bg-background/12">
 							<div class="border-b border-border/60 px-4 py-3">
 								<h3 class="text-sm font-semibold text-foreground">Path priority</h3>
@@ -341,81 +455,29 @@ onBeforeUnmount(() => {
 					<section v-else-if="activeSection === 'shortcuts'" class="grid gap-4">
 						<section class="grid gap-4 bg-background/12 p-4">
 							<div>
-								<h3 class="text-sm font-semibold text-foreground">Command center</h3>
+								<h3 class="text-sm font-semibold text-foreground">Power shortcuts</h3>
 								<p class="mt-1 text-sm leading-6 text-muted-foreground">
-									Use one shortcut for quick navigation and another for explicit command mode. Typing <span class="trackboi-mono-font">&gt;</span> also switches to commands inside the launcher.
+									Click a field and press the key combination you want. Press Escape to cancel.
 								</p>
 							</div>
 
-							<div class="grid gap-4">
-								<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-									Navigate
+							<div class="grid gap-3">
+								<label
+									v-for="row in shortcutRows"
+									:key="row.target"
+									class="grid gap-1.5 text-xs font-medium text-muted-foreground"
+								>
+									{{ row.label }}
 									<button
 										type="button"
 										class="trackboi-mono-font flex h-8 w-full items-center border border-input/82 bg-secondary/72 px-2.5 py-1 text-left text-[13px] text-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.02)] transition-colors hover:bg-secondary/88 focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-										:class="captureArmed === 'navigate' ? 'border-primary/35 ring-1 ring-ring' : ''"
-										@click="captureArmed = 'navigate'"
-										@focus="captureArmed = 'navigate'"
+										:class="captureArmed === row.target ? 'border-primary/35 ring-1 ring-ring' : ''"
+										@click="captureArmed = row.target"
+										@focus="captureArmed = row.target"
 										@blur="captureArmed = null"
-										@keydown="captureShortcut('navigate', $event)"
+										@keydown="captureShortcut(row.target, $event)"
 									>
-										{{ captureArmed === "navigate" ? "Listening for shortcut…" : commandCenterNavigateShortcut }}
-									</button>
-								</label>
-
-								<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-									Command mode
-									<button
-										type="button"
-										class="trackboi-mono-font flex h-8 w-full items-center border border-input/82 bg-secondary/72 px-2.5 py-1 text-left text-[13px] text-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.02)] transition-colors hover:bg-secondary/88 focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-										:class="captureArmed === 'command' ? 'border-primary/35 ring-1 ring-ring' : ''"
-										@click="captureArmed = 'command'"
-										@focus="captureArmed = 'command'"
-										@blur="captureArmed = null"
-										@keydown="captureShortcut('command', $event)"
-									>
-										{{ captureArmed === "command" ? "Listening for shortcut…" : commandCenterCommandShortcut }}
-									</button>
-								</label>
-							</div>
-						</section>
-
-						<section class="grid gap-4 bg-background/12 p-4">
-							<div>
-								<h3 class="text-sm font-semibold text-foreground">Panel toggles</h3>
-								<p class="mt-1 text-sm leading-6 text-muted-foreground">
-									Click a field and press the key combination you want to assign. Press Escape to cancel.
-								</p>
-							</div>
-
-							<div class="grid gap-4">
-								<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-									Left panel
-									<button
-										type="button"
-										class="trackboi-mono-font flex h-8 w-full items-center border border-input/82 bg-secondary/72 px-2.5 py-1 text-left text-[13px] text-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.02)] transition-colors hover:bg-secondary/88 focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-										:class="captureArmed === 'left' ? 'border-primary/35 ring-1 ring-ring' : ''"
-										@click="captureArmed = 'left'"
-										@focus="captureArmed = 'left'"
-										@blur="captureArmed = null"
-										@keydown="captureShortcut('left', $event)"
-									>
-										{{ captureArmed === "left" ? "Listening for shortcut…" : leftPanelShortcut }}
-									</button>
-								</label>
-
-								<label class="grid gap-1.5 text-xs font-medium text-muted-foreground">
-									Right panel
-									<button
-										type="button"
-										class="trackboi-mono-font flex h-8 w-full items-center border border-input/82 bg-secondary/72 px-2.5 py-1 text-left text-[13px] text-foreground shadow-[inset_0_1px_0_hsl(0_0%_100%/0.02)] transition-colors hover:bg-secondary/88 focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-										:class="captureArmed === 'right' ? 'border-primary/35 ring-1 ring-ring' : ''"
-										@click="captureArmed = 'right'"
-										@focus="captureArmed = 'right'"
-										@blur="captureArmed = null"
-										@keydown="captureShortcut('right', $event)"
-									>
-										{{ captureArmed === "right" ? "Listening for shortcut…" : rightPanelShortcut }}
+										{{ captureArmed === row.target ? "Listening for shortcut…" : row.model }}
 									</button>
 								</label>
 							</div>
@@ -537,13 +599,45 @@ onBeforeUnmount(() => {
 								:snapshot="snapshot"
 								:people="people"
 								:busy="busy"
+								:can-remove-project="canRemoveProject"
 								@add-person-alias="emit('addPersonAlias')"
 								@remove-person-alias="emit('removePersonAlias', $event)"
+								@remove-project="emit('removeProject')"
 							/>
 						</section>
 						<section v-else class="grid gap-4 bg-background/12 p-4">
 							<div class="border border-dashed border-border/75 bg-background/20 px-4 py-4 text-sm text-muted-foreground">
 								Open a project first to configure project-scoped settings.
+							</div>
+						</section>
+					</section>
+
+					<!-- About -->
+					<section v-else-if="activeSection === 'about'" class="grid gap-4">
+						<section class="grid gap-4 bg-background/12 p-4">
+							<div>
+								<h3 class="text-sm font-semibold text-foreground">trackboi {{ versionLabel }}</h3>
+								<p class="mt-1 text-sm leading-6 text-muted-foreground">
+									No bullshit kanban for agents and people. 100% local and git based.
+								</p>
+							</div>
+							<div class="grid gap-2 text-sm">
+								<div class="flex justify-between gap-4 border-b border-border/35 py-2">
+									<span class="text-muted-foreground">App settings</span>
+									<span class="trackboi-mono-font text-right text-foreground">~/.trackboi/config.json</span>
+								</div>
+								<div class="flex justify-between gap-4 border-b border-border/35 py-2">
+									<span class="text-muted-foreground">Repo store default</span>
+									<span class="trackboi-mono-font text-right text-foreground">.trackboi</span>
+								</div>
+								<div class="flex justify-between gap-4 border-b border-border/35 py-2">
+									<span class="text-muted-foreground">License</span>
+									<span class="trackboi-mono-font text-right text-foreground">MIT</span>
+								</div>
+								<div class="flex justify-between gap-4 py-2">
+									<span class="text-muted-foreground">Repository</span>
+									<span class="trackboi-mono-font text-right text-foreground">github.com/bumpcore/trackboi</span>
+								</div>
 							</div>
 						</section>
 					</section>

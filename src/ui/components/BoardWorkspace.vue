@@ -124,7 +124,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-	<main class="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background">
+	<main class="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background focus-visible:outline-none" data-testid="board-workspace" tabindex="-1">
 		<header class="border-b border-border/65 px-5 py-4">
 			<div class="flex flex-wrap items-start justify-between gap-4">
 				<div class="min-w-0 flex-1">

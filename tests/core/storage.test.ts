@@ -3,8 +3,9 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { STORAGE_SEARCH_PATHS } from "../../src/core/constants";
+import { newSlugId } from "../../src/core/id";
 import { writeJsonAtomic } from "../../src/core/json";
-import { sanitizeRegistry } from "../../src/core/registry";
+import { defaultAppSettings, defaultConfigDir, sanitizeRegistry } from "../../src/core/registry";
 import { projectEntry } from "../../src/core/sources";
 import { resolveProjectStorage } from "../../src/core/storage";
 import type { Board, Project, ProjectMetadata, ProjectRegistry } from "../../src/core/types";
@@ -31,9 +32,18 @@ describe("storage path preference", () => {
 		expect(resolved?.storagePath).toBe(".trackboi");
 	});
 
-	test("new storage is created under .etc when the directory already exists", () => {
+	test("new storage defaults to .trackboi when .etc exists without a store", () => {
 		const project = createProject();
 		mkdirSync(path.join(project.path, ".etc"), { recursive: true });
+
+		const resolved = resolveProjectStorage(project, registry(), true);
+
+		expect(resolved?.storagePath).toBe(".trackboi");
+	});
+
+	test("new storage keeps using an existing legacy etc store", () => {
+		const project = createProject();
+		writeStore(project.path, ".etc/.trackboi", "Etc board");
 
 		const resolved = resolveProjectStorage(project, registry(), true);
 
@@ -56,6 +66,10 @@ describe("storage path preference", () => {
 		expect(sanitized.storageSearchPaths).toEqual([...STORAGE_SEARCH_PATHS]);
 	});
 
+	test("app registry defaults to the home trackboi directory", () => {
+		expect(defaultConfigDir()).toBe(path.join(os.homedir(), ".trackboi"));
+	});
+
 	test("project entries report the effective resolved storage path", () => {
 		const project = createProject();
 		writeStore(project.path, ".trackboi", "Root board");
@@ -68,6 +82,24 @@ describe("storage path preference", () => {
 
 		expect(entry.storagePath).toBe(".trackboi");
 		expect(entry.cardCount).toBe(0);
+	});
+});
+
+describe("filesystem ids", () => {
+	test("slug ids are path safe and title based", () => {
+		const id = newSlugId("card", "Fix release menu!!!");
+
+		expect(id).toMatch(/^card-fix-release-menu-[a-z0-9_-]+$/);
+		expect(id).not.toContain(" ");
+	});
+
+	test("slug ids keep a random suffix for distributed writes", () => {
+		const first = newSlugId("track", "Onboarding polish");
+		const second = newSlugId("track", "Onboarding polish");
+
+		expect(first).not.toBe(second);
+		expect(first.startsWith("track-onboarding-polish-")).toBe(true);
+		expect(second.startsWith("track-onboarding-polish-")).toBe(true);
 	});
 });
 
@@ -89,11 +121,7 @@ function registry(): ProjectRegistry {
 		selectedBoardId: null,
 		activeWorkspaceFile: null,
 		storageSearchPaths: [...STORAGE_SEARCH_PATHS],
-		appSettings: {
-			people: [],
-			agents: [],
-			editor: { preferredEditorId: "auto", customCommand: "" },
-		},
+		appSettings: defaultAppSettings(),
 	};
 }
 

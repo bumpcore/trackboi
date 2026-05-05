@@ -7,6 +7,7 @@ import CommandCenter from "@/ui/components/CommandCenter.vue";
 import ConfirmDialog from "@/ui/components/ConfirmDialog.vue";
 import LeftRail from "@/ui/components/LeftRail.vue";
 import LeftWorkspacePanel from "@/ui/components/LeftWorkspacePanel.vue";
+import OnboardingModal from "@/ui/components/OnboardingModal.vue";
 import PanelResizer from "@/ui/components/PanelResizer.vue";
 import RightWorkspacePanel from "@/ui/components/RightWorkspacePanel.vue";
 import SettingsModal from "@/ui/components/SettingsModal.vue";
@@ -67,6 +68,7 @@ const {
 	setError,
 	loadProject,
 	chooseProject,
+	removeProject,
 	addStorageSearchPath,
 	removeStorageSearchPath,
 	resetStorageSearchPaths,
@@ -89,6 +91,7 @@ const {
 	openProjectSettings,
 	activeProject,
 	allEntries,
+	canRemoveActiveProject,
 	hasProjects,
 	selectedWorktree,
 	gitBranchLabel,
@@ -224,6 +227,10 @@ const {
 const boardSettingsOpen = ref(false);
 const agentNameDraft = ref("");
 const agentDescriptionDraft = ref("");
+const onboardingOpen = ref(false);
+const userDisplayNameDraft = ref("");
+const userGitNameDraft = ref("");
+const userGitEmailDraft = ref("");
 
 const {
 	appSettings,
@@ -232,16 +239,39 @@ const {
 	updateAgent,
 	removeAgent,
 	updateEditorPreference,
+	updateUserIdentity,
+	completeFirstProjectOnboarding,
 } = useGlobalAppSettings();
 
 watch(
 	[settingsOpen, settingsSection, appSettings],
 	([open, section]) => {
-		if (!open || section !== "agents") return;
-		const currentAgent = appSettings.value.agents[0];
-		agentNameDraft.value = currentAgent?.name ?? "";
-		agentDescriptionDraft.value = currentAgent?.description ?? "";
+		if (!open) return;
+		if (section === "agents") {
+			const currentAgent = appSettings.value.agents[0];
+			agentNameDraft.value = currentAgent?.name ?? "";
+			agentDescriptionDraft.value = currentAgent?.description ?? "";
+		}
+		if (section === "general") {
+			userDisplayNameDraft.value = appSettings.value.userIdentity.displayName;
+			userGitNameDraft.value = appSettings.value.userIdentity.gitName;
+			userGitEmailDraft.value = appSettings.value.userIdentity.gitEmail;
+		}
 	},
+);
+
+watch(
+	[snapshot, appSettings],
+	([currentSnapshot, settings]) => {
+		if (!onboardingOpen.value || !currentSnapshot || settings.onboarding.userComplete) return;
+		const identity = currentSnapshot.git.identity;
+		userDisplayNameDraft.value = settings.userIdentity.displayName || identity?.name || "";
+		userGitNameDraft.value = settings.userIdentity.gitName || identity?.name || "";
+		userGitEmailDraft.value = settings.userIdentity.gitEmail || identity?.email || "";
+		if (!agentNameDraft.value) agentNameDraft.value = settings.agents[0]?.name ?? "agent";
+		if (!agentDescriptionDraft.value) agentDescriptionDraft.value = settings.agents[0]?.description ?? "Default coding identity";
+	},
+	{ immediate: true },
 );
 
 const shell = useWorkspaceShellState();
@@ -250,6 +280,15 @@ const {
 	rightPanelShortcut,
 	commandCenterNavigateShortcut,
 	commandCenterCommandShortcut,
+	openSettingsShortcut,
+	addProjectShortcut,
+	newCardShortcut,
+	newTrackShortcut,
+	nextProjectShortcut,
+	previousProjectShortcut,
+	projectSettingsShortcut,
+	boardSettingsShortcut,
+	focusBoardShortcut,
 	themeMode,
 	resetPanelShortcuts,
 	resetThemeMode,
@@ -519,7 +558,7 @@ const commandCenterItems = computed<CommandCenterItem[]>(() => {
 			keywords: ["choose project", "workspace", "open folder"],
 			icon: "chooseProject",
 			run: async () => {
-				await chooseProject();
+				await chooseProjectWithOnboarding();
 			},
 		},
 		{
@@ -696,6 +735,17 @@ usePanelShortcuts({
 	rightShortcut: rightPanelShortcut,
 	toggleLeftPanel: shell.toggleLeftCollapsed,
 	toggleRightPanel: shell.toggleRightCollapsed,
+	shortcuts: [
+		{ shortcut: openSettingsShortcut, run: () => openSettings("general") },
+		{ shortcut: addProjectShortcut, run: chooseProjectWithOnboarding },
+		{ shortcut: newCardShortcut, run: () => openCardPanel() },
+		{ shortcut: newTrackShortcut, run: createTrackFromShell },
+		{ shortcut: nextProjectShortcut, run: () => switchAdjacentProject(1) },
+		{ shortcut: previousProjectShortcut, run: () => switchAdjacentProject(-1) },
+		{ shortcut: projectSettingsShortcut, run: openProjectSettings },
+		{ shortcut: boardSettingsShortcut, run: () => openBoardSettings() },
+		{ shortcut: focusBoardShortcut, run: focusBoardSurface },
+	],
 });
 
 useThemeMode(themeMode);
@@ -709,6 +759,33 @@ watch(columnPanelMode, (mode) => {
 async function switchProjectFromRail(projectPath: string) {
 	shell.setLeftView("explorer");
 	await switchProject(projectPath);
+}
+
+async function chooseProjectWithOnboarding() {
+	await chooseProject();
+	if (appSettings.value.onboarding.userComplete) return;
+	const identity = snapshot.value?.git.identity;
+	userDisplayNameDraft.value = appSettings.value.userIdentity.displayName || identity?.name || "";
+	userGitNameDraft.value = appSettings.value.userIdentity.gitName || identity?.name || "";
+	userGitEmailDraft.value = appSettings.value.userIdentity.gitEmail || identity?.email || "";
+	agentNameDraft.value = appSettings.value.agents[0]?.name ?? "agent";
+	agentDescriptionDraft.value = appSettings.value.agents[0]?.description ?? "Default coding identity";
+	onboardingOpen.value = true;
+}
+
+async function switchAdjacentProject(delta: number) {
+	const entries = allEntries.value;
+	if (entries.length === 0) return;
+	const currentIndex = entries.findIndex((entry) => entry.projectPath === activeProject.value?.projectPath);
+	const nextIndex = currentIndex < 0
+		? 0
+		: (currentIndex + delta + entries.length) % entries.length;
+	const nextEntry = entries[nextIndex];
+	if (nextEntry) await switchProject(nextEntry.projectPath);
+}
+
+function focusBoardSurface() {
+	document.querySelector<HTMLElement>("[data-testid='board-workspace']")?.focus();
 }
 
 async function createColumnFromBoard() {
@@ -778,6 +855,21 @@ async function handleRegisterAgent() {
 	agentDescriptionDraft.value = agentDescriptionDraft.value.trim();
 }
 
+async function saveUserIdentity() {
+	await updateUserIdentity({
+		displayName: userDisplayNameDraft.value.trim(),
+		gitName: userGitNameDraft.value.trim(),
+		gitEmail: userGitEmailDraft.value.trim(),
+	});
+}
+
+async function completeOnboarding() {
+	await saveUserIdentity();
+	await handleRegisterAgent();
+	await completeFirstProjectOnboarding();
+	onboardingOpen.value = false;
+}
+
 function handleGlobalDeleteKey(event: KeyboardEvent) {
 	if (event.key !== "Delete" || !selectedCard.value) return;
 	const target = event.target as HTMLElement | null;
@@ -821,7 +913,7 @@ onBeforeUnmount(() => {
 				:active-project-path="view.activeProjectPath"
 				:projects="allEntries"
 				@switch-project="switchProjectFromRail"
-				@add-project="chooseProject"
+				@add-project="chooseProjectWithOnboarding"
 				@settings="openSettings"
 			/>
 
@@ -863,7 +955,7 @@ onBeforeUnmount(() => {
 				:snapshot="snapshot"
 				:track-labels="trackLabels"
 				:visible-card-count="visibleCardCount"
-				@choose-project="chooseProject"
+				@choose-project="chooseProjectWithOnboarding"
 				@create-column="createColumnFromBoard"
 				@edit-column="editColumnFromBoard"
 				@reorder-column="reorderColumnFromBoard"
@@ -948,9 +1040,21 @@ onBeforeUnmount(() => {
 				v-model:right-panel-shortcut="rightPanelShortcut"
 				v-model:command-center-navigate-shortcut="commandCenterNavigateShortcut"
 				v-model:command-center-command-shortcut="commandCenterCommandShortcut"
+				v-model:open-settings-shortcut="openSettingsShortcut"
+				v-model:add-project-shortcut="addProjectShortcut"
+				v-model:new-card-shortcut="newCardShortcut"
+				v-model:new-track-shortcut="newTrackShortcut"
+				v-model:next-project-shortcut="nextProjectShortcut"
+				v-model:previous-project-shortcut="previousProjectShortcut"
+				v-model:project-settings-shortcut="projectSettingsShortcut"
+				v-model:board-settings-shortcut="boardSettingsShortcut"
+				v-model:focus-board-shortcut="focusBoardShortcut"
 				v-model:theme-mode="themeMode"
 				v-model:preferred-editor-id="appSettings.editor.preferredEditorId"
 				v-model:custom-editor-command="appSettings.editor.customCommand"
+				v-model:user-display-name="userDisplayNameDraft"
+				v-model:user-git-name="userGitNameDraft"
+				v-model:user-git-email="userGitEmailDraft"
 				v-model:agent-name-draft="agentNameDraft"
 				v-model:agent-description-draft="agentDescriptionDraft"
 				v-model:person-display-name-draft="personDisplayNameDraft"
@@ -963,17 +1067,20 @@ onBeforeUnmount(() => {
 				:people="people"
 				:detected-editors="detectedEditors"
 				:busy="busy"
+				:can-remove-project="canRemoveActiveProject"
 				@close="closeSettings"
 				@add="addStorageSearchPath"
 				@remove="removeStorageSearchPath"
 				@reset="resetStorageSearchPaths"
 				@reset-shortcuts="resetPanelShortcuts"
 				@reset-theme="resetThemeMode"
+				@save-user-identity="saveUserIdentity"
 				@register-agent="handleRegisterAgent"
 				@remove-agent="removeAgent"
 				@save-editor="saveEditorSettings"
 				@add-person-alias="addPersonAlias"
 				@remove-person-alias="removePersonAlias"
+				@remove-project="activeProject && removeProject(activeProject.projectPath)"
 			/>
 
 			<CommandCenter
@@ -1013,6 +1120,18 @@ onBeforeUnmount(() => {
 				:busy="busy"
 				@close="closeBoardCreateModal"
 				@create="submitCreateBoard"
+			/>
+
+			<OnboardingModal
+				v-model:display-name="userDisplayNameDraft"
+				v-model:git-name="userGitNameDraft"
+				v-model:git-email="userGitEmailDraft"
+				v-model:agent-name="agentNameDraft"
+				v-model:agent-description="agentDescriptionDraft"
+				:open="onboardingOpen"
+				:snapshot="snapshot"
+				@close="onboardingOpen = false"
+				@complete="completeOnboarding"
 			/>
 		</main>
 

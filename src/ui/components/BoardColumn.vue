@@ -145,6 +145,16 @@ function cardElementsForList(list: HTMLElement, draggedCardId?: string) {
 		if (!(child instanceof HTMLElement)) continue;
 		const cardId = child.dataset.cardId;
 		if (!cardId || cardId === draggedCardId) continue;
+		if (
+			child.classList.contains("sortable-chosen")
+			|| child.classList.contains("sortable-drag")
+			|| child.classList.contains("sortable-fallback")
+			|| child.classList.contains("card-dragging")
+			|| child.classList.contains("card-ghost")
+			|| child.classList.contains("card-fallback")
+		) {
+			continue;
+		}
 		elements.push(child);
 	}
 	return elements;
@@ -458,7 +468,7 @@ onBeforeUnmount(() => {
 							preview
 							class="mt-1.5 text-[12px] leading-5 text-muted-foreground"
 						/>
-						<div class="mt-2 flex max-w-full flex-wrap gap-1.5">
+						<div class="board-card-badges mt-2 flex max-w-full flex-wrap gap-1.5">
 							<Badge
 								v-if="card.trackId && props.trackLabels[card.trackId]"
 								class="max-w-full border-primary/28 bg-primary/10 text-primary/95"
@@ -467,7 +477,7 @@ onBeforeUnmount(() => {
 								<span class="truncate">{{ props.trackLabels[card.trackId] }}</span>
 							</Badge>
 						</div>
-					<div class="mt-2 flex max-w-full flex-wrap gap-1.5">
+					<div class="board-card-badges mt-2 flex max-w-full flex-wrap gap-1.5">
 						<Badge
 							v-if="card.worktreeIds && card.worktreeIds.length > 0"
 							class="max-w-full border-border/70 bg-background/36 text-muted-foreground"
@@ -488,7 +498,7 @@ onBeforeUnmount(() => {
 							{{ props.childProgress[card.id].done }}/{{ props.childProgress[card.id].total }} subtasks
 						</Badge>
 					</div>
-					<div v-if="props.customFields.length > 0" class="mt-2 flex max-w-full flex-wrap gap-1.5">
+					<div v-if="props.customFields.length > 0" class="board-card-badges mt-2 flex max-w-full flex-wrap gap-1.5">
 						<Badge
 							v-for="entry in visibleFieldEntries(card)"
 							:key="entry.field.id"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { SlidersHorizontal, Trash2 } from "lucide-vue-next";
+import { FolderMinus, SlidersHorizontal, Trash2 } from "lucide-vue-next";
 import Button from "@/ui/components/Button.vue";
 import Input from "@/ui/components/Input.vue";
 import type { PersonAlias, ProjectSnapshot } from "@/core/types";
@@ -8,6 +8,7 @@ defineProps<{
 	snapshot: ProjectSnapshot | null;
 	people: PersonAlias[];
 	busy: boolean;
+	canRemoveProject: boolean;
 }>();
 
 const personDisplayNameDraft = defineModel<string>("personDisplayNameDraft", { required: true });
@@ -17,6 +18,7 @@ const personNamesDraft = defineModel<string>("personNamesDraft", { required: tru
 const emit = defineEmits<{
 	addPersonAlias: [];
 	removePersonAlias: [personId: string];
+	removeProject: [];
 }>();
 </script>
 
@@ -73,6 +75,38 @@ const emit = defineEmits<{
 					</Button>
 				</div>
 			</form>
+		</section>
+
+		<section class="shell-section border-destructive/25 bg-destructive/5">
+			<div class="flex items-start gap-3">
+				<div class="grid h-9 w-9 place-items-center rounded-[2px] border border-destructive/35 bg-destructive/10 text-destructive">
+					<FolderMinus class="h-4 w-4" />
+				</div>
+				<div class="min-w-0 flex-1">
+					<p class="shell-section-title">Forget project</p>
+					<p class="mt-1 text-sm leading-6 text-muted-foreground">
+						Remove this project from the app registry. The repository and its trackboi files stay on disk.
+					</p>
+					<p class="mt-2 truncate font-mono text-[11px] text-muted-foreground">{{ snapshot.project.path }}</p>
+				</div>
+			</div>
+
+			<div class="flex justify-end">
+				<Button
+					variant="outline"
+					type="button"
+					class="text-destructive hover:text-destructive"
+					:disabled="busy || !canRemoveProject"
+					data-testid="project-remove-button"
+					@click="emit('removeProject')"
+				>
+					Forget project
+				</Button>
+			</div>
+
+			<p v-if="!canRemoveProject" class="text-xs leading-5 text-muted-foreground">
+				This project is coming from workspace discovery, so it cannot be removed from the manual registry here.
+			</p>
 		</section>
 	</div>
 </template>

@@ -166,7 +166,7 @@ export function createUiFixture(): UiFixture {
 	});
 
 	const configHome = path.join(root, "config-home");
-	writeRegistry(configHome, repoPath);
+	writeRegistry(root, repoPath);
 
 	return {
 		root,
@@ -182,6 +182,7 @@ export function createUiFixture(): UiFixture {
 				args: [path.resolve("dist-node/electron/main.cjs")],
 				env: {
 					...launchEnv,
+					HOME: root,
 					XDG_CONFIG_HOME: configHome,
 					ELECTRON_DISABLE_SECURITY_WARNINGS: "true",
 				},
@@ -196,8 +197,8 @@ export function createUiFixture(): UiFixture {
 	};
 }
 
-function writeRegistry(configHome: string, repoPath: string) {
-	const registryDir = path.join(configHome, "trackboi");
+function writeRegistry(home: string, repoPath: string) {
+	const registryDir = path.join(home, ".trackboi");
 	const registry: ProjectRegistry = {
 		projects: [{
 			name: "trackboi",
@@ -215,6 +216,30 @@ function writeRegistry(configHome: string, repoPath: string) {
 			editor: {
 				preferredEditorId: "auto",
 				customCommand: "",
+			},
+			userIdentity: {
+				displayName: "Fixture User",
+				gitName: "Trackboi Tests",
+				gitEmail: "tests@trackboi.local",
+			},
+			onboarding: {
+				userComplete: true,
+				firstProjectComplete: true,
+			},
+			shortcuts: {
+				leftPanel: "Ctrl+B",
+				rightPanel: "Ctrl+Shift+X",
+				commandCenterNavigate: "Ctrl+P",
+				commandCenterCommand: "Ctrl+Shift+P",
+				openSettings: "Ctrl+,",
+				addProject: "Ctrl+O",
+				newCard: "Ctrl+N",
+				newTrack: "Ctrl+Shift+N",
+				nextProject: "Ctrl+PageDown",
+				previousProject: "Ctrl+PageUp",
+				projectSettings: "Ctrl+Alt+,",
+				boardSettings: "Ctrl+Alt+B",
+				focusBoard: "Ctrl+Alt+0",
 			},
 		},
 	};

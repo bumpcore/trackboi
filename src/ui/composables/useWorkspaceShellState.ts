@@ -20,7 +20,7 @@ const RIGHT_COLLAPSE_THRESHOLD = 280;
 const RIGHT_REOPEN_THRESHOLD = 324;
 const COLLAPSED_RIGHT_WIDTH = 44;
 const LEFT_RAIL_WIDTH = 56;
-const MAIN_WORKSPACE_TARGET_MIN_WIDTH = 920;
+const MAIN_WORKSPACE_MIN_WIDTH = 420;
 
 type ResizeSide = "left" | "right";
 
@@ -74,50 +74,29 @@ export function useWorkspaceShellState(): WorkspaceShellState {
 	const viewportWidth = ref(typeof window === "undefined" ? 1440 : window.innerWidth);
 
 	/**
-	 * Fits the preferred side-panel widths into the live viewport while
-	 * preserving a usable center workspace. The side panels keep their preferred
-	 * widths whenever there is enough room, and only give width back when the
-	 * combined layout would otherwise starve the board.
+	 * Resolves preferred side-panel widths like a code editor: the dragged panel
+	 * keeps the width the user set, and the center board takes the remaining
+	 * space. Clamping only happens when the viewport is too small to fit the
+	 * minimum board and side-panel widths.
 	 */
 	function resolvePanelWidths(): ResolvedPanelWidths {
 		const leftBase = leftCollapsed.value ? 0 : LEFT_MIN_WIDTH;
 		const rightBase = rightCollapsed.value ? COLLAPSED_RIGHT_WIDTH : RIGHT_MIN_WIDTH;
-		const leftPreferred = leftCollapsed.value ? 0 : leftWidth.value;
-		const rightPreferred = rightCollapsed.value ? COLLAPSED_RIGHT_WIDTH : rightWidth.value;
 		const shellWidth = Math.max(0, viewportWidth.value - LEFT_RAIL_WIDTH);
-		const maxPossibleCenter = Math.max(0, shellWidth - leftBase - rightBase);
-		const minCenterWidth = Math.min(MAIN_WORKSPACE_TARGET_MIN_WIDTH, maxPossibleCenter);
-		const availablePanelWidth = Math.max(leftBase + rightBase, shellWidth - minCenterWidth);
+		const maxPanelWidth = Math.max(leftBase + rightBase, shellWidth - MAIN_WORKSPACE_MIN_WIDTH);
+		let nextLeft = leftCollapsed.value ? 0 : Math.max(LEFT_MIN_WIDTH, leftWidth.value);
+		let nextRight = rightCollapsed.value ? COLLAPSED_RIGHT_WIDTH : Math.max(RIGHT_MIN_WIDTH, rightWidth.value);
+		const overflow = Math.max(0, nextLeft + nextRight - maxPanelWidth);
 
-		let nextLeft = leftPreferred;
-		let nextRight = rightPreferred;
-		const preferredTotal = nextLeft + nextRight;
-
-		if (preferredTotal <= availablePanelWidth) {
-			return { left: nextLeft, right: nextRight };
+		if (overflow > 0 && !rightCollapsed.value) {
+			const trim = Math.min(overflow, Math.max(0, nextRight - rightBase));
+			nextRight -= trim;
 		}
 
-		const overflow = preferredTotal - availablePanelWidth;
-		const leftFlex = Math.max(0, nextLeft - leftBase);
-		const rightFlex = Math.max(0, nextRight - rightBase);
-		const totalFlex = leftFlex + rightFlex;
-
-		if (totalFlex <= 0) {
-			return { left: leftBase, right: rightBase };
-		}
-
-		const leftShare = overflow * (leftFlex / totalFlex);
-		const rightShare = overflow * (rightFlex / totalFlex);
-
-		nextLeft = Math.max(leftBase, nextLeft - leftShare);
-		nextRight = Math.max(rightBase, nextRight - rightShare);
-
-		const remainingOverflow = Math.max(0, (nextLeft + nextRight) - availablePanelWidth);
-		if (remainingOverflow > 0) {
-			const rightSpare = Math.max(0, nextRight - rightBase);
-			const rightTrim = Math.min(rightSpare, remainingOverflow);
-			nextRight -= rightTrim;
-			nextLeft = Math.max(leftBase, nextLeft - Math.max(0, remainingOverflow - rightTrim));
+		const remainingOverflow = Math.max(0, nextLeft + nextRight - maxPanelWidth);
+		if (remainingOverflow > 0 && !leftCollapsed.value) {
+			const trim = Math.min(remainingOverflow, Math.max(0, nextLeft - leftBase));
+			nextLeft -= trim;
 		}
 
 		return {

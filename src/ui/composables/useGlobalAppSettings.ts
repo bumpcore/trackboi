@@ -1,7 +1,7 @@
 import { onMounted, ref } from "vue";
 import { newId } from "@/core/id";
 import { desktop } from "@/electron/renderer";
-import type { AgentRegistration, AppSettings } from "@/core/types";
+import type { AgentRegistration, AppSettings, AppShortcuts, UserIdentity } from "@/core/types";
 
 type DetectedEditor = Awaited<ReturnType<typeof desktop.listDetectedEditors>>[number];
 
@@ -14,9 +14,23 @@ export function useGlobalAppSettings() {
 		version: 1,
 		agents: [],
 		agentContexts: [],
-		editor: {
-			preferredEditorId: "auto",
-			customCommand: "",
+		editor: { preferredEditorId: "auto", customCommand: "" },
+		userIdentity: { displayName: "", gitName: "", gitEmail: "" },
+		onboarding: { userComplete: false, firstProjectComplete: false },
+		shortcuts: {
+			leftPanel: "Ctrl+B",
+			rightPanel: "Ctrl+Shift+X",
+			commandCenterNavigate: "Ctrl+P",
+			commandCenterCommand: "Ctrl+Shift+P",
+			openSettings: "Ctrl+,",
+			addProject: "Ctrl+O",
+			newCard: "Ctrl+N",
+			newTrack: "Ctrl+Shift+N",
+			nextProject: "Ctrl+PageDown",
+			previousProject: "Ctrl+PageUp",
+			projectSettings: "Ctrl+Alt+,",
+			boardSettings: "Ctrl+Alt+B",
+			focusBoard: "Ctrl+Alt+0",
 		},
 	});
 	const detectedEditors = ref<DetectedEditor[]>([]);
@@ -86,6 +100,34 @@ export function useGlobalAppSettings() {
 		});
 	}
 
+	async function updateUserIdentity(userIdentity: UserIdentity) {
+		await save({
+			...appSettings.value,
+			userIdentity,
+			onboarding: {
+				...appSettings.value.onboarding,
+				userComplete: true,
+			},
+		});
+	}
+
+	async function updateShortcuts(shortcuts: AppShortcuts) {
+		await save({
+			...appSettings.value,
+			shortcuts,
+		});
+	}
+
+	async function completeFirstProjectOnboarding() {
+		await save({
+			...appSettings.value,
+			onboarding: {
+				...appSettings.value.onboarding,
+				firstProjectComplete: true,
+			},
+		});
+	}
+
 	onMounted(() => {
 		void refresh();
 	});
@@ -99,5 +141,8 @@ export function useGlobalAppSettings() {
 		updateAgent,
 		removeAgent,
 		updateEditorPreference,
+		updateUserIdentity,
+		updateShortcuts,
+		completeFirstProjectOnboarding,
 	};
 }

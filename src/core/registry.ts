@@ -1,8 +1,9 @@
 import os from "node:os";
 import path from "node:path";
 import { STORAGE_SEARCH_PATHS } from "./constants";
+import { existsSync } from "node:fs";
 import { readJson, writeJsonAtomic } from "./json";
-import type { AgentContext, AgentRegistration, AppSettings, EditorPreference, Project, ProjectRegistry } from "./types";
+import type { AgentContext, AgentRegistration, AppSettings, AppShortcuts, EditorPreference, OnboardingState, Project, ProjectRegistry, UserIdentity } from "./types";
 
 const LEGACY_ETC_FIRST_STORAGE_SEARCH_PATHS = [".etc/.trackboi", ".etc/trackboi", ".trackboi"];
 
@@ -17,6 +18,10 @@ export type RegistryStore = {
 };
 
 export function defaultConfigDir(): string {
+	return path.join(os.homedir(), ".trackboi");
+}
+
+export function legacyConfigDir(): string {
 	if (process.platform === "darwin") return path.join(os.homedir(), "Library", "Application Support", "trackboi");
 	if (process.platform === "win32") {
 		return path.join(process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming"), "trackboi");
@@ -33,11 +38,19 @@ export function defaultConfigDir(): string {
  */
 export function createRegistryStore(options: RegistryOptions = {}): RegistryStore {
 	const configPath = options.configPath ?? path.join(defaultConfigDir(), "config.json");
+	const fallbackConfigPath = options.configPath ? null : path.join(legacyConfigDir(), "config.json");
 
 	function readRegistry(): ProjectRegistry {
 		try {
 			return sanitizeRegistry(readJson<ProjectRegistry>(configPath));
 		} catch {
+			if (fallbackConfigPath && fallbackConfigPath !== configPath && existsSync(fallbackConfigPath)) {
+				try {
+					return sanitizeRegistry(readJson<ProjectRegistry>(fallbackConfigPath));
+				} catch {
+					return defaultRegistry();
+				}
+			}
 			return defaultRegistry();
 		}
 	}
@@ -69,6 +82,9 @@ export function defaultAppSettings(): AppSettings {
 		agents: [],
 		agentContexts: [],
 		editor: defaultEditorPreference(),
+		userIdentity: defaultUserIdentity(),
+		onboarding: defaultOnboardingState(),
+		shortcuts: defaultAppShortcuts(),
 	};
 }
 
@@ -76,6 +92,39 @@ export function defaultEditorPreference(): EditorPreference {
 	return {
 		preferredEditorId: "auto",
 		customCommand: "",
+	};
+}
+
+export function defaultUserIdentity(): UserIdentity {
+	return {
+		displayName: "",
+		gitName: "",
+		gitEmail: "",
+	};
+}
+
+export function defaultOnboardingState(): OnboardingState {
+	return {
+		userComplete: false,
+		firstProjectComplete: false,
+	};
+}
+
+export function defaultAppShortcuts(): AppShortcuts {
+	return {
+		leftPanel: "Ctrl+B",
+		rightPanel: "Ctrl+Shift+X",
+		commandCenterNavigate: "Ctrl+P",
+		commandCenterCommand: "Ctrl+Shift+P",
+		openSettings: "Ctrl+,",
+		addProject: "Ctrl+O",
+		newCard: "Ctrl+N",
+		newTrack: "Ctrl+Shift+N",
+		nextProject: "Ctrl+PageDown",
+		previousProject: "Ctrl+PageUp",
+		projectSettings: "Ctrl+Alt+,",
+		boardSettings: "Ctrl+Alt+B",
+		focusBoard: "Ctrl+Alt+0",
 	};
 }
 
@@ -138,6 +187,9 @@ function sanitizeAppSettings(value: Partial<AppSettings> | undefined): AppSettin
 		agents: Array.isArray(value?.agents) ? value.agents.filter(isValidAgentRegistration) : [],
 		agentContexts: Array.isArray(value?.agentContexts) ? value.agentContexts.filter(isValidAgentContext) : [],
 		editor: sanitizeEditorPreference(value?.editor),
+		userIdentity: sanitizeUserIdentity(value?.userIdentity),
+		onboarding: sanitizeOnboardingState(value?.onboarding),
+		shortcuts: sanitizeAppShortcuts(value?.shortcuts),
 	};
 }
 
@@ -148,6 +200,44 @@ function sanitizeEditorPreference(value: Partial<EditorPreference> | undefined):
 			: "auto",
 		customCommand: typeof value?.customCommand === "string" ? value.customCommand : "",
 	};
+}
+
+function sanitizeUserIdentity(value: Partial<UserIdentity> | undefined): UserIdentity {
+	return {
+		displayName: typeof value?.displayName === "string" ? value.displayName.trim() : "",
+		gitName: typeof value?.gitName === "string" ? value.gitName.trim() : "",
+		gitEmail: typeof value?.gitEmail === "string" ? value.gitEmail.trim() : "",
+	};
+}
+
+function sanitizeOnboardingState(value: Partial<OnboardingState> | undefined): OnboardingState {
+	return {
+		userComplete: typeof value?.userComplete === "boolean" ? value.userComplete : false,
+		firstProjectComplete: typeof value?.firstProjectComplete === "boolean" ? value.firstProjectComplete : false,
+	};
+}
+
+function sanitizeAppShortcuts(value: Partial<AppShortcuts> | undefined): AppShortcuts {
+	const defaults = defaultAppShortcuts();
+	return {
+		leftPanel: sanitizeShortcutValue(value?.leftPanel, defaults.leftPanel),
+		rightPanel: sanitizeShortcutValue(value?.rightPanel, defaults.rightPanel),
+		commandCenterNavigate: sanitizeShortcutValue(value?.commandCenterNavigate, defaults.commandCenterNavigate),
+		commandCenterCommand: sanitizeShortcutValue(value?.commandCenterCommand, defaults.commandCenterCommand),
+		openSettings: sanitizeShortcutValue(value?.openSettings, defaults.openSettings),
+		addProject: sanitizeShortcutValue(value?.addProject, defaults.addProject),
+		newCard: sanitizeShortcutValue(value?.newCard, defaults.newCard),
+		newTrack: sanitizeShortcutValue(value?.newTrack, defaults.newTrack),
+		nextProject: sanitizeShortcutValue(value?.nextProject, defaults.nextProject),
+		previousProject: sanitizeShortcutValue(value?.previousProject, defaults.previousProject),
+		projectSettings: sanitizeShortcutValue(value?.projectSettings, defaults.projectSettings),
+		boardSettings: sanitizeShortcutValue(value?.boardSettings, defaults.boardSettings),
+		focusBoard: sanitizeShortcutValue(value?.focusBoard, defaults.focusBoard),
+	};
+}
+
+function sanitizeShortcutValue(value: unknown, fallback: string): string {
+	return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
 function isValidAgentRegistration(agent: unknown): agent is AgentRegistration {

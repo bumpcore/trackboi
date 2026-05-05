@@ -183,7 +183,8 @@ body.trackboi-resizing * {
 	justify-content: center;
 	border-radius: 0.125rem;
 	border: 1px solid transparent;
-	color: hsl(var(--muted-foreground));
+	background: color-mix(in srgb, var(--project-color, hsl(var(--secondary))) 18%, transparent);
+	color: var(--project-color, hsl(var(--muted-foreground)));
 	transition:
 		border-color 120ms ease,
 		background-color 120ms ease,
@@ -192,14 +193,14 @@ body.trackboi-resizing * {
 
 .shell-rail-button:hover {
 	border-color: hsl(var(--border) / 0.9);
-	background: hsl(var(--secondary) / 0.92);
+	background: color-mix(in srgb, var(--project-color, hsl(var(--secondary))) 28%, hsl(var(--secondary)) 72%);
 	color: hsl(var(--foreground));
 }
 
 .shell-rail-button.is-active {
-	border-color: hsl(var(--primary) / 0.34);
-	background: hsl(var(--primary) / 0.1);
-	color: hsl(var(--primary));
+	border-color: var(--project-color, hsl(var(--primary)));
+	background: var(--project-color, hsl(var(--primary)));
+	color: var(--project-fg, hsl(var(--primary-foreground)));
 }
 
 .shell-sidebar-item {
@@ -574,7 +575,7 @@ body.trackboi-resizing * {
 }
 
 .card-ghost {
-	opacity: 0.92;
+	opacity: 1;
 	transform: scale(0.992);
 	border-color: hsl(var(--primary) / 0.55);
 	background: hsl(var(--primary) / 0.1);
@@ -589,9 +590,15 @@ body.trackboi-resizing * {
 
 .card-dragging {
 	cursor: grabbing;
-	opacity: 0.18;
+	opacity: 0.34;
 	transform: scale(0.985);
 	box-shadow: none;
+}
+
+.card-ghost .board-card-badges,
+.card-dragging .board-card-badges,
+.card-fallback .board-card-badges {
+	visibility: visible;
 }
 
 .card-fallback {

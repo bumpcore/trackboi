@@ -194,9 +194,12 @@ function initialStoragePath(project: Project, registry: ProjectRegistry): string
 	const candidates = storageCandidates(registry, project);
 	if (
 		JSON.stringify(candidates) === JSON.stringify(STORAGE_SEARCH_PATHS) &&
-		existsSync(path.join(project.path, ".etc"))
+		(
+			storageExists(storageRoot(project.path, ".etc/.trackboi")) ||
+			storageExists(storageRoot(project.path, ".etc/trackboi"))
+		)
 	) {
-		return ".etc/.trackboi";
+		return storageExists(storageRoot(project.path, ".etc/.trackboi")) ? ".etc/.trackboi" : ".etc/trackboi";
 	}
 	return candidates[0] ?? STORAGE_SEARCH_PATHS[0];
 }

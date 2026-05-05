@@ -52,7 +52,7 @@ onBeforeUnmount(() => {
 							Create another board inside the current project.
 						</p>
 					</div>
-					<Button variant="ghost" size="icon" type="button" title="Close" aria-label="Close" @click="emit('close')">
+					<Button variant="ghost" size="icon" type="button" class="rounded-[2px]" title="Close" aria-label="Close" @click="emit('close')">
 						<X class="h-4 w-4" />
 					</Button>
 				</header>

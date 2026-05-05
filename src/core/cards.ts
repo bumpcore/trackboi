@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { writeFrontmatter } from "./frontmatter";
 import { normalizeScope } from "./git";
-import { newId } from "./id";
+import { newId, newSlugId } from "./id";
 import { cardCommentPath, cardCommentsPath, cardPath } from "./paths";
 import { rankBetween } from "./rank";
 import { deleteCardFile, now, readCards, type ProjectStore } from "./storage";
@@ -27,7 +27,7 @@ export function createCardInStore(
 		.sort((left, right) => left.rank.localeCompare(right.rank));
 	const timestamp = now();
 	const card: Card = {
-		id: newId("card"),
+		id: newSlugId("card", title),
 		boardId: input.boardId ?? snapshot.board.id,
 		title,
 		description: input.description?.trim() ?? "",

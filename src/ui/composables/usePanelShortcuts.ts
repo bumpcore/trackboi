@@ -7,6 +7,7 @@ type PanelShortcutOptions = {
 	rightShortcut: Ref<string>;
 	toggleLeftPanel: () => void;
 	toggleRightPanel: () => void;
+	shortcuts?: Array<{ shortcut: Ref<string>; run: () => void | Promise<void> }>;
 };
 
 /**
@@ -26,6 +27,14 @@ export function usePanelShortcuts(options: PanelShortcutOptions) {
 		if (matchesShortcut(event, options.rightShortcut.value)) {
 			event.preventDefault();
 			options.toggleRightPanel();
+			return;
+		}
+
+		for (const binding of options.shortcuts ?? []) {
+			if (!matchesShortcut(event, binding.shortcut.value)) continue;
+			event.preventDefault();
+			void Promise.resolve(binding.run());
+			return;
 		}
 	}
 

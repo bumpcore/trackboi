@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { CircleHelp, Plus, Settings } from "lucide-vue-next";
+import { Plus, Settings } from "lucide-vue-next";
+import packageJson from "../../../package.json";
 import Button from "@/ui/components/Button.vue";
 import Tooltip from "@/ui/components/Tooltip.vue";
 import type { ProjectEntry } from "@/core/types";
@@ -19,6 +20,7 @@ const emit = defineEmits<{
 }>();
 
 const railProjects = computed(() => props.projects.slice(0, 6));
+const versionLabel = computed(() => import.meta.env.DEV ? "dev" : `v${packageJson.version}`);
 
 function projectMonogram(name: string) {
 	return name
@@ -46,7 +48,7 @@ function projectMonogram(name: string) {
 						type="button"
 						class="shell-rail-button text-[10px] font-medium"
 						:class="{ 'is-active': activeProjectPath === project.projectPath }"
-						:style="activeProjectPath === project.projectPath ? projectColorStyle(project) : undefined"
+						:style="projectColorStyle(project)"
 						:data-testid="`workspace-${project.projectPath}`"
 						@click="emit('switchProject', project.projectPath)"
 					>
@@ -69,10 +71,13 @@ function projectMonogram(name: string) {
 			<div class="my-1 h-px w-5 bg-border/80" />
 
 			<div class="mt-auto flex flex-col gap-2">
-				<Tooltip content="Help" side="right">
-					<Button variant="ghost" size="icon" type="button">
-						<CircleHelp class="h-4 w-4" />
-					</Button>
+				<Tooltip :content="`trackboi ${versionLabel}`" side="right">
+					<div
+						class="trackboi-mono-font select-none text-[10px] font-semibold uppercase tracking-normal text-muted-foreground"
+						data-testid="app-version-indicator"
+					>
+						{{ versionLabel }}
+					</div>
 				</Tooltip>
 				<Tooltip content="Settings" side="right">
 					<Button variant="ghost" size="icon" type="button" data-testid="app-settings-button" @click="emit('settings')">

@@ -10,7 +10,7 @@ export type LeftPanelView = "explorer";
 
 export type RightPanelView = "card" | "track" | "activity" | "context" | "column";
 
-export type SettingsSection = "storage" | "appearance" | "shortcuts" | "agents" | "editor" | "project";
+export type SettingsSection = "general" | "storage" | "appearance" | "shortcuts" | "agents" | "editor" | "project" | "about";
 
 export type WorkspaceShellPrefs = {
 	leftWidth: number;

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseFrontmatter, writeFrontmatter } from "./frontmatter";
-import { newId } from "./id";
+import { newSlugId } from "./id";
 import { trackBriefPath, trackDecisionsPath, trackDirPath, trackFilePath, trackFilesPath, trackPath, trackReferencesPath, tracksPath } from "./paths";
 import { now, type ProjectStore } from "./storage";
 import type {
@@ -42,7 +42,7 @@ export function createTrackInStore(store: ProjectStore, input: CreateTrackInput)
 
 	const timestamp = now();
 	const track: Track = {
-		id: newId("track"),
+		id: newSlugId("track", title),
 		title,
 		slug: slugifyTrackTitle(title),
 		summary: input.summary?.trim() ?? "",

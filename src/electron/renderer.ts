@@ -119,6 +119,23 @@ function serializeTrackPatch(patch: TrackPatch): TrackPatch {
 }
 
 function serializeAppSettings(settings: AppSettings): AppSettings {
+	const userIdentity = settings.userIdentity ?? { displayName: "", gitName: "", gitEmail: "" };
+	const onboarding = settings.onboarding ?? { userComplete: false, firstProjectComplete: false };
+	const shortcuts = settings.shortcuts ?? {
+		leftPanel: "Ctrl+B",
+		rightPanel: "Ctrl+Shift+X",
+		commandCenterNavigate: "Ctrl+P",
+		commandCenterCommand: "Ctrl+Shift+P",
+		openSettings: "Ctrl+,",
+		addProject: "Ctrl+O",
+		newCard: "Ctrl+N",
+		newTrack: "Ctrl+Shift+N",
+		nextProject: "Ctrl+PageDown",
+		previousProject: "Ctrl+PageUp",
+		projectSettings: "Ctrl+Alt+,",
+		boardSettings: "Ctrl+Alt+B",
+		focusBoard: "Ctrl+Alt+0",
+	};
 	return {
 		version: settings.version,
 		agents: settings.agents.map((agent) => ({
@@ -136,6 +153,16 @@ function serializeAppSettings(settings: AppSettings): AppSettings {
 			preferredEditorId: settings.editor.preferredEditorId,
 			customCommand: settings.editor.customCommand,
 		},
+		userIdentity: {
+			displayName: userIdentity.displayName,
+			gitName: userIdentity.gitName,
+			gitEmail: userIdentity.gitEmail,
+		},
+		onboarding: {
+			userComplete: onboarding.userComplete,
+			firstProjectComplete: onboarding.firstProjectComplete,
+		},
+		shortcuts: { ...shortcuts },
 	};
 }
 

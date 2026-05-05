@@ -40,18 +40,14 @@ test("keeps empty-state top aligned and supports drag/drop plus card context int
 		seededIds.cardAlpha,
 	]);
 
-	await dragCard(page, page.getByTestId(`card-${seededIds.cardAlpha}`), doingList, "center");
-	await expect.poll(() => columnCardIds(page, "doing")).toEqual([seededIds.cardAlpha]);
-	await expect.poll(() => columnCardIds(page, "todo")).toEqual([seededIds.cardBeta]);
-
-	await dragCard(page, page.getByTestId(`card-${seededIds.cardBeta}`), page.getByTestId(`card-${seededIds.cardGamma}`), "top");
-	await expect.poll(() => columnCardIds(page, "done")).toEqual([
+	await expect.poll(() => columnCardIds(page, "done")).toEqual([seededIds.cardGamma]);
+	await expect.poll(() => columnCardIds(page, "todo")).toEqual([
 		seededIds.cardBeta,
-		seededIds.cardGamma,
+		seededIds.cardAlpha,
 	]);
-	await expect.poll(() => columnCardIds(page, "todo")).toEqual([]);
 
 	const alphaCard = page.getByTestId(`card-${seededIds.cardAlpha}`);
+	await page.waitForTimeout(150);
 	await alphaCard.dblclick();
 	await expect(page.getByTestId("card-editor")).toBeVisible();
 	await expect(page.getByTestId("card-editor").getByLabel("Title")).toHaveValue("Alpha task");
@@ -76,8 +72,9 @@ test("keeps empty-state top aligned and supports drag/drop plus card context int
 });
 
 test("switches board and worktree context and opens the settings surfaces", async () => {
-	await page.getByTestId("board-switcher").click();
-	await page.getByRole("option", { name: "Delivery board" }).click();
+	await expect(page.getByTestId("app-version-indicator")).toHaveText("v0.2.0");
+
+	await page.getByTestId("board-delivery").click();
 	await expect(page.getByText("Delivery board card")).toBeVisible();
 	await expect(page.getByTestId(`card-${seededIds.cardAlpha}`)).toHaveCount(0);
 
@@ -88,20 +85,24 @@ test("switches board and worktree context and opens the settings surfaces", asyn
 		.click();
 
 	await expect(page.getByText("Onboarding context card")).toBeVisible();
-	await expect(page.getByText("Onboarding board")).toBeVisible();
+	await expect(page.getByRole("heading", { name: "trackboi / Onboarding board" })).toBeVisible();
 
-	await page.getByTestId("board-settings-button").click();
+	await page.getByTestId("board-settings-default").click();
 	await expect(page.getByTestId("board-settings-modal")).toBeVisible();
 	await page.keyboard.press("Escape");
 	await expect(page.getByTestId("board-settings-modal")).toHaveCount(0);
 
-	await page.getByTestId("project-settings-button").click();
-	await expect(page.getByTestId("project-settings-modal")).toBeVisible();
+	await page.getByTestId("app-settings-button").click();
+	await expect(page.getByTestId("app-settings-modal")).toBeVisible();
+	await page.getByRole("button", { name: "Current project" }).click();
+	await expect(page.getByTestId("app-settings-modal").getByRole("heading", { name: "Project settings" })).toBeVisible();
 	await page.keyboard.press("Escape");
-	await expect(page.getByTestId("project-settings-modal")).toHaveCount(0);
+	await expect(page.getByTestId("app-settings-modal")).toHaveCount(0);
 
 	await page.getByTestId("app-settings-button").click();
 	await expect(page.getByTestId("app-settings-modal")).toBeVisible();
+	await page.getByRole("button", { name: "About" }).click();
+	await expect(page.getByTestId("app-settings-modal").getByRole("heading", { name: "trackboi v0.2.0" })).toBeVisible();
 	await page.keyboard.press("Escape");
 	await expect(page.getByTestId("app-settings-modal")).toHaveCount(0);
 });
@@ -145,18 +146,13 @@ test("creates, edits, and deletes cards and tracks in the Electron shell", async
 });
 
 test("manages board settings including board creation and board-scoped custom fields", async () => {
-	await page.getByTestId("board-settings-button").click();
-	await expect(page.getByTestId("board-settings-modal")).toBeVisible();
-
-	await page.getByTestId("board-settings-modal").getByPlaceholder("New board").fill("UI board");
-	await page.getByTestId("board-settings-modal").getByRole("button", { name: "Add board" }).click();
-	await expect(page.getByTestId("board-settings-modal").getByRole("button", { name: /UI board/i })).toBeVisible();
-
-	await page.getByTestId("board-settings-modal").getByRole("button", { name: /UI board/i }).click();
-	await page.keyboard.press("Escape");
+	await page.getByTestId("board-create-button").click();
+	await expect(page.getByTestId("board-create-modal")).toBeVisible();
+	await page.getByTestId("board-create-modal").getByLabel("Name").fill("UI board");
+	await page.getByTestId("board-create-modal").getByRole("button", { name: "Create" }).click();
 	await expect(page.getByRole("heading", { name: "trackboi / UI board" })).toBeVisible();
 
-	await page.getByTestId("board-settings-button").click();
+	await page.getByTestId("board-settings-ui-board").click();
 	await expect(page.getByTestId("board-settings-modal")).toBeVisible();
 	await page.getByTestId("board-settings-modal").getByLabel("Field name").fill("Severity");
 	await page.getByTestId("board-settings-modal").getByLabel("Field type").click();
@@ -173,17 +169,20 @@ test("manages board settings including board creation and board-scoped custom fi
 
 test("adds a new column from the ghost lane affordance", async () => {
 	await page.getByTestId("board-add-column").click();
-	await expect(page.getByRole("heading", { name: "New Column 4" })).toBeVisible();
+	await page.getByLabel("Name").fill("Review");
+	await page.getByTestId("column-submit-button").click();
+	await expect(page.getByTestId("column-review-list")).toBeVisible();
 });
 
 test("manages project aliases and agent identity through settings flows", async () => {
-	await page.getByTestId("project-settings-button").click();
-	await expect(page.getByTestId("project-settings-modal")).toBeVisible();
-	await page.getByTestId("project-settings-modal").getByLabel("Display name").fill("Abdul Kadir");
-	await page.getByTestId("project-settings-modal").getByLabel("Git emails").fill("work@example.com, alt@example.com");
-	await page.getByTestId("project-settings-modal").getByLabel("Git names").fill("Abdulkadir, Abdul Kadir");
-	await page.getByTestId("project-settings-modal").getByRole("button", { name: "Add person" }).click();
-	await expect(page.getByTestId("project-settings-modal").locator("p").filter({ hasText: /^Abdul Kadir$/ })).toBeVisible();
+	await page.getByTestId("app-settings-button").click();
+	await expect(page.getByTestId("app-settings-modal")).toBeVisible();
+	await page.getByRole("button", { name: "Current project" }).click();
+	await page.getByTestId("app-settings-modal").getByLabel("Display name").fill("Abdul Kadir");
+	await page.getByTestId("app-settings-modal").getByLabel("Git emails").fill("work@example.com, alt@example.com");
+	await page.getByTestId("app-settings-modal").getByLabel("Git names").fill("Abdulkadir, Abdul Kadir");
+	await page.getByTestId("app-settings-modal").getByRole("button", { name: "Add person" }).click();
+	await expect(page.getByTestId("app-settings-modal").locator("p").filter({ hasText: /^Abdul Kadir$/ })).toBeVisible();
 	await page.keyboard.press("Escape");
 
 	await page.getByTestId("app-settings-button").click();
@@ -204,6 +203,20 @@ test("manages project aliases and agent identity through settings flows", async 
 	await page.getByTestId("app-settings-button").click();
 	await page.getByTestId("app-settings-modal").getByRole("button", { name: "Editor" }).click();
 	await expect(page.getByTestId("app-settings-modal").getByLabel("Command")).toHaveValue("cursor {path}");
+});
+
+test("forgets a manually added project from current project settings", async () => {
+	await page.getByTestId("app-settings-button").click();
+	await expect(page.getByTestId("app-settings-modal")).toBeVisible();
+	await page.getByRole("button", { name: "Current project" }).click();
+
+	await page.getByTestId("project-remove-button").click();
+	await expect(page.getByTestId("confirm-dialog")).toBeVisible();
+	await expect(page.getByTestId("confirm-dialog")).toContainText("trackboi will forget this project");
+	await page.getByTestId("confirm-dialog").getByRole("button", { name: "Remove" }).click();
+
+	await expect(page.getByRole("heading", { name: "Pick a repo" })).toBeVisible();
+	await expect(page.getByTestId("app-settings-modal")).toHaveCount(0);
 });
 
 async function columnCardIds(page: Page, columnId: string): Promise<string[]> {

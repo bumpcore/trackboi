@@ -626,7 +626,7 @@ const commandCenterItems = computed<CommandCenterItem[]>(() => {
 			kind: "command",
 			section: "Window",
 			title: "Minimize window",
-			subtitle: "Send Trackboi to the taskbar or dock",
+			subtitle: "Send trackboi to the taskbar or dock",
 			keywords: ["window", "minimize"],
 			icon: "minimizeWindow",
 			run: minimizeWindow,
@@ -808,7 +808,7 @@ onBeforeUnmount(() => {
 		/>
 
 		<WorkspaceTitleBar
-			:project-name="activeProject?.name ?? snapshot?.project.name ?? 'Trackboi'"
+			:project-name="activeProject?.name ?? snapshot?.project.name ?? 'trackboi'"
 			:branch-label="gitBranchLabel"
 			@drag="startTitlebarDrag"
 			@toggle-maximize="handleTitlebarDoubleClick"

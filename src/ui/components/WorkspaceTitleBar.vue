@@ -24,8 +24,8 @@ const emit = defineEmits<{
 			@dblclick="emit('toggleMaximize', $event)"
 			@pointerdown="emit('drag', $event)"
 		>
-			<img :src="trackboiLogoUrl" alt="Trackboi" class="h-4 w-4 shrink-0" />
-			<span class="rounded-[2px] bg-secondary/88 px-1.5 py-0.5 text-foreground">Trackboi</span>
+			<img :src="trackboiLogoUrl" alt="trackboi" class="h-4 w-4 shrink-0" />
+			<span class="rounded-[2px] bg-secondary/88 px-1.5 py-0.5 text-foreground">trackboi</span>
 			<span>/</span>
 			<span class="truncate text-foreground">{{ projectName }}</span>
 			<span

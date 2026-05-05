@@ -1,8 +1,8 @@
 # Source Boundaries
 
-Trackboi keeps the product source boundaries intentionally small:
+trackboi keeps the product source boundaries intentionally small:
 
-- `core`: product APIs and shared models. Projects, cards, boards, storage, git/source discovery, and the rules Trackboi knows.
+- `core`: product APIs and shared models. Projects, cards, boards, storage, git/source discovery, and the rules trackboi knows.
   Internal hierarchy:
   - `types.ts` is the domain model source of truth
   - `actions.ts` is the public nodefs-facing facade
@@ -15,7 +15,7 @@ Trackboi keeps the product source boundaries intentionally small:
 - `electron`: desktop shell glue only. Window creation, preload IPC, dialogs, watcher forwarding, and renderer adapters.
   Internal hierarchy:
   - `main.ts` assembles startup
-  - `main/` holds watcher, window, and Trackboi IPC registration helpers
+  - `main/` holds watcher, window, and trackboi IPC registration helpers
   - `bridge.ts`, `trackboi.ts`, and `window.ts` define renderer-facing transports
 - `ui`: Vue desktop interface and local UI primitives.
   Internal hierarchy:
@@ -27,7 +27,7 @@ Business logic should not leak into `electron` or `ui`. Those layers call `core`
 
 ## Product Model
 
-Trackboi's working hierarchy is:
+trackboi's working hierarchy is:
 
 - `Workspace`: a user-registered repo/folder
 - `Worktree`: a discovered workspace variant with its own filesystem-backed state

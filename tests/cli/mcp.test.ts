@@ -222,7 +222,7 @@ describe("mcp agent tool surface", () => {
 		registerBoardTools(server, trackboi, context);
 
 		const guide = tools.get("get_agent_guide");
-		expect(guide?.description).toContain("recommended Trackboi MCP workflow");
+		expect(guide?.description).toContain("recommended trackboi MCP workflow");
 		const result = await guide?.handler({});
 		if (!result) throw new Error("Missing get_agent_guide result");
 		const payload = parseJsonToolResult(result);

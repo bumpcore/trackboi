@@ -1,17 +1,17 @@
-# Trackboi Agent Guide
+# trackboi Agent Guide
 
-Trackboi is organized around a small set of hard boundaries:
+trackboi is organized around a small set of hard boundaries:
 
-- `core`: product rules, storage, snapshot aggregation, and the public Trackboi actions/runtime APIs.
+- `core`: product rules, storage, snapshot aggregation, and the public trackboi actions/runtime APIs.
 - `electron`: shell glue, bridge contracts, IPC wiring, watcher forwarding, and desktop-specific adapters only.
 - `ui`: Vue components, workflow composables, view-model derivation, and presentation helpers.
 - `cli`: command orchestration and MCP transport over the same core actions used by desktop.
 
 If a change makes those boundaries blur, stop and reshape it before adding more code.
 
-## Trackboi Skill
+## trackboi Skill
 
-Agents working in this repository should load `.agents/skills/trackboi/SKILL.md` when work is non-trivial, stateful, or useful to track beyond the current chat. Use Trackboi MCP tools when available to orient, choose the active project/worktree/board, update cards, and leave handoff notes.
+Agents working in this repository should load `.agents/skills/trackboi/SKILL.md` when work is non-trivial, stateful, or useful to track beyond the current chat. Use trackboi MCP tools when available to orient, choose the active project/worktree/board, update cards, and leave handoff notes.
 
 ## Product Terms
 

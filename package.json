@@ -8,7 +8,7 @@
 	},
 	"description": "A local-first Kanban desktop app with an MCP server.",
 	"author": {
-		"name": "Trackboi",
+		"name": "BumpCore",
 		"email": "noreply@trackboi.local"
 	},
 	"scripts": {
@@ -29,7 +29,7 @@
 	},
 	"build": {
 		"appId": "dev.trackboi.desktop",
-		"productName": "Trackboi",
+		"productName": "trackboi",
 		"artifactName": "${productName}-${version}-${arch}.${ext}",
 		"directories": {
 			"output": "release",
@@ -60,7 +60,7 @@
 		},
 		"linux": {
 			"category": "Development",
-			"maintainer": "Trackboi <noreply@trackboi.local>",
+			"maintainer": "BumpCore <noreply@trackboi.local>",
 			"executableName": "trackboi",
 			"icon": "build/icons",
 			"target": [

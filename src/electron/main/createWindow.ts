@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 
 /**
- * Creates the frameless desktop shell window used by Trackboi in both dev and
+ * Creates the frameless desktop shell window used by trackboi in both dev and
  * packaged desktop builds.
  */
 export function createAppWindow(): BrowserWindow {
@@ -14,7 +14,7 @@ export function createAppWindow(): BrowserWindow {
 		minWidth: 760,
 		minHeight: 480,
 		frame: false,
-		title: "Trackboi",
+		title: "trackboi",
 		backgroundColor: "#090909",
 		...(iconPath ? { icon: iconPath } : {}),
 		webPreferences: {

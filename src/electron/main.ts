@@ -10,7 +10,7 @@ import { registerWindowIpcHandlers } from "./main/windowIpc";
 import { ipcChannels } from "./ipc";
 import type { DesktopState, ProjectView } from "../core";
 
-app.setName("Trackboi");
+app.setName("trackboi");
 
 let mainWindow: BrowserWindow | null = null;
 let latestDesktopState: DesktopState | null = null;

@@ -73,7 +73,7 @@ function clearTrackSelection() {
 }
 
 function projectInitial(name: string | undefined) {
-	return (name ?? "Trackboi").slice(0, 1).toUpperCase();
+	return (name ?? "trackboi").slice(0, 1).toUpperCase();
 }
 
 function workspaceFileLabel(filePath: string) {
@@ -207,7 +207,7 @@ function workspaceFileLabel(filePath: string) {
 					<div class="min-w-0">
 						<h2 class="text-xl font-semibold">Project folder is missing</h2>
 						<p class="mt-2 text-sm text-muted-foreground">
-							Trackboi kept the entry so you can point it at the folder again or remove it from the rail.
+							trackboi kept the entry so you can point it at the folder again or remove it from the rail.
 						</p>
 						<p class="mt-3 truncate rounded-[2px] border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
 							{{ activeProject.path }}
@@ -219,7 +219,7 @@ function workspaceFileLabel(filePath: string) {
 						Locate folder
 					</Button>
 					<Button variant="outline" type="button" :disabled="busy" @click="$emit('removeProject', activeProject.projectPath)">
-						Remove from Trackboi
+						Remove from trackboi
 					</Button>
 				</div>
 				<p v-else class="text-sm text-muted-foreground">
@@ -231,7 +231,7 @@ function workspaceFileLabel(filePath: string) {
 				<div>
 					<h2 class="text-xl font-semibold">{{ hasProjects ? "Pick a project" : "Pick a repo" }}</h2>
 					<p class="mt-2 text-sm text-muted-foreground">
-						Trackboi will create a `.trackboi` folder with a starter board.
+						trackboi will create a `.trackboi` folder with a starter board.
 					</p>
 				</div>
 				<Button class="w-fit" type="button" :disabled="busy" @click="$emit('chooseProject')">

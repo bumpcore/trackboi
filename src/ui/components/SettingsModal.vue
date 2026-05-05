@@ -59,11 +59,11 @@ watch(
 );
 
 const sectionMeta: Record<SettingsSection, { group: string; title: string; description: string }> = {
-	storage:    { group: "App",       title: "Storage paths",      description: "Trackboi checks these paths in order and opens the first store it finds. Earlier entries take priority over later ones." },
-	appearance: { group: "App",       title: "Appearance",         description: "Control how Trackboi looks across the desktop shell and editing surfaces." },
+	storage:    { group: "App",       title: "Storage paths",      description: "trackboi checks these paths in order and opens the first store it finds. Earlier entries take priority over later ones." },
+	appearance: { group: "App",       title: "Appearance",         description: "Control how trackboi looks across the desktop shell and editing surfaces." },
 	shortcuts:  { group: "Workspace", title: "Keyboard shortcuts", description: "Bind key combinations for the command center and side panels. Shortcuts won't fire while you're typing inside an input or editor." },
-	agents:     { group: "Workspace", title: "Agent identity",     description: "Choose the stable handle Trackboi should stamp on agent-made work, regardless of which harness or model is driving it." },
-	editor:     { group: "Workspace", title: "Code editor",        description: "Choose which editor Trackboi launches when you open a card's source file." },
+	agents:     { group: "Workspace", title: "Agent identity",     description: "Choose the stable handle trackboi should stamp on agent-made work, regardless of which harness or model is driving it." },
+	editor:     { group: "Workspace", title: "Code editor",        description: "Choose which editor trackboi launches when you open a card's source file." },
 	project:    { group: "Current project", title: "Project settings", description: "Manage people aliases and project-scoped configuration for the active worktree project." },
 };
 
@@ -138,7 +138,7 @@ onBeforeUnmount(() => {
 				<!-- Sidebar -->
 				<div class="grid content-start gap-6 border-r border-border/35 bg-background/32 p-4">
 					<div>
-						<p class="text-xs font-semibold uppercase tracking-wide text-primary">Trackboi</p>
+						<p class="text-xs font-semibold uppercase tracking-wide text-primary">trackboi</p>
 						<h2 class="mt-1 text-lg font-semibold tracking-tight">Settings</h2>
 					</div>
 
@@ -434,7 +434,7 @@ onBeforeUnmount(() => {
 							<div>
 								<h3 class="text-sm font-semibold text-foreground">Saved identities</h3>
 								<p class="mt-1 text-sm leading-6 text-muted-foreground">
-									This is the name of your agent in Trackboi. When it touches a project, Trackboi records the identity in that project's metadata so future changes still read as the same actor.
+									This is the name of your agent in trackboi. When it touches a project, trackboi records the identity in that project's metadata so future changes still read as the same actor.
 								</p>
 							</div>
 

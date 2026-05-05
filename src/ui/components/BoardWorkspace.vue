@@ -130,7 +130,7 @@ onBeforeUnmount(() => {
 				<div class="min-w-0 flex-1">
 					<div class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Board</div>
 					<h1 class="truncate text-[22px] font-semibold tracking-tight text-foreground">
-						{{ activeProject?.name ?? snapshot?.project.name ?? "Trackboi" }} / {{ snapshot?.board.name ?? "Delivery" }}
+						{{ activeProject?.name ?? snapshot?.project.name ?? "trackboi" }} / {{ snapshot?.board.name ?? "Delivery" }}
 					</h1>
 					<p class="mt-2 truncate trackboi-mono-font text-[11px] text-muted-foreground">
 						{{ boardSubtitle }}
@@ -168,7 +168,7 @@ onBeforeUnmount(() => {
 				<div>
 					<h2 class="text-xl font-semibold">{{ hasProjects ? "Pick a project" : "Pick a repo" }}</h2>
 					<p class="mt-2 text-sm text-muted-foreground">
-						Trackboi will create a `.trackboi` folder with a starter board.
+						trackboi will create a `.trackboi` folder with a starter board.
 					</p>
 				</div>
 				<div class="flex gap-2">

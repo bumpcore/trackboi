@@ -15,7 +15,7 @@ export function readJson<T>(filePath: string): T {
  * Writes JSON through a sibling temp file and rename.
  *
  * Rename is atomic on the same filesystem, which prevents half-written card or
- * board files when Trackboi is interrupted mid-write.
+ * board files when trackboi is interrupted mid-write.
  */
 export function writeJsonAtomic<T>(filePath: string, value: T): void {
 	mkdirSync(dirname(filePath), { recursive: true });

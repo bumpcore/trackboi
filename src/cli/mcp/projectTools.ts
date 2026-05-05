@@ -31,7 +31,7 @@ function normalizeFieldOptions(type: FieldType, options?: string[]): string[] | 
 export function registerProjectTools(server: McpServer, trackboi: NodeFsTrackboiActions, context: McpProjectContext): void {
 	server.registerTool("get_agent_guide", {
 		title: "Get agent guide",
-		description: "Return the recommended Trackboi MCP workflow for agents: orient, choose context, mutate safely, and leave useful progress notes.",
+		description: "Return the recommended trackboi MCP workflow for agents: orient, choose context, mutate safely, and leave useful progress notes.",
 	}, () => toolResult(async () => ({
 		workflow: [
 			"Call get_active_context first to see your isolated project, worktree, board, and active agent identity.",

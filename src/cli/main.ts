@@ -11,7 +11,7 @@ export function findCliArgs(argv: string[]): string[] {
 }
 
 /**
- * Runs command-line Trackboi commands without opening the desktop window.
+ * Runs command-line trackboi commands without opening the desktop window.
  *
  * The MCP server will enter here too, which keeps agent and human CLI commands
  * on the same shared core as the desktop app.
@@ -37,10 +37,10 @@ export async function runCli(trackboi: NodeFsTrackboiActions, argv: string[]): P
 
 	program
 		.command("install")
-		.description("Install Trackboi agent integrations into the current project.")
+		.description("Install trackboi agent integrations into the current project.")
 		.option("--mcp", "Install a project-local .mcp.json entry for trackboi mcp.")
-		.option("--skill", "Install the Trackboi Codex skill under .agents/skills/trackboi.")
-		.option("--agents", "Install or update AGENTS.md with Trackboi guidance.")
+		.option("--skill", "Install the trackboi Codex skill under .agents/skills/trackboi.")
+		.option("--agents", "Install or update AGENTS.md with trackboi guidance.")
 		.option("--agent", "Alias for --agents.")
 		.option("--all", "Install MCP config, skill, and AGENTS.md guidance.")
 		.option("--target <path>", "Project root to install into.", process.cwd())
@@ -51,7 +51,7 @@ export async function runCli(trackboi: NodeFsTrackboiActions, argv: string[]): P
 				agents: options.agents === true || options.agent === true,
 				targetDir: options.target,
 			});
-			console.log(`Installed Trackboi integrations in ${result.targetDir}`);
+			console.log(`Installed trackboi integrations in ${result.targetDir}`);
 			for (const item of result.installed) console.log(`+ ${item}`);
 			for (const item of result.skipped) console.log(`= ${item} already configured`);
 		});

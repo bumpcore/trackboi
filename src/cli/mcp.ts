@@ -29,6 +29,6 @@ export async function runMcpServer(trackboi: NodeFsTrackboiActions): Promise<voi
 		transport.onclose = resolve;
 	});
 	await server.connect(transport);
-	console.error("Trackboi MCP server running on stdio");
+	console.error("trackboi MCP server running on stdio");
 	await closed;
 }

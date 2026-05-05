@@ -85,8 +85,4 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
-          body: |
-            Trackboi 0.1.0 is the first public release.
-
-            Trackboi is a local-first kanban app for people and agents. Project state stays on disk, close to the repo, with desktop and MCP workflows built around the same filesystem-backed data.
           files: artifacts/*

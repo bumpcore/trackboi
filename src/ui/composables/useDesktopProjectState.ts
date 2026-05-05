@@ -604,7 +604,7 @@ function createDesktopProjectState(): InternalDesktopProjectState {
 
 		confirmationRequester({
 			title: `Remove ${entry.name}?`,
-			description: "Trackboi will forget this project, but files on disk will stay where they are.",
+			description: "trackboi will forget this project, but files on disk will stay where they are.",
 			confirmLabel: "Remove",
 			destructive: true,
 			onConfirm: async () => {

@@ -1,14 +1,14 @@
-# Trackboi
+# trackboi
 
 No bullshit kanban for agents and people.
 
-Trackboi is a local-first desktop kanban app with an MCP server built in. It is 100% local and git based: your boards, cards, tracks, notes, and agent handoffs live on disk beside the work instead of disappearing into somebody else's SaaS.
+trackboi is a local-first desktop kanban app with an MCP server built in. It is 100% local and git based: your boards, cards, tracks, notes, and agent handoffs live on disk beside the work instead of disappearing into somebody else's SaaS.
 
 ## Why
 
 - Plan work with people and agents in the same place.
 - Keep task state in the repo, close to the code.
-- Use Trackboi as a desktop app, a CLI, or an MCP server for agent workflows.
+- Use trackboi as a desktop app, a CLI, or an MCP server for agent workflows.
 - Own the files. Move them, diff them, back them up, commit them.
 
 ## Install
@@ -23,7 +23,7 @@ The first public builds are unsigned, so macOS and Windows may show trust warnin
 
 ## Development
 
-Trackboi uses Bun, Vue, Electron, and electron-builder.
+trackboi uses Bun, Vue, Electron, and electron-builder.
 
 ```bash
 bun install
@@ -55,7 +55,7 @@ Run the local MCP server:
 bun run mcp
 ```
 
-Trackboi's MCP tools use the same local project state as the desktop app, so agents can create cards, update tracks, write notes, and leave handoffs without a remote service.
+trackboi's MCP tools use the same local project state as the desktop app, so agents can create cards, update tracks, write notes, and leave handoffs without a remote service.
 
 ## License
 

@@ -50,7 +50,7 @@ function selectBoardWithKeyboard(event: KeyboardEvent, boardId: string) {
 			<div class="grid content-start">
 				<section class="border-b border-border/70 px-4 py-4" data-testid="workspace-summary">
 					<div class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Workspace</div>
-					<div class="mt-1 text-sm font-medium text-foreground">{{ snapshot?.project.name ?? "Trackboi" }}</div>
+					<div class="mt-1 text-sm font-medium text-foreground">{{ snapshot?.project.name ?? "trackboi" }}</div>
 					<div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
 						<span class="inline-flex h-2 w-2 rounded-full" style="background: hsl(var(--signal-attached));" />
 						<span>MCP attached</span>

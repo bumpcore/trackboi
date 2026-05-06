@@ -1,6 +1,8 @@
-# Trackboi Product Shape
+# trackboi Product Shape
 
-Trackboi is a repo-local work context system.
+Historical note: this early product sketch predates the current track model. The current public model is boards, cards, and tracks; cards link to tracks with `trackId`. Legacy `scope` data is kept only for compatibility with older stores and is not part of the MCP tool surface.
+
+trackboi is a repo-local work context system.
 
 The first surface is a Kanban board, but the product is not only Kanban. Trackboi should help humans and agents keep track of tasks, scoped branch work, decisions, memory, and handoff context inside a repository.
 

@@ -10,16 +10,6 @@ export const projectPathSchema = z.string().optional().describe("Project path. D
 export const boardIdSchema = z.string().optional().describe("Board id. Defaults to the agent's active board for that project.");
 export const columnSchema = z.string().min(1).describe("Board column id.");
 export const cardIdSchema = z.string().min(1).describe("Card id.");
-export const scopeSchema = z.discriminatedUnion("kind", [
-	z.object({
-		kind: z.literal("project"),
-		ref: z.literal("global"),
-	}),
-	z.object({
-		kind: z.literal("track"),
-		ref: z.string().min(1),
-	}),
-]);
 
 /**
  * Wraps MCP tool handlers so successful values are serialized consistently and

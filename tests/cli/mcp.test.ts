@@ -12,17 +12,19 @@ type CapturedTool = {
 	name: string;
 	title?: string;
 	description?: string;
+	inputSchema?: Record<string, unknown>;
 	handler: CapturedToolHandler;
 };
 
 function createToolCapture() {
 	const tools = new Map<string, CapturedTool>();
 	const server = {
-		registerTool(name: string, config: { title?: string; description?: string }, handler: CapturedToolHandler) {
+		registerTool(name: string, config: { title?: string; description?: string; inputSchema?: Record<string, unknown> }, handler: CapturedToolHandler) {
 			tools.set(name, {
 				name,
 				title: config.title,
 				description: config.description,
+				inputSchema: config.inputSchema,
 				handler,
 			});
 		},
@@ -269,6 +271,23 @@ describe("mcp agent tool surface", () => {
 		]) {
 			if (!tools.has(toolName)) throw new Error(`Missing MCP parity tool: ${toolName}`);
 		}
+	});
+
+	test("card tools expose trackId instead of legacy scope", async () => {
+		const trackboi = createTrackboiActions();
+		const context = await createMcpProjectContext(trackboi, "/work/backend");
+		const { server, tools } = createToolCapture();
+
+		registerCardTools(server, trackboi, context);
+
+		const createCard = tools.get("create_card");
+		const updateCard = tools.get("update_card");
+		expect(createCard?.description).toContain("trackId");
+		expect(updateCard?.description).toContain("trackId");
+		expect(createCard?.inputSchema?.trackId).toBeDefined();
+		expect(updateCard?.inputSchema?.trackId).toBeDefined();
+		expect(createCard?.inputSchema?.scope).toBeUndefined();
+		expect(updateCard?.inputSchema?.scope).toBeUndefined();
 	});
 
 	test("update_card accepts board custom field values", async () => {

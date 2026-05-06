@@ -1,7 +1,7 @@
 {
 	"mcpServers": {
 		"trackboi": {
-			"command": "./bin/trackboi",
+			"command": "trackboi",
 			"args": [
 				"mcp"
 			]

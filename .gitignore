@@ -15,11 +15,6 @@ release/
 .tmp/
 playgrounds/
 
-# Local Trackboi data
-.trackboi/
-.etc/.trackboi/
-.etc/trackboi/
-
 # Logs and caches
 *.log
 .eslintcache

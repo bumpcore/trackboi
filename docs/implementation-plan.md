@@ -1,6 +1,8 @@
-# Trackboi Implementation Plan
+# trackboi Implementation Plan
 
-Trackboi is a local-first desktop workspace for repo-bound work. The Kanban board is the first surface, but the product should grow into a small, opinionated context system for humans and agents working inside git repositories.
+Historical note: this plan is an early implementation sketch. Current app and MCP behavior prefers `.trackboi` for new repo stores, uses `~/.trackboi` for app settings, and links cards to durable tracks with `trackId` instead of exposing card `scope` as a public workflow concept.
+
+trackboi is a local-first desktop workspace for repo-bound work. The Kanban board is the first surface, but the product should grow into a small, opinionated context system for humans and agents working inside git repositories.
 
 ## Current Bias
 
@@ -21,7 +23,7 @@ Goal: every primitive in the app should feel like Trackboi, not like a browser f
 Goal: make the repo-local data model boring, inspectable, and ready for bigger features.
 
 - Resolve existing storage roots in this order by default: `.trackboi`, `.etc/.trackboi`, `.etc/trackboi`.
-- For new storage, use `.etc/.trackboi` when the project already has a `.etc` directory; otherwise use `.trackboi`.
+- For new storage, use `.trackboi`.
 - Keep storage roots configurable per app install.
 - Move toward a directory shape that can support multiple boards:
   - `project.json`

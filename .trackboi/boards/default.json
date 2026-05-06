@@ -1,22 +1,19 @@
 {
+	"id": "default",
 	"version": 1,
 	"name": "trackboi",
 	"columns": [
-		{
-			"id": "done",
-			"name": "Done"
-		},
-		{
-			"id": "arbitrary-lane",
-			"name": "Operations Lane"
-		},
 		{
 			"id": "todo",
 			"name": "To Do"
 		},
 		{
-			"id": "review-queue",
-			"name": "Review Queue"
+			"id": "doing",
+			"name": "Doing"
+		},
+		{
+			"id": "done",
+			"name": "Done"
 		}
 	],
 	"customFields": []

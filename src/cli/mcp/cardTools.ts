@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as z from "zod/v4";
 import type { CardPatch, NodeFsTrackboiActions } from "../../core";
-import { boardIdSchema, type McpProjectContext, cardIdSchema, columnSchema, getCard, projectPathSchema, requireAgentId, scopeSchema, toolResult, withProject } from "./helpers";
+import { boardIdSchema, type McpProjectContext, cardIdSchema, columnSchema, getCard, projectPathSchema, requireAgentId, toolResult, withProject } from "./helpers";
 
 const fieldValuesSchema = z.record(
 	z.string(),
@@ -52,7 +52,7 @@ export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiAct
 
 	server.registerTool("create_card", {
 		title: "Create card",
-		description: "Create an executable task card. Prefer linking to trackId when the work belongs to an ongoing feature/workstream.",
+		description: "Create an executable task card. Link it to trackId when the work belongs to an ongoing feature/workstream; leave trackId omitted or null for board-wide tasks.",
 		inputSchema: {
 			projectPath: projectPathSchema,
 			boardId: boardIdSchema,
@@ -60,17 +60,15 @@ export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiAct
 			description: z.string().optional().describe("Markdown task body. Include concrete acceptance criteria or handoff context when useful."),
 			parentId: z.string().nullable().optional().describe("Parent card id for subtasks, null for a top-level card."),
 			column: columnSchema,
-			scope: scopeSchema.optional(),
 			trackId: z.string().nullable().optional().describe("Owning track id. Use null for untracked board-wide tasks."),
 		},
-	}, ({ projectPath, boardId, title, description, parentId, column, scope, trackId }) => toolResult(() => (
+	}, ({ projectPath, boardId, title, description, parentId, column, trackId }) => toolResult(() => (
 		withProject(trackboi, context, projectPath, async (actions) => actions.createCard({
 			boardId,
 			title,
 			description,
 			parentId,
 			column,
-			scope,
 			trackId,
 			actorId: await requireAgentId(trackboi, context),
 		}))
@@ -78,7 +76,7 @@ export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiAct
 
 	server.registerTool("update_card", {
 		title: "Update card",
-		description: "Patch task card fields. Omitted fields are left unchanged; use add_card_comment for progress/handoff notes.",
+		description: "Patch task card fields. Omitted fields are left unchanged; use trackId to link or unlink track ownership and add_card_comment for progress/handoff notes.",
 		inputSchema: {
 			projectPath: projectPathSchema,
 			cardId: cardIdSchema,
@@ -86,20 +84,18 @@ export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiAct
 			description: z.string().optional().describe("Replace the markdown task body."),
 			parentId: z.string().nullable().optional().describe("Parent card id for subtasks, null to make top-level."),
 			column: z.string().optional().describe("Column id. Use list_columns first if unsure."),
-			scope: scopeSchema.optional(),
 			trackId: z.string().nullable().optional().describe("Owning track id, or null to unlink from a track."),
 			labels: z.array(z.string()).optional().describe("Complete replacement label list."),
 			assignee: z.string().nullable().optional().describe("Person/agent alias, or null to clear."),
 			fieldValues: fieldValuesSchema.optional(),
 		},
-	}, ({ projectPath, cardId, title, description, parentId, column, scope, trackId, labels, assignee, fieldValues }) => (
+	}, ({ projectPath, cardId, title, description, parentId, column, trackId, labels, assignee, fieldValues }) => (
 		toolResult(() => withProject(trackboi, context, projectPath, async (actions) => {
 			const patch: CardPatch = {};
 			if (title !== undefined) patch.title = title;
 			if (description !== undefined) patch.description = description;
 			if (parentId !== undefined) patch.parentId = parentId;
 			if (column !== undefined) patch.column = column;
-			if (scope !== undefined) patch.scope = scope;
 			if (trackId !== undefined) patch.trackId = trackId;
 			if (labels !== undefined) patch.labels = labels;
 			if (assignee !== undefined) patch.assignee = assignee;

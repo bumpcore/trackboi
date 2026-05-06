@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import type { NodeFsTrackboiActions, ProjectRegistry, ProjectView } from "../../src/core";
+import type { NodeFsTrackboiActions, ProjectRegistry, ProjectSnapshot, ProjectView } from "../../src/core";
 import { createMcpProjectContext, pickAgentProjectPath, withProject } from "../../src/cli/mcp/helpers";
 import { registerCardTools } from "../../src/cli/mcp/cardTools";
 import { registerBoardTools, registerProjectTools } from "../../src/cli/mcp/projectTools";
@@ -36,6 +36,70 @@ function parseJsonToolResult(result: CallToolResult): unknown {
 	const first = result.content[0];
 	if (!first || first.type !== "text") throw new Error(`Expected text tool result: ${JSON.stringify(result)}`);
 	return JSON.parse(first.text);
+}
+
+function createProjectSnapshot(): ProjectSnapshot {
+	return {
+		project: { name: "backend", path: "/work/backend", storagePath: ".trackboi" },
+		metadata: {
+			version: 1,
+			name: "backend",
+			people: [],
+			agents: [],
+		},
+		git: {
+			isGitRepo: true,
+			root: "/work/backend",
+			branch: "main",
+			detached: false,
+			dirty: false,
+			identity: null,
+		},
+		board: {
+			id: "default",
+			version: 1,
+			name: "Default",
+			columns: [
+				{ id: "todo", name: "Todo" },
+				{ id: "doing", name: "Doing" },
+			],
+			customFields: [
+				{ id: "severity", name: "Severity", type: "select", options: ["Low", "High"] },
+			],
+		},
+		boards: [{ id: "default", name: "Default", status: "ready", worktreeIds: ["/work/backend"] }],
+		tracks: [{
+			id: "track-release",
+			title: "Release",
+			slug: "release",
+			summary: "Ship the release.",
+			brief: "",
+			decisions: [],
+			references: [],
+			files: [],
+			createdAt: "2026-04-23T00:00:00.000Z",
+			updatedAt: "2026-04-23T00:00:00.000Z",
+		}],
+		cards: [{
+			id: "card_release",
+			boardId: "default",
+			title: "Cut release",
+			description: "",
+			parentId: null,
+			scope: { kind: "project", ref: "global" },
+			trackId: "track-release",
+			column: "todo",
+			rank: "a0",
+			labels: [],
+			assignee: null,
+			fieldValues: {},
+			comments: [],
+			createdAt: "2026-04-23T00:00:00.000Z",
+			updatedAt: "2026-04-23T00:00:00.000Z",
+			createdBy: "agent_boi",
+			updatedBy: "agent_boi",
+		}],
+	};
 }
 
 function createTrackboiActions(overrides: Partial<NodeFsTrackboiActions> = {}): NodeFsTrackboiActions {
@@ -229,9 +293,62 @@ describe("mcp agent tool surface", () => {
 		if (!result) throw new Error("Missing get_agent_guide result");
 		const payload = parseJsonToolResult(result);
 
-		expect(JSON.stringify(payload)).toContain("get_active_context");
+		expect(JSON.stringify(payload)).toContain("orient_agent");
 		expect(JSON.stringify(payload)).toContain("card");
 		expect(JSON.stringify(payload)).toContain("track");
+	});
+
+	test("orient_agent returns a one-call project, board, track, and card orientation", async () => {
+		const snapshot = createProjectSnapshot();
+		const trackboi = createTrackboiActions({
+			withScopedContext: async (_context, action) => action(trackboi),
+			readDesktopState: async () => ({
+				snapshot,
+				view: {
+					sources: [{
+						id: "manual",
+						kind: "manual",
+						label: "Projects",
+						entries: [{ projectPath: "/work/backend", name: "backend", path: "/work/backend", status: "ready" }],
+					}],
+					activeProjectPath: "/work/backend",
+					storageSearchPaths: [".trackboi"],
+				},
+				worktrees: [{
+					id: "/work/backend",
+					name: "backend",
+					path: "/work/backend",
+					branch: "main",
+					isPrimary: true,
+					storagePath: ".trackboi",
+					storageRoot: "/work/backend/.trackboi",
+					status: "ready",
+					cardCount: 1,
+					colorKey: "blue",
+				}],
+				selectedWorktreeId: "/work/backend",
+				selectedBoardId: "default",
+			}),
+		});
+		const context = await createMcpProjectContext(trackboi, "/work/backend");
+		const { server, tools } = createToolCapture();
+
+		registerProjectTools(server, trackboi, context);
+		const result = await tools.get("orient_agent")?.handler({});
+		if (!result) throw new Error("Missing orient_agent result");
+		const payload = parseJsonToolResult(result) as {
+			guide: { commonFlows: { orient: string[] } };
+			board: { activeBoardId: string; columns: Array<{ id: string }> } | null;
+			tracks: Array<{ id: string }>;
+			cards: { boardId: string | null; items: Array<{ id: string; trackId: string | null }> };
+		};
+
+		expect(payload.guide.commonFlows.orient).toEqual(["orient_agent"]);
+		expect(payload.board?.activeBoardId).toBe("default");
+		expect(payload.board?.columns.map((column) => column.id)).toEqual(["todo", "doing"]);
+		expect(payload.tracks.map((track) => track.id)).toEqual(["track-release"]);
+		expect(payload.cards.boardId).toBe("default");
+		expect(payload.cards.items[0]?.trackId).toBe("track-release");
 	});
 
 	test("exposes read_track_file so agents can inspect markdown docs before editing", async () => {

@@ -6,7 +6,7 @@ dist/
 dist-node/
 build/
 artifacts/
-release/
+/release/
 
 # Local agent/editor state
 .codex

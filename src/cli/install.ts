@@ -18,120 +18,104 @@ export type InstallResult = {
 
 const SKILL_MD = `---
 name: trackboi
-description: Use trackboi as the local-first kanban and durable context layer for agent work. Trigger this skill in repositories or workspaces that have trackboi installed, a \`.trackboi\`, \`.etc/.trackboi\`, or \`.etc/trackboi\` store, a \`.agents/skills/trackboi\` skill, trackboi MCP tools, or requests involving multi-step coding work, planning, task tracking, handoffs, progress notes, board/card/track management, or agent coordination. Prefer trackboi for non-trivial implementation, debugging, research, review follow-up, and work that should persist beyond the chat.
+description: Use trackboi when its MCP tools are available, or read existing \`.trackboi\`, \`.etc/.trackboi\`, or \`.etc/trackboi\` files for context when present. Treat filesystem stores as read-only context unless the user explicitly asks to edit trackboi itself; create or update trackboi records through MCP tools, not by hand.
 ---
 
-# trackboi
+# trackboi 101 for agents
 
-## Core Rule
+trackboi is a local-first workbench for repo-bound work. It gives humans and agents a shared kanban board plus durable project context, stored in git-friendly files and exposed through MCP tools when the integration is available.
 
-Use trackboi when the work is more than a tiny one-shot answer. Treat it as the shared local workbench for you, the user, and other agents.
-
-Do not use trackboi for trivial chat, one-line explanations, or tasks where recording state would be noise.
+Use it as a coordination layer, not as a requirement. In a mixed repo, some people may not use trackboi at all. Presence of a \`.trackboi\`, \`.etc/.trackboi\`, or \`.etc/trackboi\` folder means useful context may exist, but it does not mean you must create or update trackboi records for every task.
 
 ## Product Model
 
-- Workspace: a user-registered repo/folder entry.
-- Worktree: a discovered workspace variant with its own trackboi storage context.
+- Workspace: a user-registered repo or folder entry.
+- Worktree: a discovered checkout variant with its own storage context.
 - Project: the per-worktree identity and settings.
-- Board: a board inside the project.
-- Track: project-wide durable context for an ongoing workstream.
-- Card: a board-scoped executable task that can link to one track.
+- Board: a kanban board inside a project.
+- Column: a workflow state on a board, such as todo, doing, review, or done.
+- Track: durable project-wide context for an ongoing workstream.
+- Card: an executable board task that can optionally link to one track.
 
-Use tracks for intent and memory: summary, brief, decisions, references, linked cards, and markdown docs.
+Tracks are for intent and memory: summary, brief, decisions, references, linked cards, and markdown docs.
 
-Use cards for execution: concrete tasks, status, column movement, and card comments for progress, blockers, handoff notes, and verification.
+Cards are for execution: concrete tasks, status, movement across columns, assignment, labels, fields, and progress comments.
 
-## First Move
+## When To Use It
 
-If trackboi MCP tools are available, orient before changing anything:
+Use trackboi MCP tools when they are available and the work benefits from durable coordination:
 
-1. Call \`get_agent_guide\`.
-2. Call \`get_active_context\`.
-3. If no active agent is set, call \`list_agents\`, then \`set_active_agent\` or \`register_agent\`.
-4. Call \`list_boards\`, \`list_columns\`, \`list_tracks\`, and \`list_cards\` as needed.
+- multi-step implementation, review, debugging, or research
+- work that may continue across sessions or agents
+- release, migration, cleanup, or feature tracks
+- blockers, decisions, or handoff notes that should not be rediscovered
+- board/status updates the user expects to persist
 
-If MCP tools are not available, do not fabricate tool results or claim trackboi is absent just because the tools are missing. Check the supported local store paths in order: \`.trackboi\`, \`.etc/.trackboi\`, then \`.etc/trackboi\`. Use those local files only for read-only orientation unless the user explicitly asks for direct file edits. Prefer asking to enable or install trackboi MCP when durable task updates matter.
+Do not force trackboi into trivial one-off chat, tiny edits, or repositories where the tool is not available. If only trackboi files are present, read them to catch up, then continue through normal repo work unless the user asks for trackboi updates.
 
-## When To Create Or Update Records
+## How To Orient
 
-Create or update a card when:
-
-- The user asks to implement, fix, review, investigate, or finish something non-trivial.
-- The task has multiple steps, tests, hidden risk, or may continue later.
-- You discover a blocker or follow-up that should not be lost.
-- You finish work and need to leave verification or handoff notes.
-
-Create or update a track when:
-
-- The work belongs to a larger feature, migration, cleanup, release, investigation, or ongoing effort.
-- Context should survive across boards, branches, sessions, or agents.
-- You need to record decisions, constraints, references, or long-form notes.
-
-Prefer linking new cards to the relevant track. A card may have zero or one owning track.
-
-## Recommended MCP Flows
-
-Orientation:
+If MCP tools are available, start with one call:
 
 \`\`\`text
-get_agent_guide -> get_active_context -> list_boards -> list_columns -> list_tracks -> list_cards
+orient_agent
 \`\`\`
 
-Start a new non-trivial task:
+That returns the active MCP context, available projects, worktrees, active board, columns, custom fields, tracks, cards for the active board, registered agents, and next steps.
+
+If \`orient_agent\` says no active agent is set, call \`list_agents\`, then \`set_active_agent\` or \`register_agent\` before using mutation tools.
+
+If MCP tools are not available, do not fabricate tool results or claim trackboi is absent just because tools are missing. Check \`.trackboi\`, \`.etc/.trackboi\`, then \`.etc/trackboi\`, and read those files only to understand local context.
+
+## How To Work
+
+Starting substantial work:
 
 \`\`\`text
-set_active_agent/register_agent -> create_track or get_track -> create_card -> add_card_comment
+orient_agent -> set_active_agent/register_agent -> create_track or get_track -> create_card -> add_card_comment
 \`\`\`
 
-Update progress:
+Updating task progress:
 
 \`\`\`text
-update_card or move_card -> add_card_comment
+orient_agent -> update_card or move_card -> add_card_comment
 \`\`\`
 
-Record durable context:
+Recording durable context:
 
 \`\`\`text
-update_track -> add_track_decision -> add_track_reference -> write_track_file
+orient_agent -> update_track -> add_track_decision -> add_track_reference -> write_track_file
 \`\`\`
 
-Manage board structure:
+Managing board shape:
 
 \`\`\`text
-list_boards -> set_active_board -> list_columns -> create_column/update_column/move_column/delete_column
+orient_agent -> set_active_board -> create_column/update_column/move_column/delete_column
 \`\`\`
 
-Manage settings:
+Cards should link to a track with \`trackId\` when they belong to a larger workstream. Leave \`trackId\` empty for board-wide tasks.
 
-\`\`\`text
-list_project_people/add_project_person/update_project_person/delete_project_person
-get_app_settings/update_storage_paths/update_editor_preference
-list_agents/register_agent/update_agent/set_active_agent
-\`\`\`
+## Filesystem Rule
+
+Never manually create, update, move, or delete trackboi records in the filesystem as a substitute for MCP tools. That includes board files, card folders, card comments, track files, project metadata, and indexes.
+
+Reading existing files is fine for orientation. Mutating trackboi state should go through MCP tools, unless the user is explicitly asking you to develop or repair trackboi itself.
 
 ## Good Agent Behavior
 
-- Keep trackboi updates short, factual, and useful to a future agent.
+- Keep updates short, factual, and useful to a future human or agent.
 - Move cards as state changes instead of leaving stale columns.
-- Add a final card comment with what changed, what was verified, and residual risks.
+- Add final comments with what changed, what was verified, and residual risk.
 - Use track decisions for durable choices, not every passing thought.
-- Use track docs for longer notes, plans, research summaries, or handoff context.
-- Avoid duplicating the entire chat transcript into trackboi.
-- Never invent board, column, card, or track ids; list first.
-
-## Safety
-
-- Respect the current project, worktree, and board from \`get_active_context\`.
-- Switch context explicitly with trackboi tools before mutating another project.
-- Do not delete boards, columns, tracks, or cards unless the user asked or the task clearly requires it.
-- Prefer comments and explicit status updates over silent state changes.
+- Use track docs for longer plans, research summaries, or handoff context.
+- Avoid duplicating the entire chat transcript.
+- Never invent board, column, card, or track ids; orient or list first.
 `;
 
 const OPENAI_YAML = `interface:
   display_name: "trackboi"
-  short_description: "Use trackboi for agent work."
-  default_prompt: "Use trackboi to plan, track, and document this work when the task is non-trivial."
+  short_description: "Use trackboi when available."
+  default_prompt: "Use orient_agent when trackboi MCP tools are available; otherwise read existing trackboi files only for context."
 `;
 
 const AGENTS_BLOCK_START = "<trackboi>";
@@ -139,7 +123,7 @@ const AGENTS_BLOCK_END = "</trackboi>";
 
 const AGENTS_SNIPPET = `## trackboi Skill
 
-Agents working in this repository should load \`.agents/skills/trackboi/SKILL.md\` when work is non-trivial, stateful, or useful to track beyond the current chat. Use trackboi MCP tools when available to orient, choose the active project/worktree/board, update cards, and leave handoff notes.
+When trackboi MCP tools are available, agents can load \`.agents/skills/trackboi/SKILL.md\` for details, then call \`orient_agent\` to catch up before updating cards, tracks, boards, or handoff notes. If \`.trackboi\`, \`.etc/.trackboi\`, or \`.etc/trackboi\` files are present but MCP tools are not available, agents may read those files to catch up on local context. Do not manually create, update, or delete trackboi records in the filesystem; use MCP tools for mutations.
 `;
 
 const AGENTS_BLOCK = `${AGENTS_BLOCK_START}
@@ -219,9 +203,9 @@ function upsertTrackboiAgentsBlock(current: string): string {
 		return current.replace(managedBlockPattern, AGENTS_BLOCK);
 	}
 
-	const legacySnippet = AGENTS_SNIPPET.trimEnd();
-	if (current.includes(legacySnippet)) {
-		return current.replace(legacySnippet, AGENTS_BLOCK.trimEnd());
+	const unwrappedSnippet = AGENTS_SNIPPET.trimEnd();
+	if (current.includes(unwrappedSnippet)) {
+		return current.replace(unwrappedSnippet, AGENTS_BLOCK.trimEnd());
 	}
 
 	return `${current.trimEnd()}\n\n${AGENTS_BLOCK}`;

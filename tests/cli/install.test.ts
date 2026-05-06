@@ -20,11 +20,15 @@ describe("trackboi install", () => {
 			args: ["mcp"],
 		});
 		const skillText = readFileSync(path.join(root, ".agents", "skills", "trackboi", "SKILL.md"), "utf8");
-		expect(skillText).toContain("Use trackboi when the work is more than a tiny one-shot answer");
+		expect(skillText).toContain("# trackboi 101 for agents");
+		expect(skillText).toContain("trackboi is a local-first workbench for repo-bound work");
+		expect(skillText).toContain("orient_agent");
 		expect(skillText).toContain("`.trackboi`, `.etc/.trackboi`, then `.etc/trackboi`");
+		expect(skillText).toContain("Never manually create, update, move, or delete trackboi records in the filesystem");
 		const agentsGuide = readFileSync(path.join(root, "AGENTS.md"), "utf8");
 		expect(agentsGuide).toContain("<trackboi>");
-		expect(agentsGuide).toContain(".agents/skills/trackboi/SKILL.md");
+		expect(agentsGuide).toContain("When trackboi MCP tools are available");
+		expect(agentsGuide).toContain("Do not manually create, update, or delete trackboi records in the filesystem");
 		expect(agentsGuide).toContain("</trackboi>");
 	});
 
@@ -76,19 +80,20 @@ describe("trackboi install", () => {
 		expect(agentsGuide).toContain("Keep this repository-specific rule.");
 		expect(agentsGuide).toContain("Keep this too.");
 		expect(agentsGuide).toContain("<trackboi>");
-		expect(agentsGuide).toContain(".agents/skills/trackboi/SKILL.md");
+		expect(agentsGuide).toContain("When trackboi MCP tools are available");
+		expect(agentsGuide).toContain("Do not manually create, update, or delete trackboi records in the filesystem");
 		expect(agentsGuide).not.toContain("old trackboi instructions");
 		expect(agentsGuide.match(/<trackboi>/g)?.length).toBe(1);
 	});
 
-	test("migrates legacy unmarked AGENTS.md trackboi guidance into a managed block", () => {
+	test("wraps current unmarked AGENTS.md trackboi guidance into a managed block", () => {
 		const root = mkdtempSync(path.join(os.tmpdir(), "trackboi-install-"));
 		writeFileSync(path.join(root, "AGENTS.md"), [
 			"# Agent Guide",
 			"",
 			"## trackboi Skill",
 			"",
-			"Agents working in this repository should load `.agents/skills/trackboi/SKILL.md` when work is non-trivial, stateful, or useful to track beyond the current chat. Use trackboi MCP tools when available to orient, choose the active project/worktree/board, update cards, and leave handoff notes.",
+			"When trackboi MCP tools are available, agents can load `.agents/skills/trackboi/SKILL.md` for details, then call `orient_agent` to catch up before updating cards, tracks, boards, or handoff notes. If `.trackboi`, `.etc/.trackboi`, or `.etc/trackboi` files are present but MCP tools are not available, agents may read those files to catch up on local context. Do not manually create, update, or delete trackboi records in the filesystem; use MCP tools for mutations.",
 			"",
 		].join("\n"), "utf8");
 
@@ -97,6 +102,7 @@ describe("trackboi install", () => {
 
 		expect(agentsGuide).toContain("<trackboi>");
 		expect(agentsGuide).toContain("</trackboi>");
+		expect(agentsGuide).toContain("When trackboi MCP tools are available");
 		expect(agentsGuide.match(/## trackboi Skill/g)?.length).toBe(1);
 	});
 });

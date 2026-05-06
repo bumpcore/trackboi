@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release"
+  short_description: "SemVer commit, push, tag, and release"
+  default_prompt: "Use $release to choose the SemVer bump, commit, push, tag, publish, and verify this release."

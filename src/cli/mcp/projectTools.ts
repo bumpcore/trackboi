@@ -25,29 +25,22 @@ function normalizeFieldOptions(type: FieldType, options?: string[]): string[] | 
 	return normalized;
 }
 
-/**
- * Registers MCP tools that inspect or switch Trackboi projects and worktrees.
- */
-export function registerProjectTools(server: McpServer, trackboi: NodeFsTrackboiActions, context: McpProjectContext): void {
-	server.registerTool("get_agent_guide", {
-		title: "Get agent guide",
-		description: "Return the recommended trackboi MCP workflow for agents: orient, choose context, mutate safely, and leave useful progress notes.",
-	}, () => toolResult(async () => ({
+function agentGuidePayload() {
+	return {
 		workflow: [
-			"Call get_active_context first to see your isolated project, worktree, board, and active agent identity.",
+			"Call orient_agent first to get the MCP session context, active project, worktree, board, columns, fields, tracks, cards, and agent identity in one response.",
 			"If no active agent is set, call list_agents, then set_active_agent or register_agent before mutating cards/tracks/boards.",
-			"Use list_boards and list_columns before creating or moving cards so you write to valid board and column ids.",
-			"Use list_board_fields before setting card fieldValues, then update_card with the complete fieldValues object.",
-			"Use project people tools for project settings, and storage/editor tools for global settings parity with the desktop UI.",
 			"Use tracks for project-wide durable feature/workstream context: summary, brief, decisions, references, linked cards, and markdown docs.",
-			"Use cards for executable tasks. Append card comments for progress, handoff notes, blockers, and verification results.",
+			"Use cards for executable board tasks. Link cards to trackId when they belong to a larger workstream.",
+			"Append card comments for progress, handoff notes, blockers, and verification results.",
+			"Use list_board_fields before setting card fieldValues, then update_card with the complete fieldValues object.",
 			"Prefer explicit projectPath when operating outside the cwd-selected project; otherwise the MCP session uses its isolated active project.",
 		],
 		commonFlows: {
-			orient: ["get_active_context", "list_boards", "list_columns", "list_board_fields", "list_tracks", "list_cards"],
+			orient: ["orient_agent"],
 			startWork: ["set_active_agent", "create_track or get_track", "create_card", "add_card_comment"],
 			updateWork: ["update_card or move_card", "add_card_comment", "add_track_decision or write_track_file when context should live beyond one card"],
-			switchContext: ["list_projects", "switch_project", "list_worktrees", "set_active_worktree", "list_boards", "set_active_board"],
+			switchContext: ["orient_agent", "switch_project", "list_worktrees", "set_active_worktree", "set_active_board"],
 			settings: ["list_project_people", "add_project_person", "update_storage_paths", "update_editor_preference"],
 		},
 		terms: {
@@ -58,7 +51,81 @@ export function registerProjectTools(server: McpServer, trackboi: NodeFsTrackboi
 			track: "A project-wide work container for durable intent, context, files, decisions, references, and linked cards across boards.",
 			card: "A board-scoped executable task that can optionally link to one track.",
 		},
-	})));
+	};
+}
+
+/**
+ * Registers MCP tools that inspect or switch Trackboi projects and worktrees.
+ */
+export function registerProjectTools(server: McpServer, trackboi: NodeFsTrackboiActions, context: McpProjectContext): void {
+	server.registerTool("get_agent_guide", {
+		title: "Get agent guide",
+		description: "Return the recommended trackboi MCP workflow for agents: orient, choose context, mutate safely, and leave useful progress notes.",
+	}, () => toolResult(() => agentGuidePayload()));
+
+	server.registerTool("orient_agent", {
+		title: "Orient agent",
+		description: "Return one agent-ready orientation payload: guide, active MCP context, projects, worktrees, board shape, tracks, active-board cards, agents, and next steps.",
+		inputSchema: {
+			projectPath: projectPathSchema,
+		},
+	}, ({ projectPath }) => toolResult(async () => {
+		const view = await context.listView();
+		const settings = await trackboi.readAppSettings();
+		const activeAgentId = await context.currentAgentId();
+		const resolvedProjectPath = projectPath ?? view.activeProjectPath ?? undefined;
+		const state = await withProject(trackboi, context, resolvedProjectPath, (actions) => actions.readDesktopState());
+		const snapshot = state.snapshot;
+		const activeBoardId = snapshot?.board.id ?? state.selectedBoardId;
+		const activeBoardCards = snapshot && activeBoardId
+			? snapshot.cards.filter((card) => card.boardId === activeBoardId)
+			: [];
+
+		return {
+			guide: agentGuidePayload(),
+			context: {
+				activeProjectPath: view.activeProjectPath,
+				agentActiveProjectPath: view.agentActiveProjectPath,
+				desktopActiveProjectPath: view.desktopActiveProjectPath,
+				agentActiveWorktreeId: view.agentActiveWorktreeId,
+				desktopActiveWorktreeId: view.desktopActiveWorktreeId,
+				agentActiveBoardId: view.agentActiveBoardId,
+				desktopActiveBoardId: view.desktopActiveBoardId,
+				activeAgentId,
+				activeAgent: settings.agents.find((agent) => agent.id === activeAgentId) ?? null,
+			},
+			projects: view.sources,
+			storageSearchPaths: view.storageSearchPaths,
+			worktrees: {
+				activeWorktreeId: state.selectedWorktreeId,
+				items: state.worktrees,
+			},
+			project: snapshot ? {
+				project: snapshot.project,
+				metadata: snapshot.metadata,
+				git: snapshot.git,
+			} : null,
+			board: snapshot ? {
+				activeBoardId: snapshot.board.id,
+				activeBoard: snapshot.board,
+				boards: snapshot.boards,
+				columns: snapshot.board.columns,
+				customFields: snapshot.board.customFields,
+			} : null,
+			tracks: snapshot?.tracks ?? [],
+			cards: {
+				boardId: activeBoardId,
+				items: activeBoardCards,
+			},
+			agents: {
+				activeAgentId,
+				items: settings.agents,
+			},
+			nextSteps: activeAgentId
+				? ["Use the returned board columns before create_card or move_card.", "Use trackId when a card belongs to a track.", "Use comments for progress, blockers, handoff, and verification notes."]
+				: ["Call list_agents, then set_active_agent or register_agent before mutating cards, tracks, or boards."],
+		};
+	}));
 
 	server.registerTool("list_projects", {
 		title: "List projects",

@@ -1,4 +1,4 @@
 interface:
-  display_name: "Trackboi"
-  short_description: "Use Trackboi for agent work."
-  default_prompt: "Use Trackboi to plan, track, and document this work when the task is non-trivial."
+  display_name: "trackboi"
+  short_description: "Use trackboi when available."
+  default_prompt: "Use orient_agent when trackboi MCP tools are available; otherwise read existing trackboi files only for context."

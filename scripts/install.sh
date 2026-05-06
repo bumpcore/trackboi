@@ -12,6 +12,10 @@ cleanup() {
 trap cleanup EXIT
 mkdir -p "$tmp_dir"
 
+say() {
+	printf '%s\n' "trackboi: $*" >&2
+}
+
 command_exists() {
 	command -v "$1" >/dev/null 2>&1
 }
@@ -27,6 +31,7 @@ download() {
 	url="$1"
 	output="$2"
 
+	say "Downloading $(basename "$output")"
 	if command_exists curl; then
 		curl -fL "$url" -o "$output"
 	elif command_exists wget; then
@@ -37,7 +42,18 @@ download() {
 	fi
 }
 
+installed_version() {
+	if command_exists dpkg && dpkg-query -W -f='${Version}' trackboi >/dev/null 2>&1; then
+		dpkg-query -W -f='${Version}' trackboi
+	elif command_exists rpm && rpm -q trackboi >/dev/null 2>&1; then
+		rpm -q --qf '%{VERSION}-%{RELEASE}' trackboi
+	else
+		printf '%s' ""
+	fi
+}
+
 latest_url() {
+	say "Resolving latest release"
 	if command_exists curl; then
 		curl -fsSL -o /dev/null -w "%{url_effective}" "https://github.com/$repo/releases/latest"
 	elif command_exists wget; then
@@ -49,6 +65,7 @@ latest_url() {
 	fi
 }
 
+say "Starting installer"
 tag="$(basename "$(latest_url)")"
 version="${tag#v}"
 
@@ -59,6 +76,13 @@ fi
 
 os="$(uname -s)"
 arch="$(uname -m)"
+current_version="$(installed_version)"
+
+say "Latest release is $tag"
+say "Detected platform $os $arch"
+if [ -n "$current_version" ]; then
+	say "Installed package is $current_version"
+fi
 
 case "$os:$arch" in
 	Linux:x86_64|Linux:amd64)
@@ -66,6 +90,7 @@ case "$os:$arch" in
 			asset="trackboi-$version-amd64.deb"
 			file="$tmp_dir/$asset"
 			download "https://github.com/$repo/releases/download/$tag/$asset" "$file"
+			say "Installing $asset with ${TRACKBOI_PACKAGE_MANAGER:-apt/dpkg}"
 			if command_exists apt-get; then
 				if [ "$(id -u)" -eq 0 ]; then
 					apt-get install -y "$file"
@@ -84,18 +109,21 @@ case "$os:$arch" in
 			file="$tmp_dir/$asset"
 			download "https://github.com/$repo/releases/download/$tag/$asset" "$file"
 			if command_exists dnf; then
+				say "Installing $asset with dnf"
 				if [ "$(id -u)" -eq 0 ]; then
 					dnf install -y "$file"
 				else
 					sudo dnf install -y "$file"
 				fi
 			elif command_exists zypper; then
+				say "Installing $asset with zypper"
 				if [ "$(id -u)" -eq 0 ]; then
 					zypper --non-interactive install "$file"
 				else
 					sudo zypper --non-interactive install "$file"
 				fi
 			else
+				say "Installing $asset with rpm"
 				if [ "$(id -u)" -eq 0 ]; then
 					rpm -Uvh "$file"
 				else
@@ -108,8 +136,8 @@ case "$os:$arch" in
 			mkdir -p "$install_dir"
 			download "https://github.com/$repo/releases/download/$tag/$asset" "$file"
 			chmod +x "$file"
-			echo "Installed trackboi AppImage to $file"
-			echo "Make sure $install_dir is on PATH."
+			say "Installed AppImage to $file"
+			say "Make sure $install_dir is on PATH."
 		fi
 		;;
 	Darwin:arm64)
@@ -118,15 +146,18 @@ case "$os:$arch" in
 		file="$tmp_dir/$asset"
 		app_dir="${TRACKBOI_APP_DIR:-/Applications}"
 		download "https://github.com/$repo/releases/download/$tag/$asset" "$file"
+		say "Expanding $asset"
 		ditto -x -k "$file" "$tmp_dir/app"
 		if [ -d "$app_dir" ] && [ -w "$app_dir" ]; then
+			say "Installing app to $app_dir"
 			rm -rf "$app_dir/trackboi.app"
 			cp -R "$tmp_dir/app/trackboi.app" "$app_dir/trackboi.app"
 		else
+			say "Installing app to $app_dir with sudo"
 			sudo rm -rf "$app_dir/trackboi.app"
 			sudo cp -R "$tmp_dir/app/trackboi.app" "$app_dir/trackboi.app"
 		fi
-		echo "Installed trackboi to $app_dir/trackboi.app"
+		say "Installed app to $app_dir/trackboi.app"
 		;;
 	*)
 		echo "Unsupported platform: $os $arch" >&2
@@ -134,3 +165,5 @@ case "$os:$arch" in
 		exit 1
 		;;
 esac
+
+say "Done"

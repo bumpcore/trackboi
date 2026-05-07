@@ -4,6 +4,10 @@
 	"name": "trackboi",
 	"columns": [
 		{
+			"id": "backlog",
+			"name": "Backlog"
+		},
+		{
 			"id": "todo",
 			"name": "To Do"
 		},

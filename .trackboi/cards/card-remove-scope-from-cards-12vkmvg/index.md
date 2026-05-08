@@ -5,15 +5,15 @@ title: "Remove scope from cards"
 parentId: null
 scope: {"kind":"project","ref":"global"}
 trackId: null
-column: "backlog"
+column: "done"
 rank: "j"
 labels: []
 assignee: null
 fieldValues: {}
 createdAt: "2026-05-07T11:33:54.821Z"
-updatedAt: "2026-05-07T11:33:54.821Z"
+updatedAt: "2026-05-08T19:08:04.956Z"
 createdBy: "agent_01KQY2VDKCWA3AEM5TF72W00FB"
-updatedBy: "agent_01KQY2VDKCWA3AEM5TF72W00FB"
+updatedBy: "agent_01KQWVZPDMN9AD0487WVC87EKX"
 ---
 Remove the `scope` field from cards because it no longer provides useful behavior and has effectively been replaced by tracks.
 

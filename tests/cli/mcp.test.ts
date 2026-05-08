@@ -189,6 +189,7 @@ function createTrackboiActions(overrides: Partial<NodeFsTrackboiActions> = {}): 
 		writeTrackFile: async () => ({ name: "notes.md", path: "", contentType: "text/plain", updatedAt: "" }),
 		deleteTrackFile: async () => ({ ok: true as const }),
 		openWorkspaceFile: async () => null,
+		chooseProjectIconFile: async () => null,
 		chooseProject: async () => null,
 		locateProject: async () => null,
 		removeProject: async () => null,
@@ -202,10 +203,13 @@ function createTrackboiActions(overrides: Partial<NodeFsTrackboiActions> = {}): 
 			registry.appSettings = settings;
 			return settings;
 		},
+		listGitChanges: async () => ({ repoRoot: "/work/backend", defaultPaths: [".trackboi"], changes: [] }),
+		commitGitChanges: async (input) => ({ ok: true as const, commit: "abc1234", message: input.message, paths: input.paths ?? [".trackboi"] }),
 		createCard: async () => { throw new Error("not implemented"); },
 		addCardComment: async () => { throw new Error("not implemented"); },
 		updateCard: async () => { throw new Error("not implemented"); },
 		updateBoard: async () => { throw new Error("not implemented"); },
+		updateProjectSettings: async (patch) => ({ version: 1, name: "backend", color: patch.color ?? null, iconPath: patch.iconPath ?? null, people: [], agents: [] }),
 		updateProjectPeople: async () => { throw new Error("not implemented"); },
 		moveCard: async () => { throw new Error("not implemented"); },
 		deleteCard: async () => ({ ok: true as const }),
@@ -340,7 +344,7 @@ describe("mcp agent tool surface", () => {
 			guide: { commonFlows: { orient: string[] } };
 			board: { activeBoardId: string; columns: Array<{ id: string }> } | null;
 			tracks: Array<{ id: string }>;
-			cards: { boardId: string | null; items: Array<{ id: string; trackId: string | null }> };
+			cards: { boardId: string | null; items: Array<{ id: string; trackId: string | null; scope?: unknown; variants?: Array<{ scope?: unknown }> }> };
 		};
 
 		expect(payload.guide.commonFlows.orient).toEqual(["orient_agent"]);
@@ -349,6 +353,84 @@ describe("mcp agent tool surface", () => {
 		expect(payload.tracks.map((track) => track.id)).toEqual(["track-release"]);
 		expect(payload.cards.boardId).toBe("default");
 		expect(payload.cards.items[0]?.trackId).toBe("track-release");
+		expect(payload.cards.items[0]?.scope).toBeUndefined();
+		expect(payload.cards.items[0]?.variants?.[0]?.scope).toBeUndefined();
+	});
+
+	test("orient_agent reports the requested project context separately from the agent and desktop context", async () => {
+		const snapshot = {
+			...createProjectSnapshot(),
+			project: { name: "frontend", path: "/work/frontend", storagePath: ".trackboi" },
+		};
+		const trackboi = createTrackboiActions();
+		const context = await createMcpProjectContext(trackboi, "/work/backend");
+		const scopedTrackboi = createTrackboiActions({
+			readDesktopState: async () => ({
+				snapshot,
+				view: {
+					sources: [{
+						id: "manual",
+						kind: "manual",
+						label: "Projects",
+						entries: [
+							{ projectPath: "/work/backend", name: "backend", path: "/work/backend", status: "ready" },
+							{ projectPath: "/work/frontend", name: "frontend", path: "/work/frontend", status: "ready" },
+						],
+					}],
+					activeProjectPath: "/work/frontend",
+					storageSearchPaths: [".trackboi"],
+				},
+				worktrees: [{
+					id: "/work/frontend",
+					name: "frontend",
+					path: "/work/frontend",
+					branch: "main",
+					isPrimary: true,
+					storagePath: ".trackboi",
+					storageRoot: "/work/frontend/.trackboi",
+					status: "ready",
+					cardCount: 1,
+					colorKey: "green",
+				}],
+				selectedWorktreeId: "/work/frontend",
+				selectedBoardId: "default",
+			}),
+		});
+		const { server, tools } = createToolCapture();
+
+		registerProjectTools(server, {
+			...trackboi,
+			withScopedContext: async (_context, action) => action(scopedTrackboi),
+		}, context);
+		const result = await tools.get("orient_agent")?.handler({ projectPath: "/work/frontend" });
+		if (!result) throw new Error("Missing orient_agent result");
+		const payload = parseJsonToolResult(result) as {
+			context: {
+				cwd: string;
+				requestedProjectPath: string | null;
+				activeProjectPath: string | null;
+				activeWorktreeId: string | null;
+				activeBoardId: string | null;
+				agentActiveProjectPath: string | null;
+				desktopActiveProjectPath: string | null;
+				contextMismatch: boolean;
+			};
+			worktrees: { activeWorktreeId: string | null };
+			cards: { boardId: string | null };
+			nextSteps: string[];
+		};
+
+		expect(payload.context.cwd).toBe("/work/backend");
+		expect(payload.context.requestedProjectPath).toBe("/work/frontend");
+		expect(payload.context.activeProjectPath).toBe("/work/frontend");
+		expect(payload.context.activeWorktreeId).toBe("/work/frontend");
+		expect(payload.context.activeBoardId).toBe("default");
+		expect(payload.context.agentActiveProjectPath).toBe("/work/backend");
+		expect(payload.context.desktopActiveProjectPath).toBe("/work/frontend");
+		expect(payload.context.contextMismatch).toBe(true);
+		expect(payload.worktrees.activeWorktreeId).toBe("/work/frontend");
+		expect(payload.cards.boardId).toBe("default");
+		expect(payload.nextSteps[0]).toContain("Requested project differs");
 	});
 
 	test("exposes read_track_file so agents can inspect markdown docs before editing", async () => {
@@ -375,6 +457,8 @@ describe("mcp agent tool surface", () => {
 			"get_app_settings",
 			"update_editor_preference",
 			"update_storage_paths",
+			"list_git_changes",
+			"commit_project_changes",
 			"list_project_people",
 			"add_project_person",
 			"update_project_person",

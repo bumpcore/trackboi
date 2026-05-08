@@ -7,7 +7,7 @@ import { newSlugId } from "../../src/core/id";
 import { writeJsonAtomic } from "../../src/core/json";
 import { defaultAppSettings, defaultConfigDir, sanitizeRegistry } from "../../src/core/registry";
 import { projectEntry } from "../../src/core/sources";
-import { resolveProjectStorage } from "../../src/core/storage";
+import { readCards, resolveProjectStorage } from "../../src/core/storage";
 import type { Board, Project, ProjectMetadata, ProjectRegistry } from "../../src/core/types";
 
 const createdRoots: string[] = [];
@@ -85,11 +85,21 @@ describe("storage path preference", () => {
 	});
 });
 
+describe("card storage", () => {
+	test("skips empty card folders without index files", () => {
+		const project = createProject();
+		const root = path.join(project.path, ".trackboi");
+		mkdirSync(path.join(root, "cards", "card_empty"), { recursive: true });
+
+		expect(readCards(root)).toEqual([]);
+	});
+});
+
 describe("filesystem ids", () => {
 	test("slug ids are path safe and title based", () => {
 		const id = newSlugId("card", "Fix release menu!!!");
 
-		expect(id).toMatch(/^card-fix-release-menu-[a-z0-9_-]+$/);
+		expect(id).toMatch(/^fix-release-menu-[a-z0-9_-]+$/);
 		expect(id).not.toContain(" ");
 	});
 
@@ -98,8 +108,8 @@ describe("filesystem ids", () => {
 		const second = newSlugId("track", "Onboarding polish");
 
 		expect(first).not.toBe(second);
-		expect(first.startsWith("track-onboarding-polish-")).toBe(true);
-		expect(second.startsWith("track-onboarding-polish-")).toBe(true);
+		expect(first.startsWith("onboarding-polish-")).toBe(true);
+		expect(second.startsWith("onboarding-polish-")).toBe(true);
 	});
 });
 

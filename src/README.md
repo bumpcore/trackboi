@@ -43,3 +43,12 @@ merged multi-worktree snapshot.
 Board custom fields are board-scoped. Project settings are reserved for
 project-wide configuration inside the active worktree, such as people aliases
 and future agent or workflow configuration.
+
+## Identifier Shape
+
+New entity ids do not include redundant type prefixes when the type is already
+clear from storage location or API context. Cards and tracks use readable
+slug-plus-suffix ids such as `release-prep-abc1234`; agent, comment, person,
+and decision ids use plain ULIDs. Existing prefixed ids remain readable for
+compatibility. When a value can reference multiple entity types, encode that in
+the reference itself, for example `agent:01K...`.

@@ -5,15 +5,15 @@ title: "Archive cards and lanes"
 parentId: null
 scope: {"kind":"project","ref":"global"}
 trackId: null
-column: "backlog"
-rank: "U"
+column: "done"
+rank: "j"
 labels: []
 assignee: null
 fieldValues: {}
 createdAt: "2026-05-07T11:31:49.474Z"
-updatedAt: "2026-05-07T11:31:49.474Z"
+updatedAt: "2026-05-08T19:18:14.060Z"
 createdBy: "agent_01KQY2VDKCWA3AEM5TF72W00FB"
-updatedBy: "agent_01KQY2VDKCWA3AEM5TF72W00FB"
+updatedBy: "agent_01KQWVZPDMN9AD0487WVC87EKX"
 ---
 Add archive support for cards and lanes so obsolete work can be hidden without destructive deletion.
 

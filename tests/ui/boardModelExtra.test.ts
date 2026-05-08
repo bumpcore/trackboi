@@ -34,6 +34,32 @@ describe("board presentation model", () => {
 		expect(result.visibleCardCount).toBe(2);
 	});
 
+	test("hides archived cards from board columns and table-visible parents", () => {
+		const result = buildBoardPresentation(baseInput([
+			card("active", { column: "todo" }),
+			card("archived", { column: "todo", archivedAt: "2026-01-02T00:00:00.000Z" }),
+		]));
+		expect(result.cardsByColumn.todo.map((entry) => entry.id)).toEqual(["active"]);
+		expect(result.visibleParentCards.map((entry) => entry.id)).toEqual(["active"]);
+		expect(result.visibleCardCount).toBe(1);
+	});
+
+	test("hides archived columns and their cards", () => {
+		const result = buildBoardPresentation({
+			...baseInput([
+				card("active", { column: "todo" }),
+				card("hidden", { column: "doing" }),
+			]),
+			columns: [
+				{ id: "todo", name: "To Do" },
+				{ id: "doing", name: "Doing", archivedAt: "2026-01-02T00:00:00.000Z" },
+			],
+		});
+		expect(Object.keys(result.cardsByColumn)).toEqual(["todo"]);
+		expect(result.cardsByColumn.todo.map((entry) => entry.id)).toEqual(["active"]);
+		expect(result.visibleParentCards.map((entry) => entry.id)).toEqual(["active"]);
+	});
+
 	test("filters by selected board id", () => {
 		const result = buildBoardPresentation({
 			...baseInput([

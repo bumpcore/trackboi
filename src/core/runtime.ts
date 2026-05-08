@@ -1,5 +1,6 @@
 import { existsSync, rmSync } from "node:fs";
-import { addCardCommentInStore, createCardInStore, deleteCardInStore, moveCardInStore, updateCardInStore } from "./cards";
+import path from "node:path";
+import { addCardCommentInStore, createCardInStore, deleteCardInStore, moveCardInStore, requireBoardColumn, updateCardInStore } from "./cards";
 import { newId } from "./id";
 import { readJson, writeJsonAtomic } from "./json";
 import { boardPath, projectMetadataPath, runtimePaths } from "./paths";
@@ -51,11 +52,15 @@ import type {
 	CreateBoardInput,
 	CreateTrackInput,
 	DesktopState,
+	GitChanges,
+	GitCommitInput,
+	GitCommitResult,
 	GitIdentity,
 	MoveCardInput,
 	PersonAlias,
 	Project,
 	ProjectMetadata,
+	ProjectSettingsPatch,
 	ProjectSnapshot,
 	ProjectSnapshotWithInternals,
 	ProjectSource,
@@ -66,9 +71,10 @@ import type {
 	TrackFileWriteInput,
 	TrackPatch,
 	TrackboiRuntime,
+	WorkScope,
 } from "./types";
 import { normalizeProjectMetadata } from "./storage";
-import { readGitIdentity } from "./git";
+import { commitGitChanges as commitRepoGitChanges, listGitChanges as listRepoGitChanges, readGitIdentity } from "./git";
 
 export type RuntimeOptions = RegistryOptions;
 
@@ -215,7 +221,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		patch: CardPatch,
 		trackId: string | null,
 	): CardPatch {
-		const nextPatch: CardPatch = { ...patch, trackId, scope: { kind: "project", ref: "global" } };
+		const nextPatch: CardPatch = { ...patch, trackId };
 		return nextPatch;
 	}
 
@@ -367,6 +373,63 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		return current.appSettings;
 	}
 
+	function defaultGitCommitPaths(snapshot: ProjectSnapshotWithInternals): string[] {
+		if (!snapshot.git.root) return [];
+		const relativeStoragePath = path.relative(snapshot.git.root, snapshot.storageRoot);
+		if (!relativeStoragePath || relativeStoragePath.startsWith("..") || path.isAbsolute(relativeStoragePath)) return [];
+		return [relativeStoragePath];
+	}
+
+	function resolveGitCommitPaths(snapshot: ProjectSnapshotWithInternals, paths?: string[]): string[] {
+		const requestedPaths = paths?.map((entry) => entry.trim()).filter(Boolean);
+		return requestedPaths && requestedPaths.length > 0 ? requestedPaths : defaultGitCommitPaths(snapshot);
+	}
+
+	function requireGitSnapshot(): ProjectSnapshotWithInternals {
+		const snapshot = activeSnapshotWithInternals();
+		if (!snapshot) throw new Error("Choose a project first");
+		if (!snapshot.git.isGitRepo || !snapshot.git.root) throw new Error("Active project is not a git repository");
+		return snapshot;
+	}
+
+	function listGitChanges(paths?: string[]): GitChanges {
+		const snapshot = requireGitSnapshot();
+		const resolvedPaths = resolveGitCommitPaths(snapshot, paths);
+		if (resolvedPaths.length === 0) throw new Error("No trackboi-managed paths are inside the git repository");
+		const result = listRepoGitChanges(snapshot.git.root!, resolvedPaths);
+		return {
+			...result,
+			defaultPaths: defaultGitCommitPaths(snapshot),
+		};
+	}
+
+	function commitGitChanges(input: GitCommitInput): GitCommitResult {
+		const snapshot = requireGitSnapshot();
+		const resolvedPaths = resolveGitCommitPaths(snapshot, input.paths);
+		if (resolvedPaths.length === 0) throw new Error("No trackboi-managed paths are inside the git repository");
+		const result = commitRepoGitChanges(snapshot.git.root!, input.message, resolvedPaths);
+		invalidateCache();
+		return result;
+	}
+
+	function updateProjectSettings(patch: ProjectSettingsPatch): ProjectMetadata {
+		const store = openTargetStore(true);
+		const filePath = projectMetadataPath(store.rootPath);
+		const metadata = normalizeProjectMetadata(readJson<ProjectMetadata>(filePath), store.project, store.storagePath);
+		const nextMetadata: ProjectMetadata = {
+			...metadata,
+			color: typeof patch.color === "string" && patch.color.trim() ? patch.color.trim() : null,
+			iconPath: typeof patch.iconPath === "string" && patch.iconPath.trim() ? patch.iconPath.trim() : null,
+		};
+		writeJsonAtomic(filePath, nextMetadata);
+		invalidateProjectState(store.project.path, {
+			rootPath: store.rootPath,
+			worktrees: true,
+			view: true,
+		});
+		return nextMetadata;
+	}
+
 	function requireActiveProject(): Project {
 		const project = activeProjectFromRegistry(registry.readRegistry());
 		if (!project) throw new Error("Choose a project first");
@@ -514,7 +577,7 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		return created;
 	}
 
-	function ensureTrackIdForCardInput(input: { trackId?: string | null; scope?: CardPatch["scope"] }, fallbackTitle?: string): string | null {
+	function ensureTrackIdForCardInput(input: { trackId?: string | null; legacyScope?: WorkScope }, fallbackTitle?: string): string | null {
 		if (input.trackId) {
 			if (input.trackId.startsWith("synthetic-track:")) {
 				const synthetic = getTrack(input.trackId);
@@ -524,8 +587,8 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			}
 			return input.trackId;
 		}
-		if (input.scope?.kind === "track") {
-			return materializeBranchTrack(input.scope.ref, fallbackTitle ?? input.scope.ref).id;
+		if (input.legacyScope?.kind === "track") {
+			return materializeBranchTrack(input.legacyScope.ref, fallbackTitle ?? input.legacyScope.ref).id;
 		}
 		return null;
 	}
@@ -590,7 +653,6 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 				if (!matchesRealTrack && !matchesLegacyBranch) continue;
 				updateCardInStore(store, card.id, {
 					trackId: null,
-					scope: { kind: "project", ref: "global" },
 				});
 			}
 		}
@@ -738,9 +800,9 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			.toLowerCase()
 			.replace(/[^a-z0-9]+/g, "-")
 			.replace(/^-|-$/g, "");
-		let boardId = slug || `board-${newId("board").slice(-8)}`;
+		let boardId = slug || newId("board").slice(-8).toLowerCase();
 		while (existingIds.has(boardId)) {
-			boardId = `${slug || "board"}-${newId("board").slice(-6)}`;
+			boardId = `${slug || "item"}-${newId("board").slice(-6).toLowerCase()}`;
 		}
 
 		writeJsonAtomic(boardPath(store.rootPath, boardId), {
@@ -816,7 +878,6 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 			...input,
 			boardId: input.boardId ?? requireActiveBoard().id,
 			trackId,
-			scope: { kind: "project", ref: "global" },
 			actorId,
 		});
 		invalidateProjectState(project.path, {
@@ -847,16 +908,24 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 	function updateCard(cardId: string, patch: CardPatch): Card {
 		const project = requireActiveProject();
 		const origin = findCardOrigin(cardId);
-		const currentCard = activeSnapshot()?.cards.find((candidate) => candidate.id === cardId);
-		const trackId = ensureTrackIdForCardInput({
-			trackId: patch.trackId ?? currentCard?.trackId ?? null,
-			scope: patch.scope ?? currentCard?.scope,
-		}, currentCard?.title);
+		const snapshot = readSnapshotForPath(project, origin.worktreePath, false);
+		if (!snapshot) throw new Error(`Unknown card origin for ${cardId}`);
+		const currentCard = snapshot.cards.find((candidate) => candidate.id === cardId);
+		if (!currentCard) throw new Error(`Unknown card: ${cardId}`);
+		const targetBoardId = patch.boardId ?? currentCard.boardId;
+		const targetColumnId = patch.column ?? currentCard.column;
+		requireBoardColumn(snapshot, targetBoardId, targetColumnId);
 		const store = openStore({
 			...project,
 			path: origin.worktreePath,
 			storagePath: undefined,
 		}, registry.readRegistry(), false);
+		const storedCard = readCards(store.rootPath).find((candidate) => candidate.id === cardId);
+		if (!storedCard) throw new Error(`Unknown card: ${cardId}`);
+		const trackId = ensureTrackIdForCardInput({
+			trackId: patch.trackId ?? storedCard.trackId ?? null,
+			legacyScope: storedCard.scope,
+		}, storedCard.scope.kind === "track" ? storedCard.scope.ref : storedCard.title);
 		const actorId = resolveDesktopActorId(store, origin.worktreePath, (patch as CardPatch & { actorId?: string }).actorId);
 		const card = updateCardInStore(store, cardId, {
 			...toStoredCardPatch(patch, trackId),
@@ -940,6 +1009,9 @@ export function createRuntime(options: RuntimeOptions = {}): TrackboiRuntime {
 		setActiveBoard,
 		readAppSettings,
 		updateAppSettings,
+		listGitChanges,
+		commitGitChanges,
+		updateProjectSettings,
 		updateProjectPeople,
 		chooseProjectPath,
 		locateProjectPath,

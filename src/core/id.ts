@@ -1,13 +1,14 @@
 import { ulid } from "ulid";
 
 /**
- * Creates a locally unique, readable id for persisted Trackboi files.
+ * Creates a locally unique id for persisted Trackboi records.
  *
- * The id is intentionally prefixed because card/project files should be easy to
- * recognize in git diffs and CLI output.
+ * Entity types are already known from storage location and API context, so new
+ * ids avoid redundant type prefixes. Mixed references should carry type in the
+ * reference value itself, for example `agent:01K...`.
  */
-export function newId(prefix: string): string {
-	return `${prefix}_${ulid()}`;
+export function newId(_prefix: string): string {
+	return ulid();
 }
 
 export function slugifyIdPart(value: string, fallback: string): string {
@@ -25,9 +26,9 @@ export function slugifyIdPart(value: string, fallback: string): string {
  * The title part makes git diffs and folder browsing humane, while the random
  * suffix keeps ids safe for distributed local writes without central counters.
  */
-export function newSlugId(prefix: string, title: string): string {
+export function newSlugId(_prefix: string, title: string): string {
 	const suffix = randomSuffix();
-	return `${prefix}-${slugifyIdPart(title, prefix)}-${suffix}`;
+	return `${slugifyIdPart(title, "item")}-${suffix}`;
 }
 
 function randomSuffix(): string {

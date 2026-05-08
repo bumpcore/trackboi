@@ -1,6 +1,8 @@
 import type { ProjectEntry, ProjectSnapshot } from "@/core/types";
 
-export type ProjectColorSource = Pick<ProjectEntry, "name" | "path"> | Pick<ProjectSnapshot["project"], "name" | "path"> | null;
+export type ProjectColorSource = (Pick<ProjectEntry, "name" | "path"> | Pick<ProjectSnapshot["project"], "name" | "path">) & {
+	color?: string | null;
+} | null;
 
 const PROJECT_PALETTE = [
 	{ bg: "hsl(211 88% 56%)", fg: "hsl(0 0% 100%)" },
@@ -15,7 +17,7 @@ export function projectColorStyle(source: ProjectColorSource) {
 	const seed = `${source?.name ?? "trackboi"}:${source?.path ?? ""}`;
 	const color = PROJECT_PALETTE[hashString(seed) % PROJECT_PALETTE.length] ?? PROJECT_PALETTE[0];
 	return {
-		"--project-color": color.bg,
+		"--project-color": source?.color ?? color.bg,
 		"--project-fg": color.fg,
 	};
 }

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { RANK_ALPHABET } from "../../src/core/constants";
 import { parseFrontmatter, writeFrontmatter } from "../../src/core/frontmatter";
-import { newSlugId, slugifyIdPart } from "../../src/core/id";
+import { newId, newSlugId, slugifyIdPart } from "../../src/core/id";
 import { rankBetween } from "../../src/core/rank";
 
 describe("filesystem id helpers", () => {
@@ -24,12 +24,12 @@ describe("filesystem id helpers", () => {
 		});
 	}
 
-	test("newSlugId includes prefix, slug, and short random suffix", () => {
-		expect(newSlugId("card", "Release prep")).toMatch(/^card-release-prep-[a-z0-9]{7}$/);
+	test("newSlugId includes slug and short random suffix without a type prefix", () => {
+		expect(newSlugId("card", "Release prep")).toMatch(/^release-prep-[a-z0-9]{7}$/);
 	});
 
-	test("newSlugId uses prefix as slug fallback for punctuation-only titles", () => {
-		expect(newSlugId("track", "!!!")).toMatch(/^track-track-[a-z0-9]{7}$/);
+	test("newSlugId uses a neutral slug fallback for punctuation-only titles", () => {
+		expect(newSlugId("track", "!!!")).toMatch(/^item-[a-z0-9]{7}$/);
 	});
 
 	test("newSlugId never emits path separators or whitespace", () => {
@@ -42,6 +42,10 @@ describe("filesystem id helpers", () => {
 	test("newSlugId keeps ids stable-shaped but unique", () => {
 		const ids = new Set(Array.from({ length: 20 }, () => newSlugId("card", "Same title")));
 		expect(ids.size).toBe(20);
+	});
+
+	test("newId returns a plain id without a type prefix", () => {
+		expect(newId("agent").startsWith("agent_")).toBe(false);
 	});
 });
 

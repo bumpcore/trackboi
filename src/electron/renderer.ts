@@ -6,12 +6,13 @@ import type {
 	CreateTrackInput,
 	CustomField,
 	DesktopState,
+	GitCommitInput,
 	PersonAlias,
+	ProjectSettingsPatch,
 	TrackDecision,
 	TrackPatch,
 	TrackReference,
 	TrackFileWriteInput,
-	WorkScope,
 } from "@/core/types";
 import type { DesktopStorePatch, TrackboiBridgeApi, WindowBridgeApi } from "./bridge";
 import { trackboi } from "./trackboi";
@@ -25,19 +26,12 @@ function serializeCustomField(field: CustomField): CustomField {
 		: { ...field };
 }
 
-function serializeWorkScope(scope: WorkScope): WorkScope {
-	return scope.kind === "project"
-		? { kind: "project", ref: "global" }
-		: { kind: "track", ref: scope.ref };
-}
-
 function serializeCreateCardInput(input: {
 	boardId?: string;
 	title: string;
 	description?: string;
 	parentId?: string | null;
 	column: string;
-	scope?: WorkScope;
 	trackId?: string | null;
 	actorId?: string;
 }) {
@@ -47,7 +41,6 @@ function serializeCreateCardInput(input: {
 		description: input.description,
 		parentId: input.parentId,
 		column: input.column,
-		scope: input.scope ? serializeWorkScope(input.scope) : undefined,
 		trackId: input.trackId,
 		actorId: input.actorId,
 	};
@@ -59,13 +52,13 @@ function serializeCardPatch(patch: CardPatch): CardPatch {
 		title: patch.title,
 		description: patch.description,
 		parentId: patch.parentId,
-		scope: patch.scope ? serializeWorkScope(patch.scope) : undefined,
 		trackId: patch.trackId,
 		column: patch.column,
 		rank: patch.rank,
 		labels: patch.labels ? [...patch.labels] : undefined,
 		assignee: patch.assignee,
 		fieldValues: patch.fieldValues ? { ...patch.fieldValues } : undefined,
+		archivedAt: patch.archivedAt,
 		actorId: patch.actorId,
 	};
 }
@@ -248,6 +241,17 @@ export function createDesktopFacade(
 	async updateAppSettings(settings: AppSettings) {
 		return trackboiApi.updateAppSettings(serializeAppSettings(settings));
 	},
+	async listGitChanges(paths?: string[]) {
+		return trackboiApi.listGitChanges(paths);
+	},
+	async commitGitChanges(input: GitCommitInput) {
+		const result = await trackboiApi.commitGitChanges({
+			message: input.message,
+			paths: input.paths ? [...input.paths] : undefined,
+		});
+		scheduleProjectPrewarm();
+		return result;
+	},
 	async listDetectedEditors() {
 		return trackboiApi.listDetectedEditors();
 	},
@@ -293,6 +297,9 @@ export function createDesktopFacade(
 	async openWorkspaceFile() {
 		return trackboiApi.openWorkspaceFile();
 	},
+	async chooseProjectIconFile() {
+		return trackboiApi.chooseProjectIconFile();
+	},
 	async chooseProject() {
 		return refreshAfterProjectSelection(() => trackboiApi.chooseProject());
 	},
@@ -311,7 +318,6 @@ export function createDesktopFacade(
 		description?: string;
 		parentId?: string | null;
 		column: string;
-		scope?: WorkScope;
 		trackId?: string | null;
 	}) {
 		return trackboiApi.createCard(serializeCreateCardInput(input));
@@ -321,6 +327,12 @@ export function createDesktopFacade(
 	},
 	async updateBoard(board: Board) {
 		return trackboiApi.updateBoard(serializeBoard(board));
+	},
+	async updateProjectSettings(patch: ProjectSettingsPatch) {
+		return trackboiApi.updateProjectSettings({
+			color: patch.color ?? null,
+			iconPath: patch.iconPath ?? null,
+		});
 	},
 	async updateProjectPeople(people: PersonAlias[]) {
 		return trackboiApi.updateProjectPeople(people.map((person) => ({

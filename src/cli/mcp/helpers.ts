@@ -5,6 +5,9 @@ import * as z from "zod/v4";
 import type { AgentContext, Card, NodeFsTrackboiActions, ProjectEntry, ProjectSnapshot, ProjectView, WorktreeContext } from "../../core";
 
 export type ToolHandler = () => unknown | Promise<unknown>;
+export type McpCard = Omit<Card, "scope" | "variants"> & {
+	variants?: Array<Omit<NonNullable<Card["variants"]>[number], "scope">>;
+};
 
 export const projectPathSchema = z.string().optional().describe("Project path. Defaults to the agent's active project.");
 export const boardIdSchema = z.string().optional().describe("Board id. Defaults to the agent's active board for that project.");
@@ -54,10 +57,28 @@ export async function getCard(
 	context: McpProjectContext,
 	cardId: string,
 	projectPath?: string,
-): Promise<Card> {
+): Promise<McpCard> {
 	const card = (await requireSnapshot(trackboi, context, projectPath)).cards.find((candidate) => candidate.id === cardId);
 	if (!card) throw new Error(`Unknown card: ${cardId}`);
-	return card;
+	return toMcpCard(card);
+}
+
+/**
+ * Keeps legacy card scope compatibility internal to core storage/runtime data.
+ */
+export function toMcpCard(card: Card): McpCard {
+	const { scope: _scope, variants, ...rest } = card;
+	return {
+		...rest,
+		...(variants
+			? {
+				variants: variants.map((variant) => {
+					const { scope: _variantScope, ...variantRest } = variant;
+					return variantRest;
+				}),
+			}
+			: {}),
+	};
 }
 
 /**
@@ -74,6 +95,7 @@ export type McpProjectContext = {
 	currentAgentId(): Promise<string | null>;
 	setCurrentAgentId(agentId: string | null): Promise<void>;
 	listView(): Promise<ProjectView & {
+		cwd: string;
 		agentActiveProjectPath: string | null;
 		desktopActiveProjectPath: string | null;
 		agentActiveWorktreeId: string | null;
@@ -190,6 +212,7 @@ export async function createMcpProjectContext(
 			const context = await currentContext();
 			return {
 				...view,
+				cwd,
 				agentActiveProjectPath: context.projectPath,
 				desktopActiveProjectPath: view.activeProjectPath,
 				agentActiveWorktreeId: context.worktreeId,

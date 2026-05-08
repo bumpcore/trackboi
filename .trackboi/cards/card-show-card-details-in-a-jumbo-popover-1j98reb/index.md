@@ -5,15 +5,15 @@ title: "Show card details in a jumbo popover"
 parentId: null
 scope: {"kind":"project","ref":"global"}
 trackId: null
-column: "backlog"
+column: "done"
 rank: "j"
 labels: []
 assignee: null
 fieldValues: {}
 createdAt: "2026-05-07T11:50:23.992Z"
-updatedAt: "2026-05-07T11:50:23.992Z"
+updatedAt: "2026-05-08T19:12:30.404Z"
 createdBy: "agent_01KQY2VDKCWA3AEM5TF72W00FB"
-updatedBy: "agent_01KQY2VDKCWA3AEM5TF72W00FB"
+updatedBy: "agent_01KQWVZPDMN9AD0487WVC87EKX"
 ---
 Add a quick card-detail popover so users can inspect a card without opening the full detail pane.
 

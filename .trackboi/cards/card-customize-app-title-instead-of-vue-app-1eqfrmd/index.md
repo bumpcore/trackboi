@@ -5,15 +5,15 @@ title: "Customize app title instead of Vue App"
 parentId: null
 scope: {"kind":"project","ref":"global"}
 trackId: null
-column: "backlog"
+column: "done"
 rank: "j"
 labels: []
 assignee: null
 fieldValues: {}
 createdAt: "2026-05-07T11:32:36.485Z"
-updatedAt: "2026-05-07T11:32:36.485Z"
+updatedAt: "2026-05-08T18:38:21.543Z"
 createdBy: "agent_01KQY2VDKCWA3AEM5TF72W00FB"
-updatedBy: "agent_01KQY2VDKCWA3AEM5TF72W00FB"
+updatedBy: "agent_01KQWVZPDMN9AD0487WVC87EKX"
 ---
 The app window/page title still shows `Vue App`. Replace it with the proper trackboi title.
 

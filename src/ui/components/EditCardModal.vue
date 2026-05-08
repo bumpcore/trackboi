@@ -10,6 +10,7 @@ import MarkdownEditor from "@/ui/components/MarkdownEditor.vue";
 import MarkdownInline from "@/ui/components/MarkdownInline.vue";
 import MarkdownContent from "@/ui/components/MarkdownContent.vue";
 import Select from "@/ui/components/Select.vue";
+import Tooltip from "@/ui/components/Tooltip.vue";
 import type { SelectOption } from "@/ui/components/Select.vue";
 import type { CardDraft, ChildProgress, FieldValuesDraft } from "@/ui/viewTypes";
 
@@ -101,17 +102,18 @@ function setFieldBooleanValue(field: CustomField, value: boolean) {
 						<h2 class="mt-1 text-[22px] font-semibold tracking-tight text-foreground">Card details</h2>
 						<p class="mt-1 text-sm text-muted-foreground">Manage content, scope, fields, and subtasks from one surface.</p>
 					</div>
-					<Button
-						variant="ghost"
-						size="icon"
-						class="rounded-[2px] border border-transparent hover:border-border/60 hover:bg-background/70"
-						type="button"
-						title="Close"
-						aria-label="Close"
-						@click="$emit('close')"
-					>
-						<X class="h-4 w-4" />
-					</Button>
+					<Tooltip content="Close" side="left">
+						<Button
+							variant="ghost"
+							size="icon"
+							class="rounded-[2px] border border-transparent hover:border-border/60 hover:bg-background/70"
+							type="button"
+							aria-label="Close"
+							@click="$emit('close')"
+						>
+							<X class="h-4 w-4" />
+						</Button>
+					</Tooltip>
 				</header>
 
 				<div class="grid gap-5 px-6 py-6 lg:grid-cols-[minmax(0,1.65fr)_300px]">

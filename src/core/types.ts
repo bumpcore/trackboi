@@ -1,6 +1,7 @@
 export type Column = {
 	id: string;
 	name: string;
+	archivedAt?: string | null;
 };
 
 export type FieldType = "text" | "number" | "checkbox" | "select" | "date";
@@ -107,6 +108,8 @@ export type AppSettings = {
 export type ProjectMetadata = {
 	version: 1;
 	name: string;
+	color?: string | null;
+	iconPath?: string | null;
 	people: PersonAlias[];
 	agents: AgentRegistration[];
 };
@@ -129,6 +132,7 @@ export type Card = {
 	updatedAt: string;
 	createdBy: string;
 	updatedBy: string;
+	archivedAt?: string | null;
 	originWorktreeId?: string;
 	originStoragePath?: string;
 	worktreeIds?: string[];
@@ -234,6 +238,8 @@ export type ProjectEntry = {
 	status: ProjectStatus;
 	branch?: string | null;
 	cardCount?: number | null;
+	color?: string | null;
+	iconPath?: string | null;
 };
 
 export type ProjectSource = ProjectSourceKind & {
@@ -267,6 +273,35 @@ export type GitContext = {
 	identity?: GitIdentity | null;
 };
 
+export type GitChange = {
+	path: string;
+	indexStatus: string;
+	worktreeStatus: string;
+};
+
+export type GitChanges = {
+	repoRoot: string;
+	defaultPaths: string[];
+	changes: GitChange[];
+};
+
+export type GitCommitInput = {
+	message: string;
+	paths?: string[];
+};
+
+export type GitCommitResult = {
+	ok: true;
+	commit: string;
+	message: string;
+	paths: string[];
+};
+
+export type ProjectSettingsPatch = {
+	color?: string | null;
+	iconPath?: string | null;
+};
+
 export type WorktreeContext = {
 	id: string;
 	name: string;
@@ -278,6 +313,8 @@ export type WorktreeContext = {
 	status: ProjectStatus;
 	cardCount: number;
 	colorKey: string;
+	color?: string | null;
+	iconPath?: string | null;
 };
 
 export type ProjectSnapshot = {
@@ -309,7 +346,6 @@ export type CreateCardInput = {
 	parentId?: string | null;
 	column: string;
 	boardId?: string;
-	scope?: WorkScope;
 	trackId?: string | null;
 	actorId?: string;
 };
@@ -321,7 +357,7 @@ export type MoveCardInput = {
 };
 
 export type CardPatch = Partial<
-	Pick<Card, "boardId" | "title" | "description" | "parentId" | "scope" | "trackId" | "column" | "rank" | "labels" | "assignee" | "fieldValues">
+	Pick<Card, "boardId" | "title" | "description" | "parentId" | "trackId" | "column" | "rank" | "labels" | "assignee" | "fieldValues" | "archivedAt">
 > & {
 	actorId?: string;
 };
@@ -393,6 +429,9 @@ export type TrackboiRuntime = {
 	setActiveBoard(boardId: string): DesktopState;
 	readAppSettings(): AppSettings;
 	updateAppSettings(settings: AppSettings): AppSettings;
+	listGitChanges(paths?: string[]): GitChanges;
+	commitGitChanges(input: GitCommitInput): GitCommitResult;
+	updateProjectSettings(patch: ProjectSettingsPatch): ProjectMetadata;
 	updateProjectPeople(people: PersonAlias[]): ProjectMetadata;
 	chooseProjectPath(projectPath: string): ProjectSnapshot;
 	locateProjectPath(currentProjectPath: string, projectPath: string): ProjectSnapshot;
@@ -429,6 +468,9 @@ export type TrackboiActions = {
 	setActiveBoard(boardId: string): Promise<DesktopState>;
 	readAppSettings(): Promise<AppSettings>;
 	updateAppSettings(settings: AppSettings): Promise<AppSettings>;
+	listGitChanges(paths?: string[]): Promise<GitChanges>;
+	commitGitChanges(input: GitCommitInput): Promise<GitCommitResult>;
+	updateProjectSettings(patch: ProjectSettingsPatch): Promise<ProjectMetadata>;
 	updateProjectPeople(people: PersonAlias[]): Promise<ProjectMetadata>;
 	setStorageSearchPaths(paths: string[]): Promise<ProjectView>;
 	setActiveWorkspaceFile(filePath: string | null): Promise<ProjectView>;
@@ -443,6 +485,7 @@ export type TrackboiActions = {
 	writeTrackFile(input: TrackFileWriteInput): Promise<TrackFile>;
 	deleteTrackFile(trackId: string, fileName: string): Promise<{ ok: true }>;
 	openWorkspaceFile(): Promise<ProjectView | null>;
+	chooseProjectIconFile(): Promise<string | null>;
 	chooseProject(): Promise<ProjectSnapshot | null>;
 	locateProject(projectPath: string): Promise<ProjectSnapshot | null>;
 	removeProject(projectPath: string): Promise<ProjectSnapshot | null>;

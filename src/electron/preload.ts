@@ -25,6 +25,8 @@ const trackboiApi: TrackboiBridgeApi = {
 	setActiveBoard: (boardId) => ipcRenderer.invoke(ipcChannels.trackboi.setActiveBoard, boardId),
 	readAppSettings: () => ipcRenderer.invoke(ipcChannels.trackboi.readAppSettings),
 	updateAppSettings: (settings) => ipcRenderer.invoke(ipcChannels.trackboi.updateAppSettings, settings),
+	listGitChanges: (paths) => ipcRenderer.invoke(ipcChannels.trackboi.listGitChanges, paths),
+	commitGitChanges: (input) => ipcRenderer.invoke(ipcChannels.trackboi.commitGitChanges, input),
 	listDetectedEditors: () => ipcRenderer.invoke(ipcChannels.trackboi.listDetectedEditors),
 	openCardInEditor: (cardId) => ipcRenderer.invoke(ipcChannels.trackboi.openCardInEditor, cardId),
 	setStorageSearchPaths: (paths) => (
@@ -50,6 +52,7 @@ const trackboiApi: TrackboiBridgeApi = {
 		ipcRenderer.invoke(ipcChannels.trackboi.deleteTrackFile, trackId, fileName)
 	),
 	openWorkspaceFile: () => ipcRenderer.invoke(ipcChannels.trackboi.openWorkspaceFile),
+	chooseProjectIconFile: () => ipcRenderer.invoke(ipcChannels.trackboi.chooseProjectIconFile),
 	chooseProject: () => ipcRenderer.invoke(ipcChannels.trackboi.chooseProject),
 	locateProject: (projectPath) => (
 		ipcRenderer.invoke(ipcChannels.trackboi.locateProject, projectPath)
@@ -63,6 +66,7 @@ const trackboiApi: TrackboiBridgeApi = {
 		ipcRenderer.invoke(ipcChannels.trackboi.updateCard, cardId, patch)
 	),
 	updateBoard: (board) => ipcRenderer.invoke(ipcChannels.trackboi.updateBoard, board),
+	updateProjectSettings: (patch) => ipcRenderer.invoke(ipcChannels.trackboi.updateProjectSettings, patch),
 	updateProjectPeople: (people) => (
 		ipcRenderer.invoke(ipcChannels.trackboi.updateProjectPeople, people)
 	),

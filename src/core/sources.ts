@@ -2,8 +2,9 @@ import { existsSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { readGitContext } from "./git";
 import { readJson } from "./json";
-import { countCards, hasBoards, projectName, resolveProjectStorage } from "./storage";
-import type { Project, ProjectEntry, ProjectRegistry, ProjectSource } from "./types";
+import { countCards, hasBoards, normalizeProjectMetadata, projectName, resolveProjectStorage } from "./storage";
+import { projectMetadataPath } from "./paths";
+import type { Project, ProjectEntry, ProjectMetadata, ProjectRegistry, ProjectSource } from "./types";
 
 type CodeWorkspaceFile = {
 	folders?: Array<{
@@ -34,6 +35,9 @@ export function projectStatus(project: Project, registry: ProjectRegistry): Proj
 export function projectEntry(project: Project, registry: ProjectRegistry): ProjectEntry {
 	const git = readGitContext(project.path);
 	const resolved = resolveProjectStorage(project, registry, false);
+	const metadata = resolved && existsSync(projectMetadataPath(resolved.rootPath))
+		? normalizeProjectMetadata(readJson<ProjectMetadata>(projectMetadataPath(resolved.rootPath)), project, resolved.storagePath)
+		: null;
 	return {
 		projectPath: project.path,
 		name: project.name,
@@ -42,6 +46,8 @@ export function projectEntry(project: Project, registry: ProjectRegistry): Proje
 		status: projectStatus(project, registry),
 		branch: git.branch,
 		cardCount: resolved && hasBoards(resolved.rootPath) ? countCards(resolved.rootPath) : null,
+		color: metadata?.color ?? null,
+		iconPath: metadata?.iconPath ?? null,
 	};
 }
 

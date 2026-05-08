@@ -1,12 +1,11 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { writeFrontmatter } from "./frontmatter";
-import { normalizeScope } from "./git";
 import { newId, newSlugId } from "./id";
 import { cardCommentPath, cardCommentsPath, cardPath } from "./paths";
 import { rankBetween } from "./rank";
 import { deleteCardFile, now, readCards, type ProjectStore } from "./storage";
-import type { Card, CardComment, CardPatch, CreateCardCommentInput, CreateCardInput, MoveCardInput, ProjectSnapshotWithInternals } from "./types";
+import type { Board, Card, CardComment, CardPatch, CreateCardCommentInput, CreateCardInput, MoveCardInput, ProjectSnapshotWithInternals } from "./types";
 
 /**
  * Creates a card at the end of its target column.
@@ -22,13 +21,14 @@ export function createCardInStore(
 	const title = input.title.trim();
 	if (!title) throw new Error("Card title is required");
 
+	const board = requireBoardColumn(snapshot, input.boardId ?? snapshot.board.id, input.column);
 	const columnCards = snapshot.cards
-		.filter((card) => card.column === input.column)
+		.filter((card) => card.boardId === board.id && card.column === input.column)
 		.sort((left, right) => left.rank.localeCompare(right.rank));
 	const timestamp = now();
 	const card: Card = {
 		id: newSlugId("card", title),
-		boardId: input.boardId ?? snapshot.board.id,
+		boardId: board.id,
 		title,
 		description: input.description?.trim() ?? "",
 		parentId: input.parentId ?? null,
@@ -65,8 +65,9 @@ export function moveCardInStore(
 	const moving = snapshot.cards.find((card) => card.id === input.cardId);
 	if (!moving) throw new Error(`Unknown card: ${input.cardId}`);
 
+	requireBoardColumn(snapshot, moving.boardId, input.toColumn);
 	const targetCards = snapshot.cards
-		.filter((card) => card.id !== input.cardId && card.column === input.toColumn)
+		.filter((card) => card.id !== input.cardId && card.boardId === moving.boardId && card.column === input.toColumn)
 		.sort((left, right) => left.rank.localeCompare(right.rank));
 	const beforeIndex = input.beforeCardId
 		? targetCards.findIndex((card) => card.id === input.beforeCardId)
@@ -82,6 +83,21 @@ export function moveCardInStore(
 		column: input.toColumn,
 		rank: rankBetween(previousRank, nextRank),
 	});
+}
+
+/**
+ * Fails mutations that would place a card into a column that is not part of the
+ * target board's current shape.
+ */
+export function requireBoardColumn(snapshot: ProjectSnapshotWithInternals, boardId: string, columnId: string): Board {
+	const board = snapshot.boardRecords.find((candidate) => candidate.id === boardId)
+		?? (snapshot.board.id === boardId ? snapshot.board : null);
+	if (!board) throw new Error(`Unknown board: ${boardId}`);
+	const validColumnIds = board.columns.map((column) => column.id);
+	if (!validColumnIds.includes(columnId)) {
+		throw new Error(`Unknown column "${columnId}" for board "${boardId}". Valid columns: ${validColumnIds.join(", ") || "(none)"}`);
+	}
+	return board;
 }
 
 export function deleteCardInStore(store: ProjectStore, cardId: string): { ok: true } {
@@ -130,10 +146,8 @@ function applyCardPatch(card: Card, patch: CardPatch): Card {
 	if (typeof patch.title === "string") next.title = patch.title.trim();
 	if (typeof patch.description === "string") next.description = patch.description.trim();
 	if ("parentId" in patch) next.parentId = patch.parentId ?? null;
-	if (patch.scope) next.scope = normalizeScope(patch.scope);
 	if ("trackId" in patch) {
 		next.trackId = patch.trackId ?? null;
-		next.scope = { kind: "project", ref: "global" };
 	}
 	if (typeof patch.column === "string") next.column = patch.column;
 	if (typeof patch.rank === "string") next.rank = patch.rank;
@@ -141,6 +155,7 @@ function applyCardPatch(card: Card, patch: CardPatch): Card {
 	if (Array.isArray(patch.labels)) next.labels = patch.labels.filter((label) => typeof label === "string");
 	if ("assignee" in patch) next.assignee = typeof patch.assignee === "string" ? patch.assignee : null;
 	if (patch.fieldValues) next.fieldValues = patch.fieldValues;
+	if ("archivedAt" in patch) next.archivedAt = typeof patch.archivedAt === "string" ? patch.archivedAt : null;
 	if (!next.title.trim()) throw new Error("Card title is required");
 	next.updatedAt = now();
 	if (typeof patch.actorId === "string" && patch.actorId) next.updatedBy = patch.actorId;
@@ -154,7 +169,6 @@ function writeCardMarkdown(store: ProjectStore, card: Card): void {
 		boardId: card.boardId,
 		title: card.title,
 		parentId: card.parentId,
-		scope: card.scope,
 		trackId: card.trackId,
 		column: card.column,
 		rank: card.rank,
@@ -165,6 +179,7 @@ function writeCardMarkdown(store: ProjectStore, card: Card): void {
 		updatedAt: card.updatedAt,
 		createdBy: card.createdBy,
 		updatedBy: card.updatedBy,
+		archivedAt: card.archivedAt ?? null,
 	}, card.description);
 	writeFileSync(cardPath(store.rootPath, card.id), payload, "utf8");
 }

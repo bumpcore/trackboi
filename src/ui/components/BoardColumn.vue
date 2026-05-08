@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import Sortable, { type SortableEvent } from "sortablejs";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { ChevronRight, CircleDashed, GripVertical, Plus, Trash2 } from "lucide-vue-next";
+import { Archive, ChevronRight, CircleDashed, GripVertical, Plus } from "lucide-vue-next";
 import Badge from "@/ui/components/Badge.vue";
 import Button from "@/ui/components/Button.vue";
 import MarkdownContent from "@/ui/components/MarkdownContent.vue";
@@ -25,9 +25,11 @@ const emit = defineEmits<{
 	move: [cardId: string, toColumn: string, beforeCardId: string | null];
 	create: [columnId: string];
 	editColumn: [column: Column];
+	archiveColumn: [column: Column];
 	select: [card: TrackboiCard];
 	edit: [card: TrackboiCard];
 	delete: [card: TrackboiCard];
+	archive: [card: TrackboiCard];
 	openInEditor: [card: TrackboiCard];
 	freshSeen: [cardId: string];
 }>();
@@ -40,10 +42,25 @@ const contextMenu = ref<{
 	moveOpen: boolean;
 	moveMenuSide: "left" | "right";
 } | null>(null);
+const detailPopover = ref<{
+	card: TrackboiCard;
+	x: number;
+	y: number;
+} | null>(null);
+const cardLens = ref<{
+	card: TrackboiCard;
+	x: number;
+	y: number;
+} | null>(null);
 const CONTEXT_MENU_WIDTH = 208;
 const CONTEXT_MENU_HEIGHT = 180;
+const DETAIL_POPOVER_WIDTH = 420;
+const DETAIL_POPOVER_HEIGHT = 360;
+const CARD_LENS_WIDTH = 460;
+const CARD_LENS_HEIGHT = 300;
 const CONTEXT_MENU_MARGIN = 8;
 const hasCards = computed(() => props.cards.length > 0);
+const cardById = computed(() => new Map(props.cards.map((card) => [card.id, card])));
 const showDraggedSourceEmptyState = ref(false);
 let sortableInstance: Sortable | null = null;
 let suppressActivation = false;
@@ -109,6 +126,8 @@ function beginDrag(sourceList?: HTMLElement | null) {
 	showDraggedSourceEmptyState.value = sourceList === listElement.value && props.cards.length === 1;
 	clearActivationResetTimer();
 	closeContextMenu();
+	closeDetailPopover();
+	closeCardLens();
 }
 
 function endDrag() {
@@ -258,20 +277,90 @@ function visibleFieldEntries(card: TrackboiCard) {
 	});
 }
 
-function activateCard(card: TrackboiCard) {
+function activateCard(card: TrackboiCard, event?: Event) {
 	if (suppressActivation) return;
 	emit("select", card);
+	closeCardLens();
+	openDetailPopover(card, event?.currentTarget instanceof HTMLElement ? event.currentTarget : null);
 }
 
 function openCardEditor(card: TrackboiCard) {
 	if (suppressActivation) return;
+	closeDetailPopover();
 	emit("edit", card);
+}
+
+function openDetailPopover(card: TrackboiCard, target: HTMLElement | null) {
+	closeCardLens();
+	const rect = target?.getBoundingClientRect();
+	const preferredX = rect ? rect.right + 10 : window.innerWidth / 2 - DETAIL_POPOVER_WIDTH / 2;
+	const preferredY = rect ? rect.top : window.innerHeight / 2 - DETAIL_POPOVER_HEIGHT / 2;
+	const maxX = Math.max(CONTEXT_MENU_MARGIN, window.innerWidth - DETAIL_POPOVER_WIDTH - CONTEXT_MENU_MARGIN);
+	const maxY = Math.max(CONTEXT_MENU_MARGIN, window.innerHeight - DETAIL_POPOVER_HEIGHT - CONTEXT_MENU_MARGIN);
+	const sideX = rect && preferredX > maxX ? rect.left - DETAIL_POPOVER_WIDTH - 10 : preferredX;
+	detailPopover.value = {
+		card,
+		x: Math.min(Math.max(sideX, CONTEXT_MENU_MARGIN), maxX),
+		y: Math.min(Math.max(preferredY, CONTEXT_MENU_MARGIN), maxY),
+	};
+}
+
+function closeDetailPopover() {
+	detailPopover.value = null;
+}
+
+function openCardLens(card: TrackboiCard, target: HTMLElement | null) {
+	if (suppressActivation || contextMenu.value) return;
+	closeDetailPopover();
+	const rect = target?.getBoundingClientRect();
+	const preferredX = rect ? rect.right + 10 : window.innerWidth / 2 - CARD_LENS_WIDTH / 2;
+	const preferredY = rect ? rect.top : window.innerHeight / 2 - CARD_LENS_HEIGHT / 2;
+	const maxX = Math.max(CONTEXT_MENU_MARGIN, window.innerWidth - CARD_LENS_WIDTH - CONTEXT_MENU_MARGIN);
+	const maxY = Math.max(CONTEXT_MENU_MARGIN, window.innerHeight - CARD_LENS_HEIGHT - CONTEXT_MENU_MARGIN);
+	const sideX = rect && preferredX > maxX ? rect.left - CARD_LENS_WIDTH - 10 : preferredX;
+	cardLens.value = {
+		card,
+		x: Math.min(Math.max(sideX, CONTEXT_MENU_MARGIN), maxX),
+		y: Math.min(Math.max(preferredY, CONTEXT_MENU_MARGIN), maxY),
+	};
+}
+
+function closeCardLens() {
+	cardLens.value = null;
+}
+
+function cardElementFromEvent(event: Event): HTMLElement | null {
+	const target = event.target;
+	if (!(target instanceof HTMLElement)) return null;
+	const cardElement = target.closest<HTMLElement>("[data-card-id]");
+	if (!cardElement || !listElement.value?.contains(cardElement)) return null;
+	return cardElement;
+}
+
+function handleCardPointerOver(event: PointerEvent) {
+	const cardElement = cardElementFromEvent(event);
+	if (!cardElement) return;
+	if (event.relatedTarget instanceof Node && cardElement.contains(event.relatedTarget)) return;
+	const cardId = cardElement.dataset.cardId;
+	const card = cardId ? cardById.value.get(cardId) : null;
+	if (!card) return;
+	openCardLens(card, cardElement);
+	emit("freshSeen", card.id);
+}
+
+function handleCardPointerOut(event: PointerEvent) {
+	const cardElement = cardElementFromEvent(event);
+	if (!cardElement) return;
+	if (event.relatedTarget instanceof Node && cardElement.contains(event.relatedTarget)) return;
+	closeCardLens();
 }
 
 function openContextMenu(card: TrackboiCard, event: MouseEvent) {
 	event.preventDefault();
 	event.stopPropagation();
 	emit("select", card);
+	closeDetailPopover();
+	closeCardLens();
 	const currentTarget = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
 	const rect = currentTarget?.getBoundingClientRect();
 	const pointerX = Number.isFinite(event.clientX) && event.clientX > 0
@@ -301,6 +390,8 @@ function closeContextMenu() {
 
 function handlePointerDown() {
 	closeContextMenu();
+	closeDetailPopover();
+	closeCardLens();
 }
 
 function moveViaContext(columnId: string) {
@@ -345,6 +436,18 @@ watch(contextMenu, (nextMenu, previousMenu) => {
 		return;
 	}
 	if (previousMenu && !nextMenu) {
+		window.removeEventListener("pointerdown", handlePointerDown);
+	}
+});
+
+watch(detailPopover, (nextPopover, previousPopover) => {
+	if (!previousPopover && nextPopover) {
+		window.setTimeout(() => {
+			if (detailPopover.value) window.addEventListener("pointerdown", handlePointerDown);
+		}, 0);
+		return;
+	}
+	if (previousPopover && !nextPopover && !contextMenu.value) {
 		window.removeEventListener("pointerdown", handlePointerDown);
 	}
 });
@@ -426,6 +529,18 @@ onBeforeUnmount(() => {
 						<Plus class="h-4 w-4" />
 					</Button>
 				</Tooltip>
+				<Tooltip content="Archive column" side="left">
+					<Button
+						variant="ghost"
+						size="icon"
+						class="rounded-[2px] border border-transparent text-muted-foreground hover:border-border/60 hover:bg-background/70 hover:text-foreground"
+						type="button"
+						data-sortable-ignore
+						@click="emit('archiveColumn', column)"
+					>
+						<Archive class="h-4 w-4" />
+					</Button>
+				</Tooltip>
 			</div>
 		</header>
 
@@ -436,6 +551,8 @@ onBeforeUnmount(() => {
 					class="flex h-full min-h-full flex-col gap-2.5 px-2.5 py-3"
 					data-column-list="true"
 					:data-testid="`column-${column.id}-list`"
+					@pointerover="handleCardPointerOver"
+					@pointerout="handleCardPointerOut"
 				>
 					<UiCard
 						v-for="card in props.cards"
@@ -447,26 +564,32 @@ onBeforeUnmount(() => {
 						:data-testid="`card-${card.id}`"
 						role="button"
 						tabindex="0"
-						@click="activateCard(card)"
+						@click="activateCard(card, $event)"
 						@dblclick.stop="openCardEditor(card)"
 						@mousedown.right.capture.prevent.stop="openContextMenu(card, $event)"
 						@contextmenu.capture.prevent.stop="openContextMenu(card, $event)"
-						@mouseenter="emit('freshSeen', card.id)"
+						@focusin="openCardLens(card, $event.currentTarget instanceof HTMLElement ? $event.currentTarget : null)"
+						@focusout="closeCardLens()"
+						@pointerenter="openCardLens(card, $event.currentTarget instanceof HTMLElement ? $event.currentTarget : null); emit('freshSeen', card.id)"
+						@pointerleave="closeCardLens()"
+						@mouseenter="openCardLens(card, $event.currentTarget instanceof HTMLElement ? $event.currentTarget : null); emit('freshSeen', card.id)"
+						@mouseleave="closeCardLens()"
 						@keydown.enter.prevent="openCardEditor(card)"
-						@keydown.space.prevent="activateCard(card)"
+						@keydown.space.prevent="activateCard(card, $event)"
+						@keydown.esc.stop="closeDetailPopover(); closeCardLens()"
 					>
 					<div
 						class="min-w-0 max-w-full bg-transparent text-left"
 					>
 						<MarkdownInline
 							:value="card.title"
-							class="block [overflow-wrap:anywhere] text-[13px] font-semibold leading-5 text-foreground"
+							class="board-card-title block [overflow-wrap:anywhere] text-[13px] font-semibold leading-5 text-foreground"
 						/>
 						<MarkdownContent
 							v-if="card.description"
 							:value="card.description"
 							preview
-							class="mt-1.5 text-[12px] leading-5 text-muted-foreground"
+							class="board-card-preview mt-1.5 text-[12px] leading-5 text-muted-foreground"
 						/>
 						<div class="board-card-badges mt-2 flex max-w-full flex-wrap gap-1.5">
 							<Badge
@@ -515,15 +638,79 @@ onBeforeUnmount(() => {
 						variant="ghost"
 						size="icon"
 						type="button"
-						title="Delete card"
-						aria-label="Delete card"
+						aria-label="Archive card"
 						data-sortable-ignore
-						@click.stop="emit('delete', card)"
+						@click.stop="emit('archive', card)"
 					>
-						<Trash2 class="h-4 w-4" />
+						<Archive class="h-4 w-4" />
 					</Button>
 					</UiCard>
 				</div>
+
+				<div
+					v-if="detailPopover"
+					class="fixed z-40 grid max-h-[min(360px,calc(100vh-24px))] w-[min(420px,calc(100vw-24px))] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-[2px] border border-border/75 bg-popover text-popover-foreground shadow-2xl"
+					:style="{ left: `${detailPopover.x}px`, top: `${detailPopover.y}px` }"
+					role="dialog"
+					aria-label="Card details"
+					data-testid="card-detail-popover"
+					@pointerdown.stop
+				>
+					<header class="flex items-start justify-between gap-3 border-b border-border/55 px-4 py-3">
+						<div class="min-w-0">
+							<MarkdownInline :value="detailPopover.card.title" class="block [overflow-wrap:anywhere] text-sm font-semibold leading-5 text-foreground" />
+							<p class="mt-1 truncate text-[11px] text-muted-foreground">
+								{{ detailPopover.card.id }}
+							</p>
+						</div>
+						<Tooltip content="Close details" side="left">
+							<Button variant="ghost" size="icon" type="button" aria-label="Close details" @click="closeDetailPopover()">
+								<ChevronRight class="h-4 w-4 rotate-90" />
+							</Button>
+						</Tooltip>
+					</header>
+					<div class="app-scroll min-h-0 overflow-y-auto px-4 py-3">
+						<div v-if="detailPopover.card.description" class="text-sm leading-6 text-foreground">
+							<MarkdownContent :value="detailPopover.card.description" />
+						</div>
+						<p v-else class="text-sm text-muted-foreground">No description.</p>
+						<section v-if="detailPopover.card.comments.length > 0" class="mt-4 grid gap-2 border-t border-border/50 pt-3">
+							<p class="text-xs font-semibold uppercase text-muted-foreground">Comments</p>
+							<div
+								v-for="comment in detailPopover.card.comments"
+								:key="comment.id"
+								class="rounded-[2px] border border-border/60 bg-background/28 px-3 py-2"
+							>
+								<MarkdownContent :value="comment.body" class="text-sm leading-6" />
+							</div>
+						</section>
+					</div>
+					<footer class="flex justify-end border-t border-border/55 px-4 py-3">
+						<Button type="button" size="sm" @click="openCardEditor(detailPopover.card)">
+							Open full details
+						</Button>
+					</footer>
+				</div>
+
+				<Teleport to="body">
+					<div
+						v-if="cardLens"
+						class="fixed z-[70] grid max-h-[min(300px,calc(100vh-24px))] w-[min(460px,calc(100vw-24px))] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[2px] border border-border/75 bg-popover text-popover-foreground shadow-2xl"
+						:style="{ left: `${cardLens.x}px`, top: `${cardLens.y}px` }"
+						role="tooltip"
+						data-testid="card-expanded-lens"
+						@pointerdown.stop
+					>
+						<header class="border-b border-border/55 px-4 py-3">
+							<p class="trackboi-mono-font text-[10px] uppercase tracking-[0.12em] text-primary">Card lens</p>
+							<MarkdownInline :value="cardLens.card.title" class="mt-1 block [overflow-wrap:anywhere] text-sm font-semibold leading-5 text-foreground" />
+						</header>
+						<div class="app-scroll min-h-0 overflow-y-auto px-4 py-3">
+							<MarkdownContent v-if="cardLens.card.description" :value="cardLens.card.description" class="text-sm leading-6" />
+							<p v-else class="text-sm text-muted-foreground">No description.</p>
+						</div>
+					</div>
+				</Teleport>
 
 				<div
 					v-if="showEmptyState"
@@ -601,7 +788,15 @@ onBeforeUnmount(() => {
 						</div>
 						<button
 							type="button"
-							class="trackboi-mono-font mt-1 flex w-full items-center rounded-[2px] px-2.5 py-1.5 text-left text-[11px] text-destructive hover:bg-destructive/8"
+							class="trackboi-mono-font mt-1 flex w-full items-center rounded-[2px] px-2.5 py-1.5 text-left text-[11px] text-foreground hover:bg-secondary/55"
+							data-testid="card-context-archive"
+							@click="emit('archive', contextMenu.card); closeContextMenu()"
+						>
+							Archive
+						</button>
+						<button
+							type="button"
+							class="trackboi-mono-font flex w-full items-center rounded-[2px] px-2.5 py-1.5 text-left text-[11px] text-destructive hover:bg-destructive/8"
 							data-testid="card-context-delete"
 							@click="emit('delete', contextMenu.card); closeContextMenu()"
 						>

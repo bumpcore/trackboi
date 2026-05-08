@@ -5,15 +5,15 @@ title: "Improve agent orientation and worktree detection"
 parentId: null
 scope: {"kind":"project","ref":"global"}
 trackId: null
-column: "backlog"
+column: "done"
 rank: "j"
 labels: []
 assignee: null
 fieldValues: {}
 createdAt: "2026-05-07T11:32:48.569Z"
-updatedAt: "2026-05-07T11:32:48.569Z"
+updatedAt: "2026-05-08T18:37:47.392Z"
 createdBy: "agent_01KQY2VDKCWA3AEM5TF72W00FB"
-updatedBy: "agent_01KQY2VDKCWA3AEM5TF72W00FB"
+updatedBy: "agent_01KQWVZPDMN9AD0487WVC87EKX"
 ---
 Improve agent orientation and current worktree detection, or at least motivate agents to switch the active worktree when appropriate.
 

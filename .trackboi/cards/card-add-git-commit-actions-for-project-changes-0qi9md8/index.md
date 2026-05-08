@@ -5,15 +5,15 @@ title: "Add git commit actions for project changes"
 parentId: null
 scope: {"kind":"project","ref":"global"}
 trackId: null
-column: "backlog"
+column: "done"
 rank: "j"
 labels: []
 assignee: null
 fieldValues: {}
 createdAt: "2026-05-07T11:46:37.100Z"
-updatedAt: "2026-05-07T11:46:37.100Z"
+updatedAt: "2026-05-08T18:54:08.494Z"
 createdBy: "agent_01KQY2VDKCWA3AEM5TF72W00FB"
-updatedBy: "agent_01KQY2VDKCWA3AEM5TF72W00FB"
+updatedBy: "agent_01KQWVZPDMN9AD0487WVC87EKX"
 ---
 Provide commit support for git-detected projects, with careful treatment of optional autocommit because it can be too aggressive.
 

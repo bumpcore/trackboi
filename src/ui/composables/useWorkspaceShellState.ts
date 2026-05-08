@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, ref, watch, type Ref } from "vue";
+import { computed, getCurrentInstance, onBeforeUnmount, ref, watch, type Ref } from "vue";
 import type { LeftPanelView, RightPanelView, WorkspaceShellPrefs } from "@/ui/viewTypes";
 
 const DEFAULT_PREFS: WorkspaceShellPrefs = {
@@ -36,7 +36,7 @@ type WorkspaceShellState = {
 	leftResizeClass: Ref<string>;
 	rightResizeClass: Ref<string>;
 	setLeftView(view: LeftPanelView): void;
-	setRightView(view: RightPanelView): void;
+	setRightView(view: RightPanelView, options?: { reveal?: boolean }): void;
 	toggleLeftCollapsed(): void;
 	toggleRightCollapsed(): void;
 	resetLeftWidth(): void;
@@ -172,9 +172,9 @@ export function useWorkspaceShellState(): WorkspaceShellState {
 		if (leftCollapsed.value) leftCollapsed.value = false;
 	}
 
-	function setRightView(view: RightPanelView) {
+	function setRightView(view: RightPanelView, options: { reveal?: boolean } = {}) {
 		rightView.value = view;
-		if (rightCollapsed.value) rightCollapsed.value = false;
+		if (options.reveal !== false && rightCollapsed.value) rightCollapsed.value = false;
 	}
 
 	function toggleLeftCollapsed() {
@@ -281,10 +281,12 @@ export function useWorkspaceShellState(): WorkspaceShellState {
 		};
 	}
 
-	onBeforeUnmount(() => {
-		activeCleanup?.();
-		if (typeof window !== "undefined") window.removeEventListener("resize", syncViewportWidth);
-	});
+	if (getCurrentInstance()) {
+		onBeforeUnmount(() => {
+			activeCleanup?.();
+			if (typeof window !== "undefined") window.removeEventListener("resize", syncViewportWidth);
+		});
+	}
 
 	if (typeof window !== "undefined") {
 		window.addEventListener("resize", syncViewportWidth);

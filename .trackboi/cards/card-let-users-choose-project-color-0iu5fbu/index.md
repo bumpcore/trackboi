@@ -5,15 +5,15 @@ title: "Let users choose project color"
 parentId: null
 scope: {"kind":"project","ref":"global"}
 trackId: null
-column: "backlog"
+column: "done"
 rank: "j"
 labels: []
 assignee: null
 fieldValues: {}
 createdAt: "2026-05-07T11:32:18.156Z"
-updatedAt: "2026-05-07T11:32:18.156Z"
+updatedAt: "2026-05-08T19:00:46.175Z"
 createdBy: "agent_01KQY2VDKCWA3AEM5TF72W00FB"
-updatedBy: "agent_01KQY2VDKCWA3AEM5TF72W00FB"
+updatedBy: "agent_01KQWVZPDMN9AD0487WVC87EKX"
 ---
 Allow users to choose a color for a project/workspace so it can be visually distinguished in project and worktree lists.
 

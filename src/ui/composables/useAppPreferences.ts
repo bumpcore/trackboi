@@ -17,8 +17,10 @@ export const DEFAULT_PROJECT_SETTINGS_SHORTCUT = "Ctrl+Alt+,";
 export const DEFAULT_BOARD_SETTINGS_SHORTCUT = "Ctrl+Alt+B";
 export const DEFAULT_FOCUS_BOARD_SHORTCUT = "Ctrl+Alt+0";
 export const DEFAULT_THEME_MODE = "dark";
+export const DEFAULT_ACCENT_COLOR = "amber";
 
 export type ThemeMode = "dark" | "light" | "system";
+export type AccentColor = "amber" | "blue" | "green" | "rose" | "violet";
 
 type PersistedAppPreferences = {
 	leftPanelShortcut: string;
@@ -35,10 +37,19 @@ type PersistedAppPreferences = {
 	boardSettingsShortcut: string;
 	focusBoardShortcut: string;
 	themeMode: ThemeMode;
+	accentColor: AccentColor;
 };
 
 function normalizeThemeMode(value: unknown): ThemeMode {
 	return value === "light" || value === "system" ? value : "dark";
+}
+
+/**
+ * Converts persisted or user-selected accent values into a supported palette
+ * id so older settings and malformed storage keep a stable default.
+ */
+export function normalizeAccentColor(value: unknown): AccentColor {
+	return value === "blue" || value === "green" || value === "rose" || value === "violet" ? value : DEFAULT_ACCENT_COLOR;
 }
 
 /**
@@ -60,6 +71,7 @@ export function useAppPreferences() {
 	const boardSettingsShortcut = ref(DEFAULT_BOARD_SETTINGS_SHORTCUT);
 	const focusBoardShortcut = ref(DEFAULT_FOCUS_BOARD_SHORTCUT);
 	const themeMode = ref<ThemeMode>(DEFAULT_THEME_MODE);
+	const accentColor = ref<AccentColor>(DEFAULT_ACCENT_COLOR);
 
 	function defaultPreferences(): PersistedAppPreferences {
 		return {
@@ -77,6 +89,7 @@ export function useAppPreferences() {
 			boardSettingsShortcut: DEFAULT_BOARD_SETTINGS_SHORTCUT,
 			focusBoardShortcut: DEFAULT_FOCUS_BOARD_SHORTCUT,
 			themeMode: DEFAULT_THEME_MODE,
+			accentColor: DEFAULT_ACCENT_COLOR,
 		};
 	}
 
@@ -104,6 +117,7 @@ export function useAppPreferences() {
 				boardSettingsShortcut: normalizeShortcut(parsed.boardSettingsShortcut ?? "") ?? defaults.boardSettingsShortcut,
 				focusBoardShortcut: normalizeShortcut(parsed.focusBoardShortcut ?? "") ?? defaults.focusBoardShortcut,
 				themeMode: normalizeThemeMode(parsed.themeMode),
+				accentColor: normalizeAccentColor(parsed.accentColor),
 			};
 		} catch {
 			return defaults;
@@ -127,6 +141,7 @@ export function useAppPreferences() {
 			boardSettingsShortcut: normalizeShortcut(boardSettingsShortcut.value) ?? DEFAULT_BOARD_SETTINGS_SHORTCUT,
 			focusBoardShortcut: normalizeShortcut(focusBoardShortcut.value) ?? DEFAULT_FOCUS_BOARD_SHORTCUT,
 			themeMode: normalizeThemeMode(themeMode.value),
+			accentColor: normalizeAccentColor(accentColor.value),
 		};
 		window.localStorage.setItem(APP_PREFERENCES_KEY, JSON.stringify(payload));
 	}
@@ -151,6 +166,10 @@ export function useAppPreferences() {
 		themeMode.value = DEFAULT_THEME_MODE;
 	}
 
+	function resetAccentColor() {
+		accentColor.value = DEFAULT_ACCENT_COLOR;
+	}
+
 	const persisted = readPreferences();
 	leftPanelShortcut.value = persisted.leftPanelShortcut;
 	rightPanelShortcut.value = persisted.rightPanelShortcut;
@@ -166,6 +185,7 @@ export function useAppPreferences() {
 	boardSettingsShortcut.value = persisted.boardSettingsShortcut;
 	focusBoardShortcut.value = persisted.focusBoardShortcut;
 	themeMode.value = persisted.themeMode;
+	accentColor.value = persisted.accentColor;
 
 	watch([
 		leftPanelShortcut,
@@ -182,6 +202,7 @@ export function useAppPreferences() {
 		boardSettingsShortcut,
 		focusBoardShortcut,
 		themeMode,
+		accentColor,
 	], () => {
 		writePreferences();
 	});
@@ -201,7 +222,9 @@ export function useAppPreferences() {
 		boardSettingsShortcut,
 		focusBoardShortcut,
 		themeMode,
+		accentColor,
 		resetPanelShortcuts,
 		resetThemeMode,
+		resetAccentColor,
 	};
 }

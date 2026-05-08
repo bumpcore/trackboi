@@ -40,9 +40,13 @@ export function useWindowChrome() {
 		await desktop.closeWindow();
 	}
 
+	async function toggleMaximizeWindow() {
+		await desktop.toggleMaximizeWindow();
+	}
+
 	async function handleTitlebarDoubleClick(event: MouseEvent) {
 		if (isWindowControlEvent(event)) return;
-		await desktop.toggleMaximizeWindow();
+		await toggleMaximizeWindow();
 	}
 
 	function startTitlebarDrag(event: PointerEvent) {
@@ -65,5 +69,6 @@ export function useWindowChrome() {
 		resizeHandleClass,
 		startResize,
 		startTitlebarDrag,
+		toggleMaximizeWindow,
 	};
 }

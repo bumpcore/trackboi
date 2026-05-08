@@ -3,6 +3,7 @@ import { onBeforeUnmount, watch } from "vue";
 import { X } from "lucide-vue-next";
 import Button from "@/ui/components/Button.vue";
 import Input from "@/ui/components/Input.vue";
+import Tooltip from "@/ui/components/Tooltip.vue";
 
 const props = defineProps<{
 	open: boolean;
@@ -52,9 +53,11 @@ onBeforeUnmount(() => {
 							Create another board inside the current project.
 						</p>
 					</div>
-					<Button variant="ghost" size="icon" type="button" class="rounded-[2px]" title="Close" aria-label="Close" @click="emit('close')">
-						<X class="h-4 w-4" />
-					</Button>
+					<Tooltip content="Close" side="left">
+						<Button variant="ghost" size="icon" type="button" class="rounded-[2px]" aria-label="Close" @click="emit('close')">
+							<X class="h-4 w-4" />
+						</Button>
+					</Tooltip>
 				</header>
 
 				<form class="grid gap-4 p-5" @submit.prevent="emit('create')">

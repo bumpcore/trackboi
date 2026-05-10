@@ -16,6 +16,7 @@ import Button from "@/ui/components/Button.vue";
 import Input from "@/ui/components/Input.vue";
 import MarkdownEditor from "@/ui/components/MarkdownEditor.vue";
 import Select from "@/ui/components/Select.vue";
+import Tooltip from "@/ui/components/Tooltip.vue";
 import type { SelectOption } from "@/ui/components/Select.vue";
 import { normalizeTrackDocName } from "@/ui/lib/trackDocs";
 
@@ -341,12 +342,16 @@ defineExpose({
 						<span class="text-sm font-medium text-foreground">{{ decision.title }}</span>
 						<div class="flex items-center gap-2">
 							<Badge variant="outline">{{ decision.status }}</Badge>
-							<Button variant="ghost" size="icon" type="button" title="Edit decision" aria-label="Edit decision" @click="startDecisionEdit(decision)">
-								<Save class="h-4 w-4" />
-							</Button>
-							<Button variant="ghost" size="icon" type="button" title="Remove decision" aria-label="Remove decision" @click="decisions = decisions.filter((entry) => entry.id !== decision.id)">
-								<Trash2 class="h-4 w-4" />
-							</Button>
+							<Tooltip content="Edit decision" side="top">
+								<Button variant="ghost" size="icon" type="button" aria-label="Edit decision" @click="startDecisionEdit(decision)">
+									<Save class="h-4 w-4" />
+								</Button>
+							</Tooltip>
+							<Tooltip content="Remove decision" side="top">
+								<Button variant="ghost" size="icon" type="button" aria-label="Remove decision" @click="decisions = decisions.filter((entry) => entry.id !== decision.id)">
+									<Trash2 class="h-4 w-4" />
+								</Button>
+							</Tooltip>
 						</div>
 					</div>
 					<p v-if="decision.body" class="mt-2 text-xs text-muted-foreground">{{ decision.body }}</p>
@@ -385,12 +390,16 @@ defineExpose({
 					</div>
 					<div class="flex items-center gap-2">
 						<Badge variant="outline">{{ reference.kind }}</Badge>
-						<Button variant="ghost" size="icon" type="button" title="Edit reference" aria-label="Edit reference" @click="startReferenceEdit(reference)">
-							<Save class="h-4 w-4" />
-						</Button>
-						<Button variant="ghost" size="icon" type="button" title="Remove reference" aria-label="Remove reference" @click="references = references.filter((entry) => entry.id !== reference.id)">
-							<Trash2 class="h-4 w-4" />
-						</Button>
+						<Tooltip content="Edit reference" side="top">
+							<Button variant="ghost" size="icon" type="button" aria-label="Edit reference" @click="startReferenceEdit(reference)">
+								<Save class="h-4 w-4" />
+							</Button>
+						</Tooltip>
+						<Tooltip content="Remove reference" side="top">
+							<Button variant="ghost" size="icon" type="button" aria-label="Remove reference" @click="references = references.filter((entry) => entry.id !== reference.id)">
+								<Trash2 class="h-4 w-4" />
+							</Button>
+						</Tooltip>
 					</div>
 				</div>
 			</div>

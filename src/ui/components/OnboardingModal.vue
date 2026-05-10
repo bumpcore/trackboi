@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { Bot, GitBranch, User, X } from "lucide-vue-next";
-import type { ProjectSnapshot } from "@/core/types";
+import type { AgentRegistration, PersonAlias, ProjectSnapshot } from "@/core/types";
 import Button from "@/ui/components/Button.vue";
 import Input from "@/ui/components/Input.vue";
+import Tooltip from "@/ui/components/Tooltip.vue";
 
 const props = defineProps<{
 	open: boolean;
 	snapshot: ProjectSnapshot | null;
+	knownPeople: PersonAlias[];
+	knownAgents: AgentRegistration[];
 }>();
 
 const displayName = defineModel<string>("displayName", { required: true });
@@ -23,6 +26,17 @@ const emit = defineEmits<{
 
 const canComplete = computed(() => displayName.value.trim().length > 0);
 const storagePath = computed(() => props.snapshot?.project.storagePath ?? ".trackboi");
+
+function usePerson(person: PersonAlias) {
+	displayName.value = person.displayName;
+	gitName.value = person.gitNames[0] ?? "";
+	gitEmail.value = person.gitEmails[0] ?? "";
+}
+
+function useAgent(agent: AgentRegistration) {
+	agentName.value = agent.name;
+	agentDescription.value = agent.description ?? "";
+}
 </script>
 
 <template>
@@ -42,9 +56,11 @@ const storagePath = computed(() => props.snapshot?.project.storagePath ?? ".trac
 							trackboi uses this to make repo-local cards, people aliases, and agent handoffs readable.
 						</p>
 					</div>
-					<Button variant="ghost" size="icon" type="button" class="rounded-[2px]" title="Close" aria-label="Close" @click="emit('close')">
-						<X class="h-4 w-4" />
-					</Button>
+					<Tooltip content="Close" side="left">
+						<Button variant="ghost" size="icon" type="button" class="rounded-[2px]" aria-label="Close" @click="emit('close')">
+							<X class="h-4 w-4" />
+						</Button>
+					</Tooltip>
 				</header>
 
 				<div class="grid gap-5 p-6">
@@ -70,6 +86,18 @@ const storagePath = computed(() => props.snapshot?.project.storagePath ?? ".trac
 								<Input v-model="gitEmail" autocomplete="off" placeholder="git config user.email" />
 							</label>
 						</div>
+						<div v-if="knownPeople.length > 0" class="flex flex-wrap gap-2">
+							<Button
+								v-for="person in knownPeople"
+								:key="person.id"
+								variant="outline"
+								size="sm"
+								type="button"
+								@click="usePerson(person)"
+							>
+								{{ person.displayName }}
+							</Button>
+						</div>
 					</section>
 
 					<section class="grid gap-3 bg-background/12 p-4">
@@ -89,6 +117,18 @@ const storagePath = computed(() => props.snapshot?.project.storagePath ?? ".trac
 								Note
 								<Input v-model="agentDescription" autocomplete="off" placeholder="Default coding identity" />
 							</label>
+						</div>
+						<div v-if="knownAgents.length > 0" class="flex flex-wrap gap-2">
+							<Button
+								v-for="agent in knownAgents"
+								:key="agent.id"
+								variant="outline"
+								size="sm"
+								type="button"
+								@click="useAgent(agent)"
+							>
+								{{ agent.name }}
+							</Button>
 						</div>
 					</section>
 

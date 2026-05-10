@@ -12,7 +12,7 @@ import Button from "@/ui/components/Button.vue";
 const open = defineModel<boolean>("open", { default: false });
 
 withDefaults(defineProps<{
-	title: string;
+	heading: string;
 	description: string;
 	confirmLabel?: string;
 	cancelLabel?: string;
@@ -38,9 +38,9 @@ defineEmits<{
 			>
 				<div class="grid gap-2">
 					<AlertDialogTitle class="text-lg font-semibold">
-						{{ title }}
+						{{ heading }}
 					</AlertDialogTitle>
-					<AlertDialogDescription class="text-sm leading-6 text-muted-foreground">
+					<AlertDialogDescription class="whitespace-pre-line text-sm leading-6 text-muted-foreground">
 						{{ description }}
 					</AlertDialogDescription>
 				</div>

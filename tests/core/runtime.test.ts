@@ -629,7 +629,7 @@ describe("runtime worktree integration", () => {
 		expect(materializedTrack).toBeDefined();
 		expect(updated.trackId).toBe(materializedTrack?.id);
 		expect(cardFile.trackId).toBe(materializedTrack?.id);
-		expect(cardFile.scope).toEqual({ kind: "project", ref: "global" });
+		expect(cardFile.scope).toBeUndefined();
 	});
 
 	test("creates, updates, reads, and deletes tracks plus track files", () => {

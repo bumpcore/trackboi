@@ -19,6 +19,8 @@ type ProjectBoardSettings = {
 	fieldOptionsDraft: Ref<string>;
 	boardCreateNameDraft: Ref<string>;
 	boardNameDraft: Ref<string>;
+	projectColorDraft: Ref<string>;
+	projectIconPathDraft: Ref<string>;
 	personDisplayNameDraft: Ref<string>;
 	personEmailsDraft: Ref<string>;
 	personNamesDraft: Ref<string>;
@@ -30,6 +32,9 @@ type ProjectBoardSettings = {
 	createBoard(): Promise<void>;
 	deleteBoard(boardId: string): Promise<void>;
 	saveBoardName(): Promise<void>;
+	saveProjectColor(): Promise<void>;
+	chooseProjectIcon(): Promise<void>;
+	saveProjectIcon(): Promise<void>;
 	addCustomField(): Promise<void>;
 	removeCustomField(fieldId: string): Promise<void>;
 	addPersonAlias(): Promise<void>;
@@ -55,6 +60,8 @@ export function useProjectBoardSettings(options: {
 	const fieldOptionsDraft = ref("");
 	const boardCreateNameDraft = ref("");
 	const boardNameDraft = ref("");
+	const projectColorDraft = ref("#3b82f6");
+	const projectIconPathDraft = ref("");
 	const personDisplayNameDraft = ref("");
 	const personEmailsDraft = ref("");
 	const personNamesDraft = ref("");
@@ -74,6 +81,8 @@ export function useProjectBoardSettings(options: {
 		() => options.snapshot.value,
 		(nextSnapshot) => {
 			boardNameDraft.value = nextSnapshot?.board.name ?? "";
+			projectColorDraft.value = nextSnapshot?.metadata.color ?? "#3b82f6";
+			projectIconPathDraft.value = nextSnapshot?.metadata.iconPath ?? "";
 		},
 		{ immediate: true },
 	);
@@ -85,7 +94,7 @@ export function useProjectBoardSettings(options: {
 			.replace(/[^a-z0-9]+/g, "-")
 			.replace(/^-|-$/g, "");
 
-		return `${slug || "field"}-${newId("field").slice(-8)}`;
+		return `${slug || "item"}-${newId("field").slice(-8).toLowerCase()}`;
 	}
 
 	async function updateBoard(nextBoard: ProjectSnapshot["board"]) {
@@ -136,6 +145,36 @@ export function useProjectBoardSettings(options: {
 		await updateBoard({
 			...options.snapshot.value.board,
 			name,
+		});
+	}
+
+	async function saveProjectColor() {
+		if (!options.snapshot.value) return;
+		const color = projectColorDraft.value.trim();
+		await options.run(async () => {
+			options.replaceMetadata(await desktop.updateProjectSettings({
+				color: color || null,
+				iconPath: options.snapshot.value?.metadata.iconPath ?? null,
+			}));
+		});
+	}
+
+	async function chooseProjectIcon() {
+		if (!options.snapshot.value) return;
+		const iconPath = await desktop.chooseProjectIconFile();
+		if (!iconPath) return;
+		projectIconPathDraft.value = iconPath;
+		await saveProjectIcon();
+	}
+
+	async function saveProjectIcon() {
+		if (!options.snapshot.value) return;
+		const iconPath = projectIconPathDraft.value.trim();
+		await options.run(async () => {
+			options.replaceMetadata(await desktop.updateProjectSettings({
+				color: options.snapshot.value?.metadata.color ?? null,
+				iconPath: iconPath || null,
+			}));
 		});
 	}
 
@@ -216,6 +255,8 @@ export function useProjectBoardSettings(options: {
 		fieldOptionsDraft,
 		boardCreateNameDraft,
 		boardNameDraft,
+		projectColorDraft,
+		projectIconPathDraft,
 		personDisplayNameDraft,
 		personEmailsDraft,
 		personNamesDraft,
@@ -227,6 +268,9 @@ export function useProjectBoardSettings(options: {
 		createBoard,
 		deleteBoard,
 		saveBoardName,
+		saveProjectColor,
+		chooseProjectIcon,
+		saveProjectIcon,
 		addCustomField,
 		removeCustomField,
 		addPersonAlias,

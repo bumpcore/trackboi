@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as z from "zod/v4";
 import { newId } from "../../core/id";
 import type { AgentRegistration, AppSettings, CustomField, FieldType, NodeFsTrackboiActions, PersonAlias } from "../../core";
-import { boardIdSchema, type McpProjectContext, projectPathSchema, requireAgentId, requireSnapshot, toolResult, withProject } from "./helpers";
+import { boardIdSchema, type McpProjectContext, projectPathSchema, requireAgentId, requireSnapshot, toMcpCard, toolResult, withProject } from "./helpers";
 
 function updateAgents(settings: AppSettings, updater: (agents: AgentRegistration[]) => AgentRegistration[]): AppSettings {
 	return {
@@ -15,7 +15,7 @@ const fieldTypeSchema = z.enum(["text", "number", "checkbox", "select", "date"])
 
 function fieldIdFromName(name: string): string {
 	const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-	return slug || `field-${newId("field").slice(-8)}`;
+	return slug || newId("field").slice(-8).toLowerCase();
 }
 
 function normalizeFieldOptions(type: FieldType, options?: string[]): string[] | undefined {
@@ -80,17 +80,27 @@ export function registerProjectTools(server: McpServer, trackboi: NodeFsTrackboi
 		const activeBoardCards = snapshot && activeBoardId
 			? snapshot.cards.filter((card) => card.boardId === activeBoardId)
 			: [];
+		const contextMismatch = Boolean(
+			projectPath &&
+			view.agentActiveProjectPath &&
+			projectPath !== view.agentActiveProjectPath,
+		);
 
 		return {
 			guide: agentGuidePayload(),
 			context: {
-				activeProjectPath: view.activeProjectPath,
+				cwd: view.cwd,
+				requestedProjectPath: projectPath ?? null,
+				activeProjectPath: resolvedProjectPath ?? null,
+				activeWorktreeId: state.selectedWorktreeId,
+				activeBoardId,
 				agentActiveProjectPath: view.agentActiveProjectPath,
 				desktopActiveProjectPath: view.desktopActiveProjectPath,
 				agentActiveWorktreeId: view.agentActiveWorktreeId,
 				desktopActiveWorktreeId: view.desktopActiveWorktreeId,
 				agentActiveBoardId: view.agentActiveBoardId,
 				desktopActiveBoardId: view.desktopActiveBoardId,
+				contextMismatch,
 				activeAgentId,
 				activeAgent: settings.agents.find((agent) => agent.id === activeAgentId) ?? null,
 			},
@@ -115,15 +125,18 @@ export function registerProjectTools(server: McpServer, trackboi: NodeFsTrackboi
 			tracks: snapshot?.tracks ?? [],
 			cards: {
 				boardId: activeBoardId,
-				items: activeBoardCards,
+				items: activeBoardCards.map(toMcpCard),
 			},
 			agents: {
 				activeAgentId,
 				items: settings.agents,
 			},
-			nextSteps: activeAgentId
-				? ["Use the returned board columns before create_card or move_card.", "Use trackId when a card belongs to a track.", "Use comments for progress, blockers, handoff, and verification notes."]
-				: ["Call list_agents, then set_active_agent or register_agent before mutating cards, tracks, or boards."],
+			nextSteps: [
+				...(contextMismatch ? ["Requested project differs from the MCP session project; use switch_project to make it the default, or keep passing projectPath explicitly."] : []),
+				...(activeAgentId
+					? ["Use the returned board columns before create_card or move_card.", "Use trackId when a card belongs to a track.", "Use comments for progress, blockers, handoff, and verification notes."]
+					: ["Call list_agents, then set_active_agent or register_agent before mutating cards, tracks, or boards."]),
+			],
 		};
 	}));
 
@@ -194,6 +207,30 @@ export function registerProjectTools(server: McpServer, trackboi: NodeFsTrackboi
 	}, ({ paths }) => toolResult(async () => {
 		await requireAgentId(trackboi, context);
 		return trackboi.setStorageSearchPaths(paths);
+	}));
+
+	server.registerTool("list_git_changes", {
+		title: "List git changes",
+		description: "List changed files that the active project's default git commit action would include. Pass paths to inspect a narrower explicit set.",
+		inputSchema: {
+			projectPath: projectPathSchema,
+			paths: z.array(z.string().min(1)).optional(),
+		},
+	}, ({ projectPath, paths }) => toolResult(() => withProject(trackboi, context, projectPath, (actions) => (
+		actions.listGitChanges(paths)
+	))));
+
+	server.registerTool("commit_project_changes", {
+		title: "Commit project changes",
+		description: "Commit the active project's trackboi-managed git changes. Defaults to the project storage path so unrelated user work is not committed.",
+		inputSchema: {
+			projectPath: projectPathSchema,
+			message: z.string().min(1).describe("Commit message."),
+			paths: z.array(z.string().min(1)).optional().describe("Optional explicit repo-relative paths to commit instead of the default trackboi storage path."),
+		},
+	}, ({ projectPath, message, paths }) => toolResult(async () => {
+		await requireAgentId(trackboi, context);
+		return withProject(trackboi, context, projectPath, (actions) => actions.commitGitChanges({ message, paths }));
 	}));
 
 	server.registerTool("list_project_people", {
@@ -547,7 +584,7 @@ export function registerBoardTools(server: McpServer, trackboi: NodeFsTrackboiAc
 		const trimmedName = name.trim();
 		const existingIds = new Set(snapshot.board.customFields.map((field) => field.id));
 		let id = fieldIdFromName(trimmedName);
-		while (existingIds.has(id)) id = `${fieldIdFromName(trimmedName)}-${newId("field").slice(-6)}`;
+		while (existingIds.has(id)) id = `${fieldIdFromName(trimmedName)}-${newId("field").slice(-6).toLowerCase()}`;
 		const fieldOptions = normalizeFieldOptions(type, options);
 		const field: CustomField = {
 			id,
@@ -628,10 +665,10 @@ export function registerBoardTools(server: McpServer, trackboi: NodeFsTrackboiAc
 		if (boardId) await actions.setActiveBoard(boardId);
 		const snapshot = await actions.getActiveProject();
 		if (!snapshot) throw new Error("Choose a project first");
-		const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `column-${newId("column").slice(-8)}`;
+		const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || newId("column").slice(-8).toLowerCase();
 		let id = slug;
 		const existing = new Set(snapshot.board.columns.map((column) => column.id));
-		while (existing.has(id)) id = `${slug}-${newId("column").slice(-6)}`;
+		while (existing.has(id)) id = `${slug}-${newId("column").slice(-6).toLowerCase()}`;
 		const board = {
 			...snapshot.board,
 			columns: [...snapshot.board.columns, { id, name: name.trim() }],

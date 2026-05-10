@@ -47,6 +47,12 @@ export function registerTrackboiIpcHandlers(options: {
 	ipcMain.handle(ipcChannels.trackboi.updateAppSettings, (_event: IpcMainInvokeEvent, settings) => (
 		trackboi.updateAppSettings(settings)
 	));
+	ipcMain.handle(ipcChannels.trackboi.listGitChanges, (_event: IpcMainInvokeEvent, paths?: string[]) => trackboi.listGitChanges(paths));
+	ipcMain.handle(ipcChannels.trackboi.commitGitChanges, async (_event: IpcMainInvokeEvent, input) => {
+		const result = await trackboi.commitGitChanges(input);
+		rememberDesktopState(await readDesktopState());
+		return result;
+	});
 	ipcMain.handle(ipcChannels.trackboi.listDetectedEditors, () => listDetectedEditors());
 	ipcMain.handle(ipcChannels.trackboi.openCardInEditor, (_event: IpcMainInvokeEvent, cardId: string) => openCardInEditor(cardId));
 	ipcMain.handle(ipcChannels.trackboi.setStorageSearchPaths, async (_event: IpcMainInvokeEvent, paths: string[]) => {
@@ -76,6 +82,7 @@ export function registerTrackboiIpcHandlers(options: {
 		trackboi.deleteTrackFile(trackId, fileName)
 	));
 	ipcMain.handle(ipcChannels.trackboi.openWorkspaceFile, () => trackboi.openWorkspaceFile());
+	ipcMain.handle(ipcChannels.trackboi.chooseProjectIconFile, () => trackboi.chooseProjectIconFile());
 	ipcMain.handle(ipcChannels.trackboi.chooseProject, async () => {
 		const snapshot = await trackboi.chooseProject();
 		rememberDesktopState(await readDesktopState());
@@ -101,6 +108,9 @@ export function registerTrackboiIpcHandlers(options: {
 		trackboi.updateCard(cardId, patch)
 	));
 	ipcMain.handle(ipcChannels.trackboi.updateBoard, (_event: IpcMainInvokeEvent, board) => trackboi.updateBoard(board));
+	ipcMain.handle(ipcChannels.trackboi.updateProjectSettings, (_event: IpcMainInvokeEvent, patch) => (
+		trackboi.updateProjectSettings(patch)
+	));
 	ipcMain.handle(ipcChannels.trackboi.updateProjectPeople, (_event: IpcMainInvokeEvent, people) => (
 		trackboi.updateProjectPeople(people)
 	));

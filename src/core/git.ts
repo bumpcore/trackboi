@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import type { GitContext, GitIdentity, WorkScope } from "./types";
+import type { GitChange, GitChanges, GitCommitResult, GitContext, GitIdentity, WorkScope } from "./types";
 
 export type GitWorktree = {
 	path: string;
@@ -31,6 +31,25 @@ function runGit(projectPath: string, args: string[]): string | null {
 	} catch {
 		return null;
 	}
+}
+
+function execGit(projectPath: string, args: string[]): string {
+	return execFileSync("git", ["-C", projectPath, ...args], {
+		encoding: "utf8",
+		stdio: ["ignore", "pipe", "pipe"],
+	}).trim();
+}
+
+function parsePorcelainLine(line: string): GitChange | null {
+	if (!line.trim()) return null;
+	const pathStart = line.startsWith("??") ? 3 : 3;
+	const rawPath = line.slice(pathStart).trim();
+	const separatorIndex = rawPath.indexOf(" -> ");
+	return {
+		path: separatorIndex >= 0 ? rawPath.slice(separatorIndex + 4) : rawPath,
+		indexStatus: line[0] ?? " ",
+		worktreeStatus: line[1] ?? " ",
+	};
 }
 
 /**
@@ -66,6 +85,39 @@ export function readGitContext(projectPath: string): GitContext {
 	const dirty = statusOutput == null ? null : statusOutput.length > 0;
 
 	return { isGitRepo: true, root, branch, detached: branch == null, dirty, identity: readGitIdentity(root) };
+}
+
+/**
+ * Lists porcelain git changes for the repository, optionally restricted to
+ * caller-provided paths that should be shown or committed.
+ */
+export function listGitChanges(repoRoot: string, paths: string[] = []): GitChanges {
+	const args = ["status", "--porcelain", "--", ...paths];
+	const output = execGit(repoRoot, args);
+	return {
+		repoRoot,
+		defaultPaths: [...paths],
+		changes: output.split("\n").map(parsePorcelainLine).filter((change): change is GitChange => change != null),
+	};
+}
+
+/**
+ * Commits a narrow set of repository paths. The `--only` commit mode keeps
+ * unrelated staged or unstaged user work out of the commit by default.
+ */
+export function commitGitChanges(repoRoot: string, message: string, paths: string[]): GitCommitResult {
+	const cleanedMessage = message.trim();
+	if (!cleanedMessage) throw new Error("Commit message is required");
+	const cleanedPaths = paths.map((entry) => entry.trim()).filter(Boolean);
+	if (cleanedPaths.length === 0) throw new Error("At least one commit path is required");
+
+	const changes = listGitChanges(repoRoot, cleanedPaths);
+	if (changes.changes.length === 0) throw new Error("No changes found in the selected paths");
+
+	execGit(repoRoot, ["add", "--", ...cleanedPaths]);
+	execGit(repoRoot, ["commit", "--only", "-m", cleanedMessage, "--", ...cleanedPaths]);
+	const commit = execGit(repoRoot, ["rev-parse", "--short", "HEAD"]);
+	return { ok: true, commit, message: cleanedMessage, paths: cleanedPaths };
 }
 
 export function listGitWorktrees(repoRoot: string): GitWorktree[] {

@@ -37,6 +37,29 @@ test("keeps empty-state top aligned and supports drag/drop plus card context int
 		seededIds.cardBeta,
 	]);
 
+	await expect(page.getByTestId("board-filter-tray")).toBeVisible();
+	await page.getByTestId("board-filter-column").locator("select").selectOption("Done");
+	await expect.poll(() => columnCardIds(page, "todo")).toEqual([]);
+	await expect.poll(() => columnCardIds(page, "done")).toEqual([seededIds.cardGamma]);
+	await page.getByRole("button", { name: "Clear filters" }).click();
+	await expect.poll(() => columnCardIds(page, "todo")).toEqual([
+		seededIds.cardAlpha,
+		seededIds.cardBeta,
+	]);
+
+	await page.getByRole("button", { name: "More" }).click();
+	await expect(page.getByTestId("board-more-filters")).toBeVisible();
+	await page.keyboard.press("Escape");
+	await page.getByRole("button", { name: "Close more filters" }).click();
+	await expect(page.getByTestId("board-more-filters")).toHaveCount(0);
+
+	const preDragAlphaCard = page.getByTestId(`card-${seededIds.cardAlpha}`);
+	await preDragAlphaCard.hover();
+	await expect(page.getByTestId("card-expanded-lens")).toBeVisible();
+	await expect(page.getByTestId("card-expanded-lens")).toContainText("First todo card.");
+	await page.mouse.move(1, 1);
+	await expect(page.getByTestId("card-expanded-lens")).toHaveCount(0);
+
 	await dragCard(page, page.getByTestId(`card-${seededIds.cardBeta}`), page.getByTestId(`card-${seededIds.cardAlpha}`), "top");
 	await expect.poll(() => columnCardIds(page, "todo")).toEqual([
 		seededIds.cardBeta,

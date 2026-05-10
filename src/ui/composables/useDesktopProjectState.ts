@@ -371,7 +371,6 @@ function createDesktopProjectState(): InternalDesktopProjectState {
 			nextCards[cardId] = {
 				...card,
 				trackId: null,
-				scope: { kind: "project", ref: "global" },
 			};
 			mutatedCards = true;
 		}

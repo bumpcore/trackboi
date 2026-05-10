@@ -1,6 +1,8 @@
 {
 	"version": 1,
 	"name": "trackboi",
+	"color": null,
+	"iconPath": null,
 	"people": [],
 	"agents": [
 		{

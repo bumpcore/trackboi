@@ -4,6 +4,7 @@ import Button from "@/ui/components/Button.vue";
 import Input from "@/ui/components/Input.vue";
 import MarkdownEditor from "@/ui/components/MarkdownEditor.vue";
 import Select from "@/ui/components/Select.vue";
+import Tooltip from "@/ui/components/Tooltip.vue";
 import type { SelectOption } from "@/ui/components/Select.vue";
 
 defineProps<{
@@ -38,19 +39,20 @@ const trackId = defineModel<string>("trackId", { required: true });
 					<div class="min-w-0">
 						<p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary/95">Create Card</p>
 						<h2 class="mt-1 text-[22px] font-semibold tracking-tight text-foreground">New work item</h2>
-						<p class="mt-1 text-sm text-muted-foreground">Capture the title first, then fill in placement and scope.</p>
+						<p class="mt-1 text-sm text-muted-foreground">Capture the title first, then fill in placement and track.</p>
 					</div>
-					<Button
-						variant="ghost"
-						size="icon"
-						class="rounded-[2px] border border-transparent hover:border-border/60 hover:bg-background/70"
-						type="button"
-						title="Close"
-						aria-label="Close"
-						@click="$emit('close')"
-					>
-						<X class="h-4 w-4" />
-					</Button>
+					<Tooltip content="Close" side="left">
+						<Button
+							variant="ghost"
+							size="icon"
+							class="rounded-[2px] border border-transparent hover:border-border/60 hover:bg-background/70"
+							type="button"
+							aria-label="Close"
+							@click="$emit('close')"
+						>
+							<X class="h-4 w-4" />
+						</Button>
+					</Tooltip>
 				</header>
 
 				<form class="grid gap-6 px-6 py-6" @submit.prevent="$emit('create')">

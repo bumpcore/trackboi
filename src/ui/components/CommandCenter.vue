@@ -7,6 +7,7 @@ import {
 	FileText,
 	Folders,
 	GitBranch,
+	GitCommitHorizontal,
 	LayoutGrid,
 	Minimize2,
 	MessageSquareText,
@@ -66,6 +67,7 @@ const commandIcons: Record<string, Component> = {
 	closeWindow: X,
 	projectSettings: Settings2,
 	boardSettings: LayoutGrid,
+	commitChanges: GitCommitHorizontal,
 };
 
 function focusInput() {

@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as z from "zod/v4";
 import type { CardPatch, NodeFsTrackboiActions } from "../../core";
-import { boardIdSchema, type McpProjectContext, cardIdSchema, columnSchema, getCard, projectPathSchema, requireAgentId, toolResult, withProject } from "./helpers";
+import { boardIdSchema, type McpProjectContext, cardIdSchema, columnSchema, getCard, projectPathSchema, requireAgentId, toMcpCard, toolResult, withProject } from "./helpers";
 
 const fieldValuesSchema = z.record(
 	z.string(),
@@ -38,7 +38,7 @@ export function registerCardTools(server: McpServer, trackboi: NodeFsTrackboiAct
 			(label == null || card.labels.includes(label)) &&
 			(parentId === undefined || card.parentId === parentId) &&
 			(!needle || card.title.toLowerCase().includes(needle) || card.description.toLowerCase().includes(needle))
-		));
+		)).map(toMcpCard);
 	})));
 
 	server.registerTool("get_card", {

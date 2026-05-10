@@ -11,6 +11,7 @@ type BoardPresentationState = {
 	cardsByColumn: ComputedRef<ReturnType<typeof buildBoardPresentation>["cardsByColumn"]>;
 	childProgress: ComputedRef<Record<string, ChildProgress>>;
 	editingSubtasks: ComputedRef<ReturnType<typeof buildBoardPresentation>["editingSubtasks"]>;
+	visibleParentCards: ComputedRef<ReturnType<typeof buildBoardPresentation>["visibleParentCards"]>;
 	editingSubtaskProgress: ComputedRef<ChildProgress>;
 	totalCards: ComputedRef<number>;
 	visibleCardCount: ComputedRef<number>;
@@ -54,6 +55,7 @@ export function useBoardPresentationState(options: {
 	const cardsByColumn = computed(() => boardPresentation.value.cardsByColumn);
 	const childProgress = computed<Record<string, ChildProgress>>(() => boardPresentation.value.childProgress);
 	const editingSubtasks = computed(() => boardPresentation.value.editingSubtasks);
+	const visibleParentCards = computed(() => boardPresentation.value.visibleParentCards);
 	const editingSubtaskProgress = computed(() => {
 		const editingCardId = options.editingCardId.value;
 		if (!editingCardId) return { total: 0, done: 0 };
@@ -86,6 +88,7 @@ export function useBoardPresentationState(options: {
 		cardsByColumn,
 		childProgress,
 		editingSubtasks,
+		visibleParentCards,
 		editingSubtaskProgress,
 		totalCards,
 		visibleCardCount,

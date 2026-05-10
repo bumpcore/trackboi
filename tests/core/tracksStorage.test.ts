@@ -66,7 +66,7 @@ describe("track storage", () => {
 			actorId: "agent_codex",
 		});
 
-		expect(track.id).toMatch(/^track-release-readiness-[a-z0-9]{7}$/);
+		expect(track.id).toMatch(/^release-readiness-[a-z0-9]{7}$/);
 		expect(track.slug).toBe("release-readiness");
 		expect(track.createdBy).toBe("agent_codex");
 		expect(existsSync(path.join(store.rootPath, "tracks", track.id, "index.md"))).toBe(true);

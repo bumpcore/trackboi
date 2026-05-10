@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { HelpCircle, Plus, Settings } from "lucide-vue-next";
 import Button from "@/ui/components/Button.vue";
+import ProjectIcon from "@/ui/components/ProjectIcon.vue";
 import Tooltip from "@/ui/components/Tooltip.vue";
 import type { ProjectEntry, ProjectView } from "@/core/types";
 import { projectColorStyle } from "@/ui/lib/projectColor";
@@ -16,10 +17,6 @@ const emit = defineEmits<{
 	chooseProject: [];
 	switchProject: [projectPath: string];
 }>();
-
-function projectInitial(name: string) {
-	return name.slice(0, 1).toUpperCase();
-}
 
 function projectTooltip(entry: ProjectEntry, sourceLabel: string) {
 	const branch = entry.branch ? `, ${entry.branch}` : "";
@@ -52,7 +49,13 @@ const manualSource = computed(() => props.view.sources.find((source) => source.k
 						type="button"
 						@click="emit('switchProject', entry.projectPath)"
 					>
-						{{ projectInitial(entry.name) }}
+						<ProjectIcon
+							:name="entry.name"
+							:path="entry.path"
+							:color="entry.color"
+							:icon-path="entry.iconPath"
+							icon-class="h-8 w-8 text-sm"
+						/>
 					</button>
 			</Tooltip>
 

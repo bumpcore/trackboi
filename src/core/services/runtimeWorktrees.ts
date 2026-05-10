@@ -1,9 +1,10 @@
 import { existsSync } from "node:fs";
 import { findGitRoot, listGitWorktrees, readGitContext } from "../git";
-import { boardPath } from "../paths";
+import { boardPath, projectMetadataPath } from "../paths";
 import { projectStatus } from "../sources";
-import { canonicalProjectPath, countCards, projectName, resolveProjectStorage } from "../storage";
-import type { Project, ProjectRegistry, ProjectSnapshotWithInternals, WorktreeContext } from "../types";
+import { canonicalProjectPath, countCards, normalizeProjectMetadata, projectName, resolveProjectStorage } from "../storage";
+import { readJson } from "../json";
+import type { Project, ProjectMetadata, ProjectRegistry, ProjectSnapshotWithInternals, WorktreeContext } from "../types";
 import type { WorktreeStore } from "./runtimeTypes";
 
 type RegistryReader = () => ProjectRegistry;
@@ -49,6 +50,9 @@ export function discoverWorktrees(options: {
 		const cardCount = resolved && existsSync(boardPath(resolved.rootPath))
 			? countCards(resolved.rootPath)
 			: 0;
+		const metadata = resolved && existsSync(projectMetadataPath(resolved.rootPath))
+			? normalizeProjectMetadata(readJson<ProjectMetadata>(projectMetadataPath(resolved.rootPath)), worktreeProject, resolved.storagePath)
+			: null;
 		return {
 			id: worktreePath,
 			name: projectName(worktreePath),
@@ -60,6 +64,8 @@ export function discoverWorktrees(options: {
 			status,
 			cardCount,
 			colorKey: worktreePath,
+			color: metadata?.color ?? null,
+			iconPath: metadata?.iconPath ?? null,
 			project: worktreeProject,
 			git: readGitContext(worktreePath),
 		};

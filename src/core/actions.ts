@@ -13,9 +13,13 @@ import type {
 	CreateBoardInput,
 	CreateTrackInput,
 	DesktopState,
+	GitChanges,
+	GitCommitInput,
+	GitCommitResult,
 	MoveCardInput,
 	PersonAlias,
 	ProjectMetadata,
+	ProjectSettingsPatch,
 	ProjectRegistry,
 	ProjectSnapshot,
 	ProjectSnapshotWithInternals,
@@ -34,6 +38,7 @@ import type {
 export type TrackboiSystemDialogs = {
 	chooseProjectDirectory(): Promise<string | null>;
 	chooseWorkspaceFile(): Promise<string | null>;
+	chooseProjectIconFile(): Promise<string | null>;
 };
 
 export type NodeFsTrackboiActions = TrackboiActions & {
@@ -59,6 +64,9 @@ const defaultDialogs: TrackboiSystemDialogs = {
 		return null;
 	},
 	async chooseWorkspaceFile() {
+		return null;
+	},
+	async chooseProjectIconFile() {
 		return null;
 	},
 };
@@ -165,6 +173,18 @@ class NodeFsTrackboiActionsImpl implements NodeFsTrackboiActions {
 		return this.runtime.updateAppSettings(settings);
 	}
 
+	async listGitChanges(paths?: string[]): Promise<GitChanges> {
+		return this.runtime.listGitChanges(paths);
+	}
+
+	async commitGitChanges(input: GitCommitInput): Promise<GitCommitResult> {
+		return this.runtime.commitGitChanges(input);
+	}
+
+	async updateProjectSettings(patch: ProjectSettingsPatch): Promise<ProjectMetadata> {
+		return this.runtime.updateProjectSettings(patch);
+	}
+
 	async setStorageSearchPaths(paths: string[]): Promise<ProjectView> {
 		return this.runtime.setStorageSearchPaths(paths);
 	}
@@ -217,6 +237,10 @@ class NodeFsTrackboiActionsImpl implements NodeFsTrackboiActions {
 		const filePath = await this.dialogs.chooseWorkspaceFile();
 		if (!filePath) return null;
 		return this.runtime.setActiveWorkspaceFile(filePath);
+	}
+
+	async chooseProjectIconFile(): Promise<string | null> {
+		return this.dialogs.chooseProjectIconFile();
 	}
 
 	async chooseProject(): Promise<ProjectSnapshot | null> {

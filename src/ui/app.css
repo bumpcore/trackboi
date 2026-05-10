@@ -56,6 +56,11 @@
 	--border: 215 10% 21%;
 	--input: 215 10% 21%;
 	--ring: 34 59% 58%;
+	--accent-preview-amber: 34 59% 58%;
+	--accent-preview-blue: 207 72% 62%;
+	--accent-preview-green: 152 46% 50%;
+	--accent-preview-rose: 349 64% 63%;
+	--accent-preview-violet: 263 64% 66%;
 	--radius: 0.125rem;
 	--signal-attached: 174 30% 49%;
 	--panel-inset-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.02);
@@ -448,6 +453,28 @@ body.trackboi-resizing * {
 .markdown-preview {
 	max-height: 5.6rem;
 	overflow: hidden;
+}
+
+.board-card-title,
+.board-card-preview {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.board-card-title {
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+}
+
+.board-card-preview {
+	-webkit-line-clamp: 3;
+	line-clamp: 3;
+	max-height: none;
+}
+
+.board-card-preview > * {
+	overflow-wrap: anywhere;
 }
 
 .note-editor-grid {

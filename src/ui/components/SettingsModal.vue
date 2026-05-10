@@ -6,8 +6,10 @@ import type { AgentRegistration, PersonAlias, ProjectSnapshot } from "@/core/typ
 import Button from "@/ui/components/Button.vue";
 import Input from "@/ui/components/Input.vue";
 import ProjectSettingsPanel from "@/ui/components/ProjectSettingsPanel.vue";
+import Tooltip from "@/ui/components/Tooltip.vue";
+import { ACCENT_COLOR_OPTIONS } from "@/ui/composables/useThemeMode";
 import { shortcutFromKeyboardEvent } from "@/ui/lib/keyboardShortcuts";
-import type { ThemeMode } from "@/ui/composables/useAppPreferences";
+import type { AccentColor, ThemeMode } from "@/ui/composables/useAppPreferences";
 import type { SettingsSection } from "@/ui/viewTypes";
 
 const props = defineProps<{
@@ -37,6 +39,7 @@ const projectSettingsShortcut = defineModel<string>("projectSettingsShortcut", {
 const boardSettingsShortcut = defineModel<string>("boardSettingsShortcut", { required: true });
 const focusBoardShortcut = defineModel<string>("focusBoardShortcut", { required: true });
 const themeMode = defineModel<ThemeMode>("themeMode", { required: true });
+const accentColor = defineModel<AccentColor>("accentColor", { required: true });
 const preferredEditorId = defineModel<string>("preferredEditorId", { required: true });
 const customEditorCommand = defineModel<string>("customEditorCommand", { required: true });
 const userDisplayName = defineModel<string>("userDisplayName", { required: true });
@@ -47,6 +50,8 @@ const agentDescriptionDraft = defineModel<string>("agentDescriptionDraft", { req
 const personDisplayNameDraft = defineModel<string>("personDisplayNameDraft", { required: true });
 const personEmailsDraft = defineModel<string>("personEmailsDraft", { required: true });
 const personNamesDraft = defineModel<string>("personNamesDraft", { required: true });
+const projectColorDraft = defineModel<string>("projectColorDraft", { required: true });
+const projectIconPathDraft = defineModel<string>("projectIconPathDraft", { required: true });
 
 const emit = defineEmits<{
 	close: [];
@@ -55,12 +60,16 @@ const emit = defineEmits<{
 	reset: [];
 	resetShortcuts: [];
 	resetTheme: [];
+	resetAccent: [];
 	saveUserIdentity: [];
 	registerAgent: [];
 	removeAgent: [agentId: string];
 	saveEditor: [];
 	addPersonAlias: [];
 	removePersonAlias: [personId: string];
+	saveProjectColor: [];
+	chooseProjectIcon: [];
+	saveProjectIcon: [];
 	removeProject: [];
 }>();
 type ShortcutTarget =
@@ -122,6 +131,8 @@ const themeOptions: Array<{ value: ThemeMode; label: string; description: string
 	{ value: "light",  label: "Light",  description: "A brighter canvas with the same warm accent direction.",        icon: Sun     },
 	{ value: "system", label: "System", description: "Follows your desktop color-scheme preference automatically.",   icon: Monitor },
 ];
+
+const accentOptions = ACCENT_COLOR_OPTIONS;
 
 const editorOptions = computed(() => [
 	{ id: "auto",   label: "Auto-detect",     description: "Use the first detected editor, falling back to the OS default." },
@@ -313,9 +324,11 @@ onBeforeUnmount(() => {
 							<h2 class="mt-1 text-xl font-semibold tracking-tight">{{ sectionMeta[activeSection].title }}</h2>
 							<p class="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{{ sectionMeta[activeSection].description }}</p>
 						</div>
-						<Button variant="ghost" size="icon" type="button" class="rounded-[2px]" title="Close" aria-label="Close" @click="emit('close')">
-							<X class="h-4 w-4" />
-						</Button>
+						<Tooltip content="Close" side="left">
+							<Button variant="ghost" size="icon" type="button" class="rounded-[2px]" aria-label="Close" @click="emit('close')">
+								<X class="h-4 w-4" />
+							</Button>
+						</Tooltip>
 					</header>
 
 					<!-- General -->
@@ -373,18 +386,19 @@ onBeforeUnmount(() => {
 										</p>
 										<p class="mt-1 truncate font-mono text-sm text-foreground">{{ path }}</p>
 									</div>
-									<Button
-										variant="ghost"
-										size="icon"
-										type="button"
-										title="Remove path"
-										aria-label="Remove path"
-										:disabled="busy"
-										class="rounded-none text-muted-foreground hover:text-destructive"
-										@click="emit('remove', path)"
-									>
-										<Trash2 class="h-4 w-4" />
-									</Button>
+									<Tooltip content="Remove path" side="left">
+										<Button
+											variant="ghost"
+											size="icon"
+											type="button"
+											aria-label="Remove path"
+											:disabled="busy"
+											class="rounded-none text-muted-foreground hover:text-destructive"
+											@click="emit('remove', path)"
+										>
+											<Trash2 class="h-4 w-4" />
+										</Button>
+									</Tooltip>
 								</div>
 							</div>
 						</section>
@@ -445,6 +459,40 @@ onBeforeUnmount(() => {
 
 							<div>
 								<Button variant="outline" type="button" class="rounded-none" @click="emit('resetTheme')">
+									Reset
+								</Button>
+							</div>
+						</section>
+
+						<section class="grid gap-4 bg-background/12 p-4">
+							<div>
+								<h3 class="text-sm font-semibold text-foreground">Accent color</h3>
+								<p class="mt-1 text-sm leading-6 text-muted-foreground">
+									Choose the highlight color used by selected states, focus rings, and primary actions.
+								</p>
+							</div>
+
+							<div class="grid gap-2 sm:grid-cols-2">
+								<button
+									v-for="option in accentOptions"
+									:key="option.value"
+									type="button"
+									class="flex items-center gap-3 border px-3 py-3 text-left transition-colors"
+									:class="accentColor === option.value
+										? 'border-primary/45 bg-primary/10 text-foreground'
+										: 'border-border/70 bg-secondary/55 text-foreground hover:border-border/90 hover:bg-secondary/78'"
+									@click="accentColor = option.value"
+								>
+									<span
+										class="h-5 w-5 shrink-0 rounded-[2px] border border-border/70"
+										:style="{ backgroundColor: `hsl(var(--accent-preview-${option.value}))` }"
+									/>
+									<span class="trackboi-mono-font text-[12px] text-foreground">{{ option.label }}</span>
+								</button>
+							</div>
+
+							<div>
+								<Button variant="outline" type="button" class="rounded-none" @click="emit('resetAccent')">
 									Reset
 								</Button>
 							</div>
@@ -510,17 +558,18 @@ onBeforeUnmount(() => {
 										<div class="trackboi-mono-font text-[12px] text-foreground">{{ agent.name }}</div>
 										<p class="mt-1 text-sm text-muted-foreground">{{ agent.description }}</p>
 									</div>
-									<Button
-										variant="ghost"
-										size="icon"
-										type="button"
-										title="Remove identity"
-										aria-label="Remove identity"
-										class="rounded-none text-muted-foreground hover:text-destructive"
-										@click="emit('removeAgent', agent.id)"
-									>
-										<Trash2 class="h-4 w-4" />
-									</Button>
+									<Tooltip content="Remove identity" side="left">
+										<Button
+											variant="ghost"
+											size="icon"
+											type="button"
+											aria-label="Remove identity"
+											class="rounded-none text-muted-foreground hover:text-destructive"
+											@click="emit('removeAgent', agent.id)"
+										>
+											<Trash2 class="h-4 w-4" />
+										</Button>
+									</Tooltip>
 								</div>
 							</div>
 
@@ -596,12 +645,17 @@ onBeforeUnmount(() => {
 								v-model:person-display-name-draft="personDisplayNameDraft"
 								v-model:person-emails-draft="personEmailsDraft"
 								v-model:person-names-draft="personNamesDraft"
+								v-model:project-color-draft="projectColorDraft"
+								v-model:project-icon-path-draft="projectIconPathDraft"
 								:snapshot="snapshot"
 								:people="people"
 								:busy="busy"
 								:can-remove-project="canRemoveProject"
 								@add-person-alias="emit('addPersonAlias')"
 								@remove-person-alias="emit('removePersonAlias', $event)"
+								@save-project-color="emit('saveProjectColor')"
+								@choose-project-icon="emit('chooseProjectIcon')"
+								@save-project-icon="emit('saveProjectIcon')"
 								@remove-project="emit('removeProject')"
 							/>
 						</section>

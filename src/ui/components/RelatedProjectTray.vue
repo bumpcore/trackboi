@@ -14,8 +14,8 @@ import {
 	SelectViewport,
 } from "reka-ui";
 import Badge from "@/ui/components/Badge.vue";
+import ProjectIcon from "@/ui/components/ProjectIcon.vue";
 import type { WorktreeContext } from "@/core/types";
-import { projectColorStyle } from "@/ui/lib/projectColor";
 
 const props = defineProps<{
 	worktrees: WorktreeContext[];
@@ -30,10 +30,6 @@ const emit = defineEmits<{
 const selectedWorktree = computed(() => (
 	props.worktrees.find((worktree) => worktree.id === props.selectedWorktreeId) ?? props.worktrees[0] ?? null
 ));
-
-function projectInitial(name: string) {
-	return name.slice(0, 1).toUpperCase();
-}
 
 function selectWorktree(worktreeId: string) {
 	emit("selectWorktree", worktreeId);
@@ -61,13 +57,14 @@ function selectWorktree(worktreeId: string) {
 				>
 					<div
 						class="flex min-w-0 items-center gap-1.5"
-						:style="projectColorStyle({ name: selectedWorktree.name, path: selectedWorktree.colorKey })"
 					>
-						<span
-							class="grid h-4 w-4 shrink-0 place-items-center rounded-[2px] bg-[var(--project-color)] text-[10px] font-bold text-[var(--project-fg)]"
-						>
-							{{ projectInitial(selectedWorktree.name) }}
-						</span>
+						<ProjectIcon
+							:name="selectedWorktree.name"
+							:path="selectedWorktree.colorKey"
+							:color="selectedWorktree.color"
+							:icon-path="selectedWorktree.iconPath"
+							icon-class="h-4 w-4 text-[10px]"
+						/>
 						<SelectValue class="truncate text-left">
 							<span class="truncate">{{ selectedWorktree.name }}</span>
 						</SelectValue>
@@ -102,13 +99,14 @@ function selectWorktree(worktreeId: string) {
 								<div class="flex min-w-0 items-center gap-2">
 									<span
 										class="grid h-4 w-4 shrink-0 place-items-center rounded-[2px] text-[10px] font-bold"
-										:style="projectColorStyle({ name: worktree.name, path: worktree.colorKey })"
 									>
-										<span
-											class="grid h-4 w-4 place-items-center rounded-[2px] bg-[var(--project-color)] text-[var(--project-fg)]"
-										>
-											{{ projectInitial(worktree.name) }}
-										</span>
+										<ProjectIcon
+											:name="worktree.name"
+											:path="worktree.colorKey"
+											:color="worktree.color"
+											:icon-path="worktree.iconPath"
+											icon-class="h-4 w-4 text-[10px]"
+										/>
 									</span>
 									<div class="min-w-0">
 										<SelectItemText class="block truncate font-medium">

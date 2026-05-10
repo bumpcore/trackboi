@@ -89,6 +89,8 @@ export function ensureProjectFiles(project: Project, rootPath: string, _storageP
 		writeJsonAtomic<ProjectMetadata>(metadataPath, {
 			version: 1,
 			name: project.name,
+			color: null,
+			iconPath: null,
 			people: [],
 			agents: [],
 		});
@@ -110,17 +112,24 @@ export function normalizeProjectMetadata(metadata: ProjectMetadata, project: Pro
 	return {
 		version: 1,
 		name: typeof metadata.name === "string" ? metadata.name : project.name,
+		color: typeof metadata.color === "string" && metadata.color.trim() ? metadata.color.trim() : null,
+		iconPath: typeof metadata.iconPath === "string" && metadata.iconPath.trim() ? metadata.iconPath.trim() : null,
 		people: Array.isArray(metadata.people) ? metadata.people : [],
 		agents: Array.isArray(metadata.agents) ? metadata.agents : [],
 	};
 }
 
 export function normalizeBoard(board: Board, project: Project, boardId = DEFAULT_BOARD_ID): Board {
+	const columns = Array.isArray(board.columns) ? board.columns : defaultColumns();
 	return {
 		id: typeof board.id === "string" && board.id.length > 0 ? board.id : boardId,
 		version: 1,
 		name: typeof board.name === "string" ? board.name : project.name,
-		columns: Array.isArray(board.columns) ? board.columns : defaultColumns(),
+		columns: columns.map((column) => ({
+			id: column.id,
+			name: column.name,
+			archivedAt: typeof column.archivedAt === "string" ? column.archivedAt : null,
+		})),
 		customFields: Array.isArray(board.customFields) ? board.customFields : [],
 	};
 }
@@ -164,6 +173,7 @@ export function readCards(rootPath: string): Card[] {
 	if (existsSync(cardDir)) {
 		for (const entry of readdirSync(cardDir, { withFileTypes: true })) {
 			if (!entry.isDirectory()) continue;
+			if (!existsSync(cardPath(rootPath, entry.name))) continue;
 			cards.push(readCard(rootPath, entry.name));
 		}
 	}
@@ -226,6 +236,7 @@ function readCard(rootPath: string, cardId: string): Card {
 		updatedAt: typeof parsed.data.updatedAt === "string" ? parsed.data.updatedAt : timestamp,
 		createdBy: typeof parsed.data.createdBy === "string" ? parsed.data.createdBy : "person_unknown",
 		updatedBy: typeof parsed.data.updatedBy === "string" ? parsed.data.updatedBy : "person_unknown",
+		archivedAt: typeof parsed.data.archivedAt === "string" ? parsed.data.archivedAt : null,
 	};
 }
 

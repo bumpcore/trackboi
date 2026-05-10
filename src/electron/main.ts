@@ -18,6 +18,7 @@ const trackboi = createNodeFsTrackboiActions({
 	dialogs: {
 		chooseProjectDirectory: chooseDirectory,
 		chooseWorkspaceFile,
+		chooseProjectIconFile,
 	},
 });
 const storageWatcher = createProjectStorageWatcher({
@@ -106,6 +107,19 @@ async function chooseWorkspaceFile(): Promise<string | null> {
 	const options: OpenDialogOptions = {
 		properties: ["openFile"],
 		filters: [{ name: "Code Workspace", extensions: ["code-workspace"] }],
+	};
+	const result = mainWindow
+		? await dialog.showOpenDialog(mainWindow, options)
+		: await dialog.showOpenDialog(options);
+	return result.canceled ? null : result.filePaths[0] ?? null;
+}
+
+async function chooseProjectIconFile(): Promise<string | null> {
+	const options: OpenDialogOptions = {
+		properties: ["openFile"],
+		filters: [
+			{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "svg"] },
+		],
 	};
 	const result = mainWindow
 		? await dialog.showOpenDialog(mainWindow, options)

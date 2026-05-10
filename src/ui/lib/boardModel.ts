@@ -19,14 +19,24 @@ type BuildBoardPresentationInput = {
 };
 
 export function buildBoardPresentation(input: BuildBoardPresentationInput): BoardPresentation {
+	const visibleColumns = input.columns.filter((column) => !column.archivedAt);
+	const archivedColumnIds = new Set(input.columns.filter((column) => column.archivedAt).map((column) => column.id));
 	const cardsByColumn: Record<string, Card[]> = Object.fromEntries(
-		input.columns.map((column) => [column.id, [] as Card[]]),
+		visibleColumns.map((column) => [column.id, [] as Card[]]),
 	);
 	const childProgress: Record<string, ChildProgress> = {};
 	const editingSubtasks: Card[] = [];
 	const visibleParentCards: Card[] = [];
 
 	for (const card of input.cards) {
+		if (card.archivedAt) {
+			continue;
+		}
+
+		if (archivedColumnIds.has(card.column)) {
+			continue;
+		}
+
 		if (input.selectedBoardId && card.boardId !== input.selectedBoardId) {
 			continue;
 		}

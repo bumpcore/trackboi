@@ -73,12 +73,18 @@ describe("nodefs trackboi actions", () => {
 		const created = await trackboi.createCard({
 			title: "Actions test card",
 			column: "todo",
-			scope: { kind: "project", ref: "global" },
 		});
 		expect(created.title).toBe("Actions test card");
+		const cardMarkdown = await Bun.file(path.join(fixture.repo, ".trackboi", "cards", created.id, "index.md")).text();
+		expect(cardMarkdown).not.toContain("scope:");
 
 		const updated = await trackboi.updateCard(created.id, { title: "Updated through actions" });
 		expect(updated.title).toBe("Updated through actions");
+
+		const archived = await trackboi.updateCard(created.id, { archivedAt: "2026-01-02T00:00:00.000Z" });
+		expect(archived.archivedAt).toBe("2026-01-02T00:00:00.000Z");
+		const restored = await trackboi.updateCard(created.id, { archivedAt: null });
+		expect(restored.archivedAt).toBeNull();
 
 		const comment = await trackboi.addCardComment({
 			cardId: created.id,
@@ -95,6 +101,46 @@ describe("nodefs trackboi actions", () => {
 		await trackboi.deleteCard(created.id);
 		const snapshot = await trackboi.getActiveProject();
 		expect(snapshot?.cards.find((card) => card.id === created.id)).toBeUndefined();
+	});
+
+	test("card mutations reject columns that are not on the target board", async () => {
+		const fixture = createActionsFixture();
+		fixture.seedStore(fixture.repo, ".trackboi", {
+			board: {
+				name: "Main board",
+				columns: [
+					{ id: "todo", name: "To Do" },
+					{ id: "done", name: "Done" },
+				],
+			},
+			cards: [{
+				id: "card_existing",
+				title: "Existing card",
+				description: "",
+				column: "todo",
+				rank: "a0",
+				scope: { kind: "project", ref: "global" },
+				updatedAt: "2026-04-23T00:00:00.000Z",
+			}],
+		});
+
+		const trackboi = createNodeFsTrackboiActions({
+			runtime: createRuntime({ configPath: fixture.configPath }),
+			dialogs: {
+				chooseProjectDirectory: async () => fixture.repo,
+			},
+		});
+
+		await trackboi.chooseProject();
+		await expect(trackboi.createCard({
+			title: "Invalid create column",
+			column: "review",
+		})).rejects.toThrow("Unknown column \"review\" for board \"default\"");
+		await expect(trackboi.updateCard("card_existing", { column: "review" })).rejects.toThrow("Unknown column \"review\" for board \"default\"");
+		await expect(trackboi.moveCard("card_existing", "review", null)).rejects.toThrow("Unknown column \"review\" for board \"default\"");
+
+		const snapshot = await trackboi.getActiveProject();
+		expect(snapshot?.cards.find((card) => card.id === "card_existing")?.column).toBe("todo");
 	});
 
 	test("track mutations and files flow through the runtime-backed actions facade", async () => {

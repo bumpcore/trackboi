@@ -33,13 +33,13 @@ import type { BoardScopeMode, CommandCenterItem, RightPanelView } from "@/ui/vie
 
 const {
 	closeWindow,
-	handleTitlebarDoubleClick,
 	minimizeWindow,
 	resizeCursor,
 	resizeEdges,
 	resizeHandleClass,
 	startResize: startWindowResize,
 	startTitlebarDrag,
+	toggleMaximizeWindow,
 } = useWindowChrome();
 
 const {
@@ -140,6 +140,8 @@ const {
 	submitCard,
 	addComment,
 	deleteCard,
+	archiveCard,
+	restoreCard,
 	createSubtask,
 	closeCardPanel,
 } = useCardWorkflow({
@@ -158,6 +160,7 @@ const {
 	childProgress,
 	editingSubtasks,
 	editingSubtaskProgress,
+	visibleParentCards,
 	visibleCardCount,
 } = useBoardPresentationState({
 	snapshot,
@@ -176,6 +179,8 @@ const {
 	fieldTypeDraft,
 	fieldOptionsDraft,
 	boardNameDraft,
+	projectColorDraft,
+	projectIconPathDraft,
 	boards,
 	personDisplayNameDraft,
 	personEmailsDraft,
@@ -187,6 +192,9 @@ const {
 	createBoard,
 	deleteBoard,
 	saveBoardName,
+	saveProjectColor,
+	chooseProjectIcon,
+	saveProjectIcon,
 	addCustomField,
 	removeCustomField,
 	addPersonAlias,
@@ -290,16 +298,21 @@ const {
 	boardSettingsShortcut,
 	focusBoardShortcut,
 	themeMode,
+	accentColor,
 	resetPanelShortcuts,
 	resetThemeMode,
+	resetAccentColor,
 } = useAppPreferences();
 
 const columnOptions = computed<SelectOption[]>(() => (
-	snapshot.value?.board.columns.map((column) => ({
+	snapshot.value?.board.columns.filter((column) => !column.archivedAt).map((column) => ({
 		value: column.id,
 		label: column.name,
 	})) ?? []
 ));
+
+const archivedCards = computed(() => (snapshot.value?.cards ?? []).filter((card) => card.archivedAt));
+const archivedColumns = computed(() => (snapshot.value?.board.columns ?? []).filter((column) => column.archivedAt));
 
 const trackCounts = computed<Record<string, number>>(() => {
 	const counts: Record<string, number> = {};
@@ -352,7 +365,7 @@ function ensureRightPanelOpen() {
 
 function focusTrack(trackId: string) {
 	selectTrack(trackId);
-	shell.setRightView("track");
+	shell.setRightView("track", { reveal: false });
 }
 
 function openCardPanel(columnId?: string) {
@@ -561,6 +574,17 @@ const commandCenterItems = computed<CommandCenterItem[]>(() => {
 				await chooseProjectWithOnboarding();
 			},
 		},
+		...(snapshot.value?.git.isGitRepo && snapshot.value.git.dirty ? [{
+			id: "command:commit-trackboi-changes",
+			mode: "command" as const,
+			kind: "command" as const,
+			section: "Workspace",
+			title: "Commit trackboi changes",
+			subtitle: "Commit only the active project's trackboi-managed storage paths",
+			keywords: ["git", "commit", "changes", "trackboi storage"],
+			icon: "commitChanges",
+			run: commitTrackboiChanges,
+		}] : []),
 		{
 			id: "command:create-card",
 			mode: "command",
@@ -679,7 +703,7 @@ const commandCenterItems = computed<CommandCenterItem[]>(() => {
 			subtitle: "Maximize or restore the desktop window",
 			keywords: ["window", "maximize", "restore"],
 			icon: "maximizeWindow",
-			run: () => handleTitlebarDoubleClick(new MouseEvent("dblclick")),
+			run: toggleMaximizeWindow,
 		},
 		{
 			id: "command:close-window",
@@ -748,7 +772,7 @@ usePanelShortcuts({
 	],
 });
 
-useThemeMode(themeMode);
+useThemeMode(themeMode, accentColor);
 
 watch(columnPanelMode, (mode) => {
 	if (mode === "closed" && shell.rightView.value === "column") {
@@ -765,11 +789,16 @@ async function chooseProjectWithOnboarding() {
 	await chooseProject();
 	if (appSettings.value.onboarding.userComplete) return;
 	const identity = snapshot.value?.git.identity;
-	userDisplayNameDraft.value = appSettings.value.userIdentity.displayName || identity?.name || "";
-	userGitNameDraft.value = appSettings.value.userIdentity.gitName || identity?.name || "";
-	userGitEmailDraft.value = appSettings.value.userIdentity.gitEmail || identity?.email || "";
-	agentNameDraft.value = appSettings.value.agents[0]?.name ?? "agent";
-	agentDescriptionDraft.value = appSettings.value.agents[0]?.description ?? "Default coding identity";
+	const knownPerson = snapshot.value?.metadata.people.find((person) => (
+		(identity?.email && person.gitEmails.includes(identity.email)) ||
+		(identity?.name && person.gitNames.includes(identity.name))
+	)) ?? snapshot.value?.metadata.people[0] ?? null;
+	const knownAgent = snapshot.value?.metadata.agents[0] ?? appSettings.value.agents[0] ?? null;
+	userDisplayNameDraft.value = appSettings.value.userIdentity.displayName || knownPerson?.displayName || identity?.name || "";
+	userGitNameDraft.value = appSettings.value.userIdentity.gitName || knownPerson?.gitNames[0] || identity?.name || "";
+	userGitEmailDraft.value = appSettings.value.userIdentity.gitEmail || knownPerson?.gitEmails[0] || identity?.email || "";
+	agentNameDraft.value = knownAgent?.name ?? "agent";
+	agentDescriptionDraft.value = knownAgent?.description ?? "Default coding identity";
 	onboardingOpen.value = true;
 }
 
@@ -788,6 +817,36 @@ function focusBoardSurface() {
 	document.querySelector<HTMLElement>("[data-testid='board-workspace']")?.focus();
 }
 
+function previewGitPaths(paths: string[]): string {
+	const visiblePaths = paths.slice(0, 8);
+	const suffix = paths.length > visiblePaths.length ? `\n...and ${paths.length - visiblePaths.length} more` : "";
+	return `${visiblePaths.join("\n")}${suffix}`;
+}
+
+async function commitTrackboiChanges() {
+	await run(async () => {
+		const changes = await desktop.listGitChanges();
+		if (changes.changes.length === 0) {
+			setError("No trackboi-managed git changes to commit.");
+			return;
+		}
+		const message = window.prompt("Commit message", "Update trackboi project state")?.trim();
+		if (!message) return;
+		const changedPaths = changes.changes.map((change) => change.path);
+		requestConfirmation({
+			title: "Commit trackboi changes",
+			description: `This will commit only trackboi-managed paths:\n${previewGitPaths(changedPaths)}`,
+			confirmLabel: "Commit",
+			onConfirm: async () => {
+				await run(async () => {
+					await desktop.commitGitChanges({ message });
+					await loadProject();
+				});
+			},
+		});
+	});
+}
+
 async function createColumnFromBoard() {
 	openCreateColumnPanel(snapshot.value?.board.columns.at(-1)?.id ?? null);
 }
@@ -798,6 +857,46 @@ function editColumnFromBoard(column: { id: string }) {
 
 async function reorderColumnFromBoard(columnId: string, beforeColumnId: string | null) {
 	await reorderColumn(columnId, beforeColumnId);
+}
+
+async function archiveColumnFromBoard(column: { id: string; name: string }) {
+	const snapshotValue = snapshot.value;
+	if (!snapshotValue) return;
+	const activeColumnCount = snapshotValue.board.columns.filter((candidate) => !candidate.archivedAt).length;
+	if (activeColumnCount <= 1) {
+		setError("Board needs at least one active column");
+		return;
+	}
+	requestConfirmation({
+		title: `Archive ${column.name}?`,
+		description: "The column and its cards stay in storage and can be restored from board settings.",
+		confirmLabel: "Archive",
+		onConfirm: async () => {
+			await run(async () => {
+				replaceBoard(await desktop.updateBoard({
+					...snapshotValue.board,
+					columns: snapshotValue.board.columns.map((candidate) => (
+						candidate.id === column.id
+							? { ...candidate, archivedAt: new Date().toISOString() }
+							: candidate
+					)),
+				}));
+			});
+		},
+	});
+}
+
+async function restoreColumn(columnId: string) {
+	const snapshotValue = snapshot.value;
+	if (!snapshotValue) return;
+	await run(async () => {
+		replaceBoard(await desktop.updateBoard({
+			...snapshotValue.board,
+			columns: snapshotValue.board.columns.map((column) => (
+				column.id === columnId ? { ...column, archivedAt: null } : column
+			)),
+		}));
+	});
 }
 
 async function submitColumnFromPanel() {
@@ -903,7 +1002,7 @@ onBeforeUnmount(() => {
 			:project-name="activeProject?.name ?? snapshot?.project.name ?? 'trackboi'"
 			:branch-label="gitBranchLabel"
 			@drag="startTitlebarDrag"
-			@toggle-maximize="handleTitlebarDoubleClick"
+			@toggle-maximize="toggleMaximizeWindow"
 			@minimize="minimizeWindow"
 			@close="closeWindow"
 		/>
@@ -954,16 +1053,19 @@ onBeforeUnmount(() => {
 				:selected-worktree="selectedWorktree"
 				:snapshot="snapshot"
 				:track-labels="trackLabels"
+				:visible-cards="visibleParentCards"
 				:visible-card-count="visibleCardCount"
 				@choose-project="chooseProjectWithOnboarding"
 				@create-column="createColumnFromBoard"
 				@edit-column="editColumnFromBoard"
+				@archive-column="archiveColumnFromBoard"
 				@reorder-column="reorderColumnFromBoard"
 				@create-card="openCardPanel"
 				@clear-card-selection="closeCardPanel"
 				@select-card="selectCardFromBoard"
 				@edit-card="editCard"
 				@delete-card="deleteCard"
+				@archive-card="archiveCard"
 				@open-card-in-editor="openSelectedCardInEditor"
 				@fresh-seen="clearFreshCard"
 				@move-card="moveCard"
@@ -1050,6 +1152,7 @@ onBeforeUnmount(() => {
 				v-model:board-settings-shortcut="boardSettingsShortcut"
 				v-model:focus-board-shortcut="focusBoardShortcut"
 				v-model:theme-mode="themeMode"
+				v-model:accent-color="accentColor"
 				v-model:preferred-editor-id="appSettings.editor.preferredEditorId"
 				v-model:custom-editor-command="appSettings.editor.customCommand"
 				v-model:user-display-name="userDisplayNameDraft"
@@ -1060,6 +1163,8 @@ onBeforeUnmount(() => {
 				v-model:person-display-name-draft="personDisplayNameDraft"
 				v-model:person-emails-draft="personEmailsDraft"
 				v-model:person-names-draft="personNamesDraft"
+				v-model:project-color-draft="projectColorDraft"
+				v-model:project-icon-path-draft="projectIconPathDraft"
 				:open="settingsOpen"
 				:paths="view.storageSearchPaths"
 				:agents="appSettings.agents"
@@ -1074,12 +1179,16 @@ onBeforeUnmount(() => {
 				@reset="resetStorageSearchPaths"
 				@reset-shortcuts="resetPanelShortcuts"
 				@reset-theme="resetThemeMode"
+				@reset-accent="resetAccentColor"
 				@save-user-identity="saveUserIdentity"
 				@register-agent="handleRegisterAgent"
 				@remove-agent="removeAgent"
 				@save-editor="saveEditorSettings"
 				@add-person-alias="addPersonAlias"
 				@remove-person-alias="removePersonAlias"
+				@save-project-color="saveProjectColor"
+				@choose-project-icon="chooseProjectIcon"
+				@save-project-icon="saveProjectIcon"
 				@remove-project="activeProject && removeProject(activeProject.projectPath)"
 			/>
 
@@ -1107,11 +1216,15 @@ onBeforeUnmount(() => {
 				:board-count="boards.length"
 				:custom-fields="customFields"
 				:field-type-options="fieldTypeOptions"
+				:archived-cards="archivedCards"
+				:archived-columns="archivedColumns"
 				@close="closeBoardSettings"
 				@delete-board="snapshot && deleteBoard(snapshot.board.id)"
 				@save-board-name="saveBoardName"
 				@add-custom-field="addCustomField"
 				@remove-custom-field="removeCustomField"
+				@restore-card="restoreCard"
+				@restore-column="restoreColumn"
 			/>
 
 			<BoardCreateModal
@@ -1130,6 +1243,8 @@ onBeforeUnmount(() => {
 				v-model:agent-description="agentDescriptionDraft"
 				:open="onboardingOpen"
 				:snapshot="snapshot"
+				:known-people="snapshot?.metadata.people ?? []"
+				:known-agents="snapshot?.metadata.agents ?? appSettings.agents"
 				@close="onboardingOpen = false"
 				@complete="completeOnboarding"
 			/>
@@ -1138,7 +1253,7 @@ onBeforeUnmount(() => {
 		<ConfirmDialog
 			v-if="confirmation"
 			v-model:open="confirmDialogOpen"
-			:title="confirmation.title"
+			:heading="confirmation.title"
 			:description="confirmation.description"
 			:confirm-label="confirmation.confirmLabel"
 			:destructive="confirmation.destructive"

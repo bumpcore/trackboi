@@ -5,15 +5,15 @@ title: "Remove type prefixes from generated ids"
 parentId: null
 scope: {"kind":"project","ref":"global"}
 trackId: null
-column: "backlog"
+column: "done"
 rank: "j"
 labels: []
 assignee: null
 fieldValues: {}
 createdAt: "2026-05-07T11:33:48.779Z"
-updatedAt: "2026-05-07T11:33:48.779Z"
+updatedAt: "2026-05-08T19:10:18.853Z"
 createdBy: "agent_01KQY2VDKCWA3AEM5TF72W00FB"
-updatedBy: "agent_01KQY2VDKCWA3AEM5TF72W00FB"
+updatedBy: "agent_01KQWVZPDMN9AD0487WVC87EKX"
 ---
 Stop using ids like `card-slug-suffixid` or `agent_ULID` as primary identifiers. Use plain ids for entities, and use polymorphic keys only when a value needs type context.
 

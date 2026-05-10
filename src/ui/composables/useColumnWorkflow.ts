@@ -33,7 +33,7 @@ function columnIdFromName(name: string) {
 		.replace(/[^a-z0-9]+/g, "-")
 		.replace(/^-|-$/g, "");
 
-	return slug || `column-${newId("column").slice(-8)}`;
+	return slug || newId("column").slice(-8).toLowerCase();
 }
 
 function previousColumnId(columns: Column[], columnId: string): string {
@@ -192,7 +192,7 @@ export function useColumnWorkflow(options: {
 		if (panelMode.value === "create") {
 			let id = columnIdFromName(name);
 			const existingIds = new Set(snapshot.board.columns.map((column) => column.id));
-			if (existingIds.has(id)) id = `${id}-${newId("column").slice(-6)}`;
+			if (existingIds.has(id)) id = `${id}-${newId("column").slice(-6).toLowerCase()}`;
 			const nextColumn: Column = { id, name };
 			await updateBoardColumns(insertColumn(snapshot.board.columns, nextColumn, insertAfterId.value));
 			panelMode.value = "edit";

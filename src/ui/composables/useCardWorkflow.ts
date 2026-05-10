@@ -36,6 +36,8 @@ type CardWorkflow = {
 	submitCard(): Promise<void>;
 	addComment(): Promise<void>;
 	deleteCard(card: TrackboiCard): Promise<void>;
+	archiveCard(card: TrackboiCard): Promise<void>;
+	restoreCard(card: TrackboiCard): Promise<void>;
 	createSubtask(): Promise<void>;
 };
 
@@ -231,6 +233,27 @@ export function useCardWorkflow(options: {
 		});
 	}
 
+	async function archiveCard(card: TrackboiCard) {
+		options.requestConfirmation({
+			title: `Archive ${card.title}?`,
+			description: "The card stays in storage and can be restored from board settings.",
+			confirmLabel: "Archive",
+			onConfirm: async () => {
+				await options.run(async () => {
+					const updated = await desktop.updateCard(card.id, { archivedAt: new Date().toISOString() });
+					options.upsertCard(updated);
+					if (selectedCard.value?.id === card.id) closeCardPanel();
+				});
+			},
+		});
+	}
+
+	async function restoreCard(card: TrackboiCard) {
+		await options.run(async () => {
+			options.upsertCard(await desktop.updateCard(card.id, { archivedAt: null }));
+		});
+	}
+
 	async function createSubtask() {
 		if (!selectedCard.value) return;
 		const title = subtaskTitle.value.trim();
@@ -263,6 +286,8 @@ export function useCardWorkflow(options: {
 		submitCard,
 		addComment,
 		deleteCard,
+		archiveCard,
+		restoreCard,
 		createSubtask,
 	};
 }

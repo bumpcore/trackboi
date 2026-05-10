@@ -35,6 +35,8 @@ function createTrackboiBridge(overrides: Partial<TrackboiBridgeApi> = {}): Track
 		setActiveBoard: async () => ({ snapshot: null, view: { sources: [], activeProjectPath: null, storageSearchPaths: [] }, worktrees: [], selectedWorktreeId: null, selectedBoardId: null }),
 		readAppSettings: async () => ({ version: 1, agents: [], agentContexts: [], editor: { preferredEditorId: "auto", customCommand: "" } }),
 		updateAppSettings: async (settings) => settings,
+		listGitChanges: async () => ({ repoRoot: "/repo", defaultPaths: [".trackboi"], changes: [] }),
+		commitGitChanges: async (input) => ({ ok: true, commit: "abc1234", message: input.message, paths: input.paths ?? [".trackboi"] }),
 		listDetectedEditors: async () => [],
 		openCardInEditor: async () => ({ ok: true }),
 		setStorageSearchPaths: async () => ({ sources: [], activeProjectPath: null, storageSearchPaths: [] }),
@@ -42,6 +44,7 @@ function createTrackboiBridge(overrides: Partial<TrackboiBridgeApi> = {}): Track
 		createBoard: async () => ({ project: {} as never, metadata: {} as never, git: {} as never, board: { id: "default", version: 1, name: "Board", columns: [], customFields: [] }, boards: [], tracks: [], cards: [] }),
 		deleteBoard: async () => ({ project: {} as never, metadata: {} as never, git: {} as never, board: { id: "default", version: 1, name: "Board", columns: [], customFields: [] }, boards: [], tracks: [], cards: [] }),
 		openWorkspaceFile: async () => null,
+		chooseProjectIconFile: async () => null,
 		chooseProject: async () => null,
 		locateProject: async () => null,
 		removeProject: async () => null,
@@ -85,6 +88,14 @@ function createTrackboiBridge(overrides: Partial<TrackboiBridgeApi> = {}): Track
 			updatedBy: "person_unknown",
 		}),
 		updateBoard: async () => ({ id: "default", version: 1, name: "Board", columns: [], customFields: [] }),
+		updateProjectSettings: async (patch) => ({
+			version: 1,
+			name: "Project",
+			color: patch.color ?? null,
+			iconPath: patch.iconPath ?? null,
+			people: [],
+			agents: [],
+		}),
 		updateProjectPeople: async () => ({
 			version: 1,
 			name: "Project",
@@ -203,12 +214,39 @@ describe("electron adapters", () => {
 		expect(getActiveProject).not.toHaveBeenCalled();
 	});
 
+	test("desktop facade delegates git commit actions through the bridge", async () => {
+		const listGitChanges = mock(async () => ({
+			repoRoot: "/repo",
+			defaultPaths: [".trackboi"],
+			changes: [{ path: ".trackboi/cards/card/index.md", indexStatus: " ", worktreeStatus: "M" }],
+		}));
+		const commitGitChanges = mock(async () => ({ ok: true as const, commit: "abc1234", message: "Update board", paths: [".trackboi"] }));
+		const desktop = createDesktopFacade(createTrackboiBridge({ listGitChanges, commitGitChanges }), createWindowBridge());
+
+		const changes = await desktop.listGitChanges();
+		const result = await desktop.commitGitChanges({ message: "Update board" });
+
+		expect(changes.changes[0]?.path).toBe(".trackboi/cards/card/index.md");
+		expect(result.commit).toBe("abc1234");
+		expect(listGitChanges).toHaveBeenCalledTimes(1);
+		expect(commitGitChanges).toHaveBeenCalledWith({ message: "Update board", paths: undefined });
+	});
+
 	test("window shell delegates to the dedicated window bridge", async () => {
+		const minimize = mock(async () => {});
+		const toggleMaximize = mock(async () => {});
+		const close = mock(async () => {});
 		const startResize = mock(async (_edge: string) => {});
-		const bridge = createWindowBridge({ startResize });
+		const bridge = createWindowBridge({ minimize, toggleMaximize, close, startResize });
 		const windowShell = createWindowShell(bridge);
 
+		await windowShell.minimize();
+		await windowShell.toggleMaximize();
+		await windowShell.close();
 		await windowShell.startResize("se");
+		expect(minimize).toHaveBeenCalledTimes(1);
+		expect(toggleMaximize).toHaveBeenCalledTimes(1);
+		expect(close).toHaveBeenCalledTimes(1);
 		expect(startResize).toHaveBeenCalledWith("se");
 	});
 

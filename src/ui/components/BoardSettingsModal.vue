@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { onBeforeUnmount, watch } from "vue";
-import { Trash2, X } from "lucide-vue-next";
-import type { CustomField, FieldType, ProjectSnapshot } from "@/core/types";
+import { RotateCcw, Trash2, X } from "lucide-vue-next";
+import type { Card, Column, CustomField, FieldType, ProjectSnapshot } from "@/core/types";
 import Button from "@/ui/components/Button.vue";
 import Input from "@/ui/components/Input.vue";
 import Select, { type SelectOption } from "@/ui/components/Select.vue";
+import Tooltip from "@/ui/components/Tooltip.vue";
 
 const props = defineProps<{
 	open: boolean;
@@ -13,6 +14,8 @@ const props = defineProps<{
 	boardCount: number;
 	customFields: CustomField[];
 	fieldTypeOptions: SelectOption[];
+	archivedCards: Card[];
+	archivedColumns: Column[];
 }>();
 
 const boardNameDraft = defineModel<string>("boardNameDraft", { required: true });
@@ -26,6 +29,8 @@ const emit = defineEmits<{
 	saveBoardName: [];
 	addCustomField: [];
 	removeCustomField: [fieldId: string];
+	restoreCard: [card: Card];
+	restoreColumn: [columnId: string];
 }>();
 
 function handleEscapeKey(event: KeyboardEvent) {
@@ -64,9 +69,11 @@ onBeforeUnmount(() => {
 							Adjust the board name and board-owned fields. Columns stay on the canvas and right panel.
 						</p>
 					</div>
-					<Button variant="ghost" size="icon" type="button" class="rounded-[2px]" title="Close" aria-label="Close" @click="emit('close')">
-						<X class="h-4 w-4" />
-					</Button>
+					<Tooltip content="Close" side="left">
+						<Button variant="ghost" size="icon" type="button" class="rounded-[2px]" aria-label="Close" @click="emit('close')">
+							<X class="h-4 w-4" />
+						</Button>
+					</Tooltip>
 				</header>
 
 				<div v-if="snapshot" class="grid content-start gap-6">
@@ -107,9 +114,11 @@ onBeforeUnmount(() => {
 											{{ field.type }}{{ field.options?.length ? `: ${field.options.join(", ")}` : "" }}
 										</p>
 									</div>
-									<Button variant="ghost" size="icon" type="button" class="rounded-none text-muted-foreground hover:text-destructive" title="Remove field" aria-label="Remove field" :disabled="busy" @click="emit('removeCustomField', field.id)">
-										<Trash2 class="h-4 w-4" />
-									</Button>
+									<Tooltip content="Remove field" side="left">
+										<Button variant="ghost" size="icon" type="button" class="rounded-none text-muted-foreground hover:text-destructive" aria-label="Remove field" :disabled="busy" @click="emit('removeCustomField', field.id)">
+											<Trash2 class="h-4 w-4" />
+										</Button>
+									</Tooltip>
 								</div>
 							</div>
 
@@ -138,6 +147,55 @@ onBeforeUnmount(() => {
 									</Button>
 								</div>
 							</form>
+						</section>
+
+						<section class="grid gap-4 bg-background/12 p-4">
+							<div>
+								<h3 class="text-sm font-semibold text-foreground">Archived</h3>
+								<p class="mt-1 text-sm leading-6 text-muted-foreground">Restore hidden cards and columns without touching their files.</p>
+							</div>
+
+							<div v-if="archivedColumns.length > 0 || archivedCards.length > 0" class="grid gap-3">
+								<div v-if="archivedColumns.length > 0" class="grid border border-border/50">
+									<div
+										v-for="column in archivedColumns"
+										:key="column.id"
+										class="flex items-center justify-between gap-3 border-b border-border/35 bg-secondary/35 px-3 py-3 last:border-b-0"
+									>
+										<div class="min-w-0">
+											<p class="truncate text-sm font-medium text-foreground">{{ column.name }}</p>
+											<p class="mt-1 truncate text-xs text-muted-foreground">Column · {{ column.id }}</p>
+										</div>
+										<Tooltip content="Restore column" side="left">
+											<Button variant="ghost" size="icon" type="button" class="rounded-none text-muted-foreground hover:text-foreground" aria-label="Restore column" :disabled="busy" @click="emit('restoreColumn', column.id)">
+												<RotateCcw class="h-4 w-4" />
+											</Button>
+										</Tooltip>
+									</div>
+								</div>
+
+								<div v-if="archivedCards.length > 0" class="grid border border-border/50">
+									<div
+										v-for="card in archivedCards"
+										:key="card.id"
+										class="flex items-center justify-between gap-3 border-b border-border/35 bg-secondary/35 px-3 py-3 last:border-b-0"
+									>
+										<div class="min-w-0">
+											<p class="truncate text-sm font-medium text-foreground">{{ card.title }}</p>
+											<p class="mt-1 truncate text-xs text-muted-foreground">Card · {{ snapshot?.board.columns.find((column) => column.id === card.column)?.name ?? card.column }}</p>
+										</div>
+										<Tooltip content="Restore card" side="left">
+											<Button variant="ghost" size="icon" type="button" class="rounded-none text-muted-foreground hover:text-foreground" aria-label="Restore card" :disabled="busy" @click="emit('restoreCard', card)">
+												<RotateCcw class="h-4 w-4" />
+											</Button>
+										</Tooltip>
+									</div>
+								</div>
+							</div>
+
+							<div v-else class="border border-dashed border-border/75 bg-background/20 px-4 py-4 text-sm text-muted-foreground">
+								No archived items.
+							</div>
 						</section>
 
 						<section v-if="boardCount > 1" class="grid gap-4 border border-destructive/20 bg-destructive/5 p-4">
